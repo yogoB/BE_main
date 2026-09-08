@@ -69,6 +69,8 @@
 | 한국어 | 식별자 | 비고 |
 |---|---|---|
 | 카탈로그 시드 로더 | `CatalogSeedLoader` | `catalog` 내부, CSV 스냅샷 적재 |
+| 통신 요금제 로더 | `loadMobilePlans` | 통신사 이름 파생·망 매핑·(carrier_id,name) 업서트, 파일 있을 때만 |
+| 통신사 종류 파생 | `carrier_type` | SKT/KT/LGU+ → `MNO`, 그 외 → `MVNO` (템플릿에 없어 이름으로 파생) |
 | 카탈로그 읽기 계층 | `CatalogReader` | `catalog` 내부, DB 행 → pricing 도메인 매핑 (읽기 전용) |
 | 대표 티어 | `findRepresentativeTiers` | 서비스 → 티어 선정: 스탠다드(광고 제외) → 광고 제외 최저가 → 최저가 |
 | 번들 구성 | `bundle_item` / `tier_ids` | DB 관계 테이블 / 시드 CSV의 티어 ID 목록 |
