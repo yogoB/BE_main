@@ -73,6 +73,10 @@
 | 제휴 혜택 로더 | `loadPlanBenefits` | 요금제 자연키(carrier,plan_name) 해석, 요금제별 혜택 교체(멱등), 미매칭 시 전체 실패 |
 | 통신사 종류 파생 | `carrier_type` | SKT/KT/LGU+ → `MNO`, 그 외 → `MVNO` (템플릿에 없어 이름으로 파생) |
 | 카탈로그 읽기 계층 | `CatalogReader` | `catalog` 내부, DB 행 → pricing 도메인 매핑 (읽기 전용) |
+| 개발용 더미 시드 로더 | `DevSeedLoader` | dev 프로파일 전용, `db/seed/dev/` 더미 적재 (로컬 bootRun) |
+| 중복 결제 탐지기 | `DuplicateDetector` | `detection` 순수 도메인, 세 규칙 독립 적용 |
+| 활성 구독 | `ActiveSubscription` | 탐지 입력 — 현재 결제 중인 구독(서비스·티어·월액) |
+| 탐지 결과 | `DetectionFinding` | 규칙·대상·월 낭비액 (DB `DetectionResult`와 구분되는 도메인 값) |
 | 대표 티어 | `findRepresentativeTiers` | 서비스 → 티어 선정: 스탠다드(광고 제외) → 광고 제외 최저가 → 최저가 |
 | 번들 구성 | `bundle_item` / `tier_ids` | DB 관계 테이블 / 시드 CSV의 티어 ID 목록 |
 | 티어 비고 | `note` | 시드 원문 보존 |
