@@ -69,6 +69,8 @@
 | 한국어 | 식별자 | 비고 |
 |---|---|---|
 | 카탈로그 시드 로더 | `CatalogSeedLoader` | `catalog` 내부, CSV 스냅샷 적재 |
+| 카탈로그 읽기 계층 | `CatalogReader` | `catalog` 내부, DB 행 → pricing 도메인 매핑 (읽기 전용) |
+| 대표 티어 | `findRepresentativeTiers` | 서비스 → 티어 선정: 스탠다드(광고 제외) → 광고 제외 최저가 → 최저가 |
 | 번들 구성 | `bundle_item` / `tier_ids` | DB 관계 테이블 / 시드 CSV의 티어 ID 목록 |
 | 티어 비고 | `note` | 시드 원문 보존 |
 | 번들 제공자 | `provider` | 시드 원문 보존 |
