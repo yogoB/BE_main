@@ -1,0 +1,6 @@
+#!/bin/sh
+[ "${YOGOBI_SKIP_TRACKING:-0}" = "1" ] && exit 0
+root=$(git rev-parse --show-toplevel) || exit 0
+python3 "$root/scripts/knowledge.py" sync || {
+    printf '%s\n' '[yogobi] 기록 동기화 실패. python3 scripts/knowledge.py sync 로 재시도하세요.' >&2
+}

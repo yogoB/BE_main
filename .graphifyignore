@@ -1,0 +1,6 @@
+# Generated files are not source material.
+# (로컬 도구 심링크·백업 파일은 git ignore/exclude 로 처리한다)
+build/
+.gradle/
+graphify-out/
+**/__pycache__/

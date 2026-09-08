@@ -1,0 +1,17 @@
+.env
+.env.*
+!.env.example
+build/
+.gradle/
+out/
+graphify-out/
+.DS_Store
+.idea/
+*.iml
+__pycache__/
+*.bak
+
+# 팀 내부 기획 문서 — Private 레포지만 협업자 초대 대비 git에서 제외
+docs/project.md
+docs/worklog.md
+docs/state.md
