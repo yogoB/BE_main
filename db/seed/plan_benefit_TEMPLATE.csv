@@ -1,0 +1,5 @@
+carrier,plan_name,service_id,tier_id,benefit_type,discount_value,is_exclusive,exclusive_group,valid_from,valid_to,source_url,collected_at
+SKT,5G 슬림+,1,2,FREE,,false,,,,https://www.smartchoice.or.kr/smc/plan/ottPdt.do,2026-09-07
+KT,5G 심플,3,,FIXED_DISCOUNT,4000,false,,,,https://www.smartchoice.or.kr/smc/plan/ottPdt.do,2026-09-07
+LGU+,5G 프리미어,1,2,FREE,,true,OTT_PICK_ONE,,,https://www.smartchoice.or.kr/smc/plan/ottPdt.do,2026-09-07
+LGU+,5G 프리미어,4,12,FREE,,true,OTT_PICK_ONE,,,https://www.smartchoice.or.kr/smc/plan/ottPdt.do,2026-09-07

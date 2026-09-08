@@ -35,3 +35,15 @@ CSV는 `mobile_plan_TEMPLATE.csv` 헤더·순서를 그대로 쓴다. 로더가 
 - `network_type` `5G`/`LTE`/`3G` → `FIVE_G`/`LTE`/`THREE_G`로 매핑한다.
 - `source_url`이 빈 행은 병합하지 않는다(건너뜀). 그 외 잘못된 값(음수 가격 등)은 전체 롤백·기동 실패.
 - CSV에 `id`가 없으므로 `(carrier_id, name)` 기준으로 추가·갱신한다(재실행 시 중복 없음).
+
+## 제휴 혜택 (`plan_benefit.csv`)
+
+D3 크롤링 결과를 정리한 CSV. `plan_benefit_TEMPLATE.csv` 헤더를 쓴다. 요금제 다음에 적재한다.
+
+- 요금제는 자연키 `(carrier, plan_name)`로 참조한다(크롤러는 내부 요금제 ID를 모른다).
+  매칭되는 `mobile_plan`이 없는 행이 하나라도 있으면 **전체 실패**한다(혜택 누락은 잘못된 추천).
+  → `mobile_plan.csv`와 통신사·요금제명 표기를 정확히 맞춘다.
+- `service_id`/`tier_id`는 고정 시드 ID(넷플1·디즈니2·티빙3·웨이브4·왓챠5·유튜브6). `tier_id`는 비우면 서비스 전체.
+- `benefit_type`·`discount_value`·`is_exclusive`/`exclusive_group` 정합성은 DB CHECK가 검증한다
+  (FREE/BUNDLE_INCLUDED는 값 없음, FIXED는 정수 원, RATE는 0~1, exclusive면 group 필수).
+- `source_url` 빈 행은 병합하지 않는다. 재실행 시 **CSV가 다루는 요금제의 혜택만 교체**한다(bundle_item과 동일).
