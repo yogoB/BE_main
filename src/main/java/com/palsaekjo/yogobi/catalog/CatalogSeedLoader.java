@@ -8,11 +8,13 @@ import javax.sql.DataSource;
 import org.postgresql.PGConnection;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.core.annotation.Order;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
 
 @Component
+@Order(1)
 public class CatalogSeedLoader implements ApplicationRunner {
     private static final List<String> TABLES = List.of(
             "subscription_service", "subscription_tier", "bundle_product");

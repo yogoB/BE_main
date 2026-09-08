@@ -33,7 +33,7 @@ dependencies {
 tasks.named('processResources') {
     from('db') {
         into 'db'
-        include 'migration/*.sql', 'seed/*.csv'
+        include 'migration/*.sql', 'seed/*.csv', 'seed/dev/*.csv'
         exclude 'seed/*_TEMPLATE.csv'
     }
 }

@@ -47,3 +47,14 @@ D3 크롤링 결과를 정리한 CSV. `plan_benefit_TEMPLATE.csv` 헤더를 쓴�
 - `benefit_type`·`discount_value`·`is_exclusive`/`exclusive_group` 정합성은 DB CHECK가 검증한다
   (FREE/BUNDLE_INCLUDED는 값 없음, FIXED는 정수 원, RATE는 0~1, exclusive면 group 필수).
 - `source_url` 빈 행은 병합하지 않는다. 재실행 시 **CSV가 다루는 요금제의 혜택만 교체**한다(bundle_item과 동일).
+
+## 로컬 개발용 더미 (`db/seed/dev/`)
+
+실제 D3/D4 데이터가 오기 전, 로컬에서 추천/탐지를 눈으로 확인하려면 `db/seed/dev/`에 더미
+`mobile_plan.csv`·`plan_benefit.csv`를 둔다(gitignore, 커밋 안 함). `DevSeedLoader`가 **dev 프로파일에서만** 적재한다.
+
+```bash
+SPRING_PROFILES_ACTIVE=dev ./gradlew bootRun
+```
+
+테스트는 dev 프로파일을 켜지 않으므로 영향 없다. 실제 데이터는 `db/seed/`(prod 경로)로 커밋하면 모든 프로파일에서 적재된다.
