@@ -75,6 +75,8 @@
 | 카탈로그 읽기 계층 | `CatalogReader` | `catalog` 내부, DB 행 → pricing 도메인 매핑 (읽기 전용) |
 | 개발용 더미 시드 로더 | `DevSeedLoader` | dev 프로파일 전용, `db/seed/dev/` 더미 적재 (로컬 bootRun) |
 | 중복 결제 탐지기 | `DuplicateDetector` | `detection` 순수 도메인, 세 규칙 독립 적용 |
+| 탐지 응용 서비스 | `DetectionService` | 활성 구독·현재 요금제 혜택·번들 로드 → 탐지 → 저장 |
+| 사용자(예약어 회피) | `app_user` | `user` 는 PostgreSQL 예약어. `current_plan_id` 로 현재 요금제 |
 | 활성 구독 | `ActiveSubscription` | 탐지 입력 — 현재 결제 중인 구독(서비스·티어·월액) |
 | 탐지 결과 | `DetectionFinding` | 규칙·대상·월 낭비액 (DB `DetectionResult`와 구분되는 도메인 값) |
 | 대표 티어 | `findRepresentativeTiers` | 서비스 → 티어 선정: 스탠다드(광고 제외) → 광고 제외 최저가 → 최저가 |

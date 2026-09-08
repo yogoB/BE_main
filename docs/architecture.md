@@ -163,10 +163,12 @@ CREATE TABLE plan_benefit (
 CREATE INDEX idx_plan_benefit_plan ON plan_benefit(mobile_plan_id);
 ```
 
-### Phase 1
-`user` · `user_subscription`(user_id, tier_id, started_at, ended_at, monthly_price, last_used_at)
+### Phase 1 (V2 마이그레이션)
+`app_user`(id, email, password_hash, **current_plan_id** → mobile_plan, created_at)
+— `user` 는 PostgreSQL 예약어라 `app_user`. `current_plan_id` 는 BENEFIT_OVERLAP 탐지에 쓰는 현재 요금제.
+· `user_subscription`(user_id, tier_id, started_at, ended_at, monthly_price, last_used_at)
 · `payment_record`(user_id, merchant_raw, service_id nullable, amount, paid_at, source)
-· `detection_result`(user_id, rule_code, target_ref, wasted_amount)
+· `detection_result`(user_id, rule_code, target_ref, wasted_amount, detected_at)
 
 ### Phase 2 (스키마만 선반영)
 `contract` · `promotion` · `alert_schedule`
