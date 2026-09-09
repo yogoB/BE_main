@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>요고비 BE 검증 목업</title>
+<style>
+  :root { --bg:#0f1220; --card:#1a1f36; --line:#2b3252; --fg:#e7eaf6; --mut:#9aa3c7; --acc:#6ea8fe; --ok:#4ade80; --bad:#f87171; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,-apple-system,"Apple SD Gothic Neo",sans-serif; background:var(--bg); color:var(--fg); }
+  header { padding:16px 20px; border-bottom:1px solid var(--line); display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+  header h1 { font-size:18px; margin:0; }
+  header .base { margin-left:auto; display:flex; gap:6px; align-items:center; font-size:13px; color:var(--mut); }
+  header input { background:var(--card); border:1px solid var(--line); color:var(--fg); border-radius:6px; padding:5px 8px; width:230px; }
+  main { max-width:1100px; margin:0 auto; padding:20px; display:grid; gap:18px; grid-template-columns:1fr 1fr; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; }
+  .card.full { grid-column:1/-1; }
+  .card h2 { margin:0 0 4px; font-size:15px; }
+  .card p.hint { margin:0 0 12px; font-size:12px; color:var(--mut); }
+  label { display:block; font-size:12px; color:var(--mut); margin:10px 0 4px; }
+  input[type=number], input[type=text], select { width:100%; background:var(--bg); border:1px solid var(--line); color:var(--fg); border-radius:8px; padding:8px; }
+  .row { display:flex; gap:10px; } .row > * { flex:1; }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:4px; }
+  .chip { display:flex; align-items:center; gap:5px; background:var(--bg); border:1px solid var(--line); border-radius:20px; padding:5px 10px; font-size:13px; cursor:pointer; }
+  button { margin-top:14px; background:var(--acc); color:#08122b; border:0; border-radius:8px; padding:9px 14px; font-weight:600; cursor:pointer; }
+  button.ghost { background:transparent; color:var(--acc); border:1px solid var(--line); }
+  .out { margin-top:14px; }
+  .status { font-size:12px; margin-bottom:8px; } .status.ok { color:var(--ok); } .status.bad { color:var(--bad); }
+  .plan { border:1px solid var(--line); border-radius:10px; padding:12px; margin-bottom:10px; }
+  .plan .top { display:flex; justify-content:space-between; align-items:baseline; gap:8px; }
+  .plan .name { font-weight:600; } .plan .carrier { font-size:12px; color:var(--mut); }
+  .plan .total { font-size:18px; font-weight:700; color:var(--acc); }
+  .plan .save { font-size:12px; color:var(--ok); }
+  .plan table { width:100%; border-collapse:collapse; margin-top:8px; font-size:12px; }
+  .plan td { padding:3px 0; border-top:1px solid var(--line); color:var(--mut); }
+  .plan td.amt { text-align:right; color:var(--fg); font-variant-numeric:tabular-nums; }
+  .neg { color:var(--ok) !important; }
+  .miss { font-size:12px; color:var(--mut); margin-top:8px; }
+  details { margin-top:10px; } summary { cursor:pointer; font-size:12px; color:var(--mut); }
+  pre { background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:10px; overflow:auto; font-size:11px; max-height:280px; }
+  .svcgrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:8px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>요고비 BE 검증 목업</h1>
+  <span style="font-size:12px;color:var(--mut)">동일 오리진 호출 — CORS 없이 백엔드 기능만 확인</span>
+  <span class="base">API base <input id="base" placeholder="(비움 = 현재 호스트)"></span>
+</header>
+
+<main>
+  <!-- 카탈로그 -->
+  <section class="card">
+    <h2>① 카탈로그</h2>
+    <p class="hint">GET /catalog/services · /catalog/plans</p>
+    <div class="row">
+      <button onclick="loadServices()">서비스+티어 조회</button>
+      <button class="ghost" onclick="loadPlans()">요금제 조회</button>
+    </div>
+    <div id="catOut" class="out"></div>
+  </section>
+
+  <!-- 추천 -->
+  <section class="card">
+    <h2>② 추천</h2>
+    <p class="hint">POST /recommendations · 원하는 서비스만 바꿔 순위 역전 확인</p>
+    <label>월 데이터(GB)</label>
+    <input id="recData" type="number" value="20" min="1">
+    <label>원하는 서비스 (서비스 조회하면 채워짐)</label>
+    <div id="recSvc" class="svcgrid"><span style="font-size:12px;color:var(--mut)">먼저 "서비스+티어 조회"</span></div>
+    <div class="row">
+      <div><label>약정</label><select id="recContract"><option value="">(미지정)</option><option>NONE</option><option>SELECTIVE_25</option><option>DEVICE_SUBSIDY</option></select></div>
+      <div><label>망</label><select id="recNet"><option value="">(미지정)</option><option>5G</option><option>LTE</option><option>3G</option></select></div>
+    </div>
+    <button onclick="recommend()">추천 받기</button>
+    <div id="recOut" class="out"></div>
+  </section>
+
+  <!-- 계산기 -->
+  <section class="card">
+    <h2>③ 계산기</h2>
+    <p class="hint">POST /calculator · 요금제 ID + 티어 ID들의 총비용</p>
+    <div class="row">
+      <div><label>요금제 ID</label><input id="calPlan" type="number" placeholder="예: 1"></div>
+      <div><label>티어 ID (쉼표)</label><input id="calTiers" type="text" placeholder="예: 8,12"></div>
+    </div>
+    <label>약정</label>
+    <select id="calContract"><option value="">(미지정)</option><option>NONE</option><option>SELECTIVE_25</option><option>DEVICE_SUBSIDY</option></select>
+    <button onclick="calculate()">계산</button>
+    <div id="calOut" class="out"></div>
+  </section>
+
+  <!-- 상태 -->
+  <section class="card">
+    <h2>④ 연결 상태</h2>
+    <p class="hint">서버 살아있는지 빠르게</p>
+    <button onclick="ping()">핑 (서비스 개수)</button>
+    <div id="pingOut" class="out"></div>
+  </section>
+</main>
+
+<script>
+const won = n => (n==null?'-':n.toLocaleString('ko-KR')+'원');
+const base = () => document.getElementById('base').value.trim().replace(/\/$/,'');
+async function api(path, opts) {
+  const res = await fetch(base()+path, opts);
+  let body; try { body = await res.json(); } catch { body = null; }
+  return { ok: res.ok, status: res.status, body };
+}
+function statusLine(r) {
+  const cls = r.ok ? 'ok' : 'bad';
+  const err = r.body && r.body.error;
+  const msg = err ? `${err.code} · ${err.message}` : `${r.status}`;
+  return `<div class="status ${cls}">${r.ok?'✔':'✖'} ${msg}</div>`;
+}
+function raw(r){ return `<details><summary>raw JSON</summary><pre>${JSON.stringify(r.body,null,2)}</pre></details>`; }
+
+let SERVICES = [];
+async function loadServices() {
+  const out = document.getElementById('catOut'); out.innerHTML = '조회 중…';
+  const r = await api('/api/v1/catalog/services');
+  out.innerHTML = statusLine(r) + raw(r);
+  if (r.ok) {
+    SERVICES = r.body.data;
+    document.getElementById('recSvc').innerHTML = SERVICES.map(s =>
+      `<label class="chip"><input type="checkbox" value="${s.id}"> ${s.name}</label>`).join('');
+  }
+}
+async function loadPlans() {
+  const out = document.getElementById('catOut'); out.innerHTML = '조회 중…';
+  const r = await api('/api/v1/catalog/plans');
+  let html = statusLine(r);
+  if (r.ok) html += `<div class="miss">요금제 ${r.body.data.length}건</div>` +
+    r.body.data.map(p=>`<div class="plan"><div class="top"><span class="name">${p.name} <span class="carrier">${p.carrier} · ${p.networkType}</span></span><span class="total">${won(p.basePrice)}</span></div></div>`).join('');
+  out.innerHTML = html + raw(r);
+}
+function renderResult(res) {
+  return `<div class="plan"><div class="top">
+      <span><span class="name">${res.planName}</span> <span class="carrier">${res.carrier}</span></span>
+      <span class="total">${won(res.monthlyTotal)}</span></div>
+      <div class="save">baseline ${won(res.baseline)} · 월 -${won(res.monthlySavings)} · 연 -${won(res.annualSavings)}</div>
+      <table>${res.breakdown.map(b=>`<tr><td>${b.label}${b.note?` <span style="color:var(--mut)">(${b.note})</span>`:''}</td><td class="amt ${b.amount<0?'neg':''}">${won(b.amount)}</td></tr>`).join('')}</table></div>`;
+}
+function missBox(m){ return m&&m.length?`<div class="miss">missingInputs: ${m.map(x=>x.field).join(', ')}</div>`:''; }
+
+async function recommend() {
+  const out = document.getElementById('recOut'); out.innerHTML = '요청 중…';
+  const ids = [...document.querySelectorAll('#recSvc input:checked')].map(e=>+e.value);
+  const opt = {};
+  const c = document.getElementById('recContract').value; if(c) opt.contractType=c;
+  const n = document.getElementById('recNet').value; if(n) opt.networkType=n;
+  const req = { required:{ monthlyDataGb:+document.getElementById('recData').value, wantedServiceIds:ids }, optional:opt };
+  const r = await api('/api/v1/recommendations', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(req)});
+  let html = statusLine(r);
+  if (r.ok) html += `<div class="miss">accuracy: ${r.body.data.accuracy}</div>` + missBox(r.body.data.missingInputs) + r.body.data.results.map(renderResult).join('');
+  out.innerHTML = html + raw(r);
+}
+async function calculate() {
+  const out = document.getElementById('calOut'); out.innerHTML = '요청 중…';
+  const tiers = document.getElementById('calTiers').value.split(',').map(s=>+s.trim()).filter(Boolean);
+  const opt = {}; const c = document.getElementById('calContract').value; if(c) opt.contractType=c;
+  const req = { planId:+document.getElementById('calPlan').value, tierIds:tiers, optional:opt };
+  const r = await api('/api/v1/calculator', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(req)});
+  let html = statusLine(r);
+  if (r.ok) html += `<div class="miss">accuracy: ${r.body.data.accuracy}</div>` + renderResult(r.body.data.result);
+  out.innerHTML = html + raw(r);
+}
+async function ping() {
+  const out = document.getElementById('pingOut'); out.innerHTML = '…';
+  const r = await api('/api/v1/catalog/services');
+  out.innerHTML = statusLine(r) + (r.ok?`<div class="miss">서비스 ${r.body.data.length}건 · 서버 정상</div>`:'');
+}
+loadServices();
+</script>
+</body>
+</html>
