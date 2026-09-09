@@ -220,8 +220,9 @@ Flyway `db/migration/V{n}__{설명}.sql`.
 ### Definition of Done
 1. 골든 케이스 또는 단위 테스트 green
 2. API를 추가했으면 §3 표 갱신 (+ AI- 레포 사본)
-3. 새 개념을 만들었으면 `docs/domain.md` §2에 등록
-4. `docs/state.md` 갱신
-5. `docker compose down -v && up`으로 처음부터 재현
+3. **API 요청/응답이 바뀌면 `docs/BE_API.md`(프론트 참고본) 갱신**
+4. 새 개념을 만들었으면 `docs/domain.md` §2에 등록
+5. `docs/state.md` 갱신
+6. `docker compose down -v && up`으로 처음부터 재현
 
-5번이 자주 빠진다. 내 로컬 DB에만 있는 데이터로 동작하면 완료가 아니다.
+6번이 자주 빠진다. 내 로컬 DB에만 있는 데이터로 동작하면 완료가 아니다.
