@@ -69,6 +69,9 @@
 | 한국어 | 식별자 | 비고 |
 |---|---|---|
 | 카탈로그 시드 로더 | `CatalogSeedLoader` | `catalog` 내부, CSV 스냅샷 적재 |
+| AI 서버 게이트웨이 | `AiGateway` | `/parse`·`/narrate` HTTP 호출과 응답 검증 |
+| 챗봇 요청 진입점 | `ChatController` | 기존 추천 서비스 재사용, 추가 입력·필터 폴백 안내 |
+| 챗봇 응답 | `ChatResponse` | `status`, `message`, `recommendation` |
 | 통신 요금제 로더 | `loadMobilePlans` | 통신사 이름 파생·망 매핑·(carrier_id,name) 업서트, 파일 있을 때만 |
 | 제휴 혜택 로더 | `loadPlanBenefits` | 요금제 자연키(carrier,plan_name) 해석, 요금제별 혜택 교체(멱등), 미매칭 시 전체 실패 |
 | 통신사 종류 파생 | `carrier_type` | SKT/KT/LGU+ → `MNO`, 그 외 → `MVNO` (템플릿에 없어 이름으로 파생) |
@@ -79,6 +82,8 @@
 | 사용자(예약어 회피) | `app_user` | `user` 는 PostgreSQL 예약어. `current_plan_id` 로 현재 요금제 |
 | 활성 구독 | `ActiveSubscription` | 탐지 입력 — 현재 결제 중인 구독(서비스·티어·월액) |
 | 탐지 결과 | `DetectionFinding` | 규칙·대상·월 낭비액 (DB `DetectionResult`와 구분되는 도메인 값) |
+| 가맹점 정규화기 | `MerchantNormalizer` | `subscription` 순수 도메인, 가맹점 원문 → service_id (모르면 empty) |
+| 별칭 매칭 방식 | `MatchType` | `CONTAINS` `PREFIX` (common enum) |
 | 대표 티어 | `findRepresentativeTiers` | 서비스 → 티어 선정: 스탠다드(광고 제외) → 광고 제외 최저가 → 최저가 |
 | 번들 구성 | `bundle_item` / `tier_ids` | DB 관계 테이블 / 시드 CSV의 티어 ID 목록 |
 | 티어 비고 | `note` | 시드 원문 보존 |
