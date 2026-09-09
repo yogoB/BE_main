@@ -54,7 +54,7 @@
     <h2>① 카탈로그</h2>
     <p class="hint">GET /catalog/services · /catalog/plans</p>
     <div class="row">
-      <button onclick="loadServices()">서비스·OTT 등급 조회</button>
+      <button onclick="loadServices()">서비스·구독 등급 조회</button>
       <button class="ghost" onclick="loadPlans()">요금제 조회</button>
     </div>
     <div id="catOut" class="out"></div>
@@ -67,7 +67,7 @@
     <label>월 데이터(GB)</label>
     <input id="recData" type="number" value="20" min="1">
     <label>원하는 서비스 (서비스 조회하면 채워짐)</label>
-    <div id="recSvc" class="svcgrid"><span style="font-size:12px;color:var(--mut)">먼저 "서비스·OTT 등급 조회"</span></div>
+    <div id="recSvc" class="svcgrid"><span style="font-size:12px;color:var(--mut)">먼저 "서비스·구독 등급 조회"</span></div>
     <div class="row">
       <div><label>약정</label><select id="recContract"><option value="">(미지정)</option><option>NONE</option><option>SELECTIVE_25</option><option>DEVICE_SUBSIDY</option></select></div>
       <div><label>망</label><select id="recNet"><option value="">(미지정)</option><option>5G</option><option>LTE</option><option>3G</option></select></div>
@@ -79,10 +79,10 @@
   <!-- 계산기 -->
   <section class="card">
     <h2>③ 계산기</h2>
-    <p class="hint">POST /calculator · 요금제 ID + OTT 등급 ID들의 총비용</p>
+    <p class="hint">POST /calculator · 요금제 ID + 구독 등급 ID들의 총비용</p>
     <div class="row">
       <div><label>요금제 ID</label><input id="calPlan" type="number" placeholder="예: 1"></div>
-      <div><label>OTT 등급 ID (쉼표)</label><input id="calTiers" type="text" placeholder="예: 8,12"></div>
+      <div><label>구독 등급 ID (쉼표)</label><input id="calTiers" type="text" placeholder="예: 8,12"></div>
     </div>
     <label>약정</label>
     <select id="calContract"><option value="">(미지정)</option><option>NONE</option><option>SELECTIVE_25</option><option>DEVICE_SUBSIDY</option></select>

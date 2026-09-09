@@ -81,14 +81,14 @@ public class RecommendationService {
             throw ApiException.requiredMissing("planId", "요금제 ID가 필요합니다.");
         }
         if (request.tierIds() == null || request.tierIds().isEmpty()) {
-            throw ApiException.requiredMissing("tierIds", "OTT 등급을 하나 이상 지정하세요.");
+            throw ApiException.requiredMissing("tierIds", "구독 등급을 하나 이상 지정하세요.");
         }
         var candidate = catalog.findPlanById(request.planId())
                 .orElseThrow(() -> ApiException.planNotFound("요금제를 찾을 수 없습니다: " + request.planId()));
 
         List<SubscriptionTier> tiers = catalog.findTiersByIds(request.tierIds());
         if (tiers.size() != request.tierIds().stream().distinct().count()) {
-            throw ApiException.requiredMissing("tierIds", "존재하지 않는 OTT 등급 ID가 포함됐습니다.");
+            throw ApiException.requiredMissing("tierIds", "존재하지 않는 구독 등급 ID가 포함됐습니다.");
         }
         Set<SubscriptionTier> wanted = new LinkedHashSet<>(tiers);
         Set<Long> wantedTierIds = new LinkedHashSet<>(tiers.stream().map(SubscriptionTier::id).toList());
