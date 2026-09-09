@@ -11,7 +11,7 @@
 | 공통 프리픽스 | `/api/v1` |
 | 인증 | **현재 없음** — 모든 엔드포인트 공개(비회원). `/me`·`/auth`(회원 기능)는 미구현 |
 | 콘텐츠 타입 | `application/json` (UTF-8) |
-| CORS | 로컬 `localhost:*` 기본 허용. 프론트 배포 도메인은 서버 env `YOGOBI_CORS_ALLOWED_ORIGINS`로 추가 |
+| CORS | 로컬 `localhost:*` + 배포 오리진(`https://yogob.fly.dev`) 허용. 프론트 도메인은 env `YOGOBI_CORS_ALLOWED_ORIGINS`로 추가 |
 
 ---
 
