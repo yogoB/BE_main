@@ -148,7 +148,8 @@
 
 ## 2. 계산기 — `POST /api/v1/calculator`
 
-특정 조합(요금제 + 티어들)의 총비용. 추천과 달리 **티어를 직접 지정**한다(대표 티어 자동선정 없음).
+특정 조합(요금제 + OTT 등급들)의 총비용. 추천과 달리 **OTT 등급을 직접 지정**한다(대표 등급 자동선정 없음).
+> 사용자 노출 용어는 "OTT 등급". API 필드명은 `tierId`/`tierIds` 그대로다(구독 티어 = OTT 등급).
 
 ### 요청
 
@@ -163,7 +164,7 @@
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|---|---|
 | `planId` | long | ✅ | 통신 요금제 ID |
-| `tierIds` | long[] (≥1개) | ✅ | 구독 티어 ID들 |
+| `tierIds` | long[] (≥1개) | ✅ | OTT 등급 ID들 (구독 티어) |
 | `optional` | object | | 추천과 동일(`contractType`·`hasFamilyBundle`·`currentCarrier`·`networkType`) |
 
 ### 응답 200
@@ -188,14 +189,14 @@
 
 ### 에러
 
-- `400 YGB-REQ-001` — `planId` 누락, `tierIds` 비었거나 없는 티어 ID
+- `400 YGB-REQ-001` — `planId` 누락, `tierIds` 비었거나 없는 OTT 등급 ID
 - `404 YGB-CAT-001` — 요금제 없음
 
 ---
 
 ## 3. 카탈로그 조회 (GET)
 
-### 3-1. 구독 서비스 + 티어 — `GET /api/v1/catalog/services`
+### 3-1. 구독 서비스 + OTT 등급 — `GET /api/v1/catalog/services`
 
 ```json
 {
