@@ -1,0 +1,15 @@
+# 빌드 컨텍스트에서 제외 — 이미지·전송 크기를 줄이고 비밀값 유입을 막는다
+.git/
+.gradle/
+build/
+graphify-out/
+.env
+.env.*
+.idea/
+*.iml
+docs/
+scripts/
+.githooks/
+.DS_Store
+README.md.bak
+# db/seed/dev/ 는 일부러 남긴다: SPRING_PROFILES_ACTIVE=dev 로 데모 시드를 띄우려면 필요

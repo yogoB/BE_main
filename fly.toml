@@ -1,0 +1,26 @@
+# Fly.io 배포 설정. `fly launch` 가 이 파일을 감지해 재사용한다.
+# app 이름은 전역 유일해야 하므로 이미 쓰이면 바꾼다. region nrt = 도쿄(한국에서 가장 가까움).
+app = "yogob"
+primary_region = "nrt"
+
+[build]
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  # 헬스체크: 액추에이터가 없으므로 항상 200 을 주는 카탈로그 엔드포인트로 확인한다(DB 연결까지 검증됨).
+  # Spring Boot 콜드 스타트가 있으므로 grace_period 를 넉넉히 준다.
+  [[http_service.checks]]
+    grace_period = "60s"
+    interval = "15s"
+    method = "GET"
+    timeout = "5s"
+    path = "/api/v1/catalog/services"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

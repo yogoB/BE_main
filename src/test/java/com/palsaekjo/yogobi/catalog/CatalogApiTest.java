@@ -1,6 +1,8 @@
 package com.palsaekjo.yogobi.catalog;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -42,6 +44,15 @@ class CatalogApiTest {
                 .andExpect(jsonPath("$.data[0].name").value("넷플릭스"))
                 .andExpect(jsonPath("$.data[0].tiers[?(@.name=='스탠다드')].price").value(
                         org.hamcrest.Matchers.hasItem(13500)));
+    }
+
+    @Test
+    void corsPreflightAllowsLocalFrontendOrigin() throws Exception {
+        mvc.perform(options("/api/v1/catalog/services")
+                        .header("Origin", "http://localhost:5173")
+                        .header("Access-Control-Request-Method", "GET"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:5173"));
     }
 
     @Test
