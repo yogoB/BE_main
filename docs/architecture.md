@@ -67,6 +67,14 @@ POST /api/v1/chat/messages  (BE_main)
 **BE_main이 AI-를 호출한다. 반대 방향은 없다.** `confidence < 0.7`이면 되묻는다.
 AI 서버가 죽어도 필터 경로는 정상 동작해야 한다.
 
+프론트는 BE_main API만 호출하며 AI 서버와 직접 통신하지 않는다.
+프론트 연동 명세는 `docs/BE_API.md`, AI 서버 간 계약은 `AI-/docs/contract.md` 사본과 AI README에서 확인한다.
+BE와 AI에 같은 비밀 환경 변수 `AI_INTERNAL_TOKEN`을 설정하고,
+BE가 `Authorization: Bearer <AI_INTERNAL_TOKEN>`으로 호출한다. 사용자 인증 헤더는 AI에 전달하지 않는다.
+AI의 `/parse`·`/narrate`·`/ocr`는 토큰 누락·불일치 시 401, 서버 토큰 미설정 시 503 (`AI-AUTH-001`)로 차단한다.
+헬스체크는 토큰 없이 사용한다. 배포 시 AI 접근은 사설망 또는 BE만 허용한 네트워크로 제한한다.
+이는 사용자 JWT 인증과 별도이며 AI 서버에 사용자 DB·세션을 추가하지 않는다.
+
 ### 왜 나눴나 — 핵심 근거
 
 **금액의 신뢰 경계(trust boundary)가 유일한 핵심 이유다.** 요고비의 존재 이유는
@@ -104,7 +112,17 @@ AI 서버가 죽어도 필터 경로는 정상 동작해야 한다.
 ### Phase 1
 | Method | Path | 설명 |
 |---|---|---|
-| POST | `/api/v1/auth/signup` `/login` `/logout` | 인증 |
+| POST | `/api/v1/auth/signup` | 자체 가입 — `{token,password}`, 이메일 검증 토큰 필수 |
+| POST | `/api/v1/auth/login` `/logout` | 로그인 `{email,password}` · 로그아웃 |
+| POST | `/api/v1/auth/email/verification` | 가입용 본인 확인 메일 발송 — `{email}` |
+| POST | `/api/v1/auth/password/reset-request` `/reset` | 재설정 메일 발송 · 토큰으로 재설정 `{token,password}` |
+| GET | `/api/v1/auth/csrf` | 회원 요청용 CSRF 토큰 |
+| GET | `/oauth2/authorization/google` → `/login/oauth2/code/google` | Google OIDC 로그인·콜백 |
+| POST | `/api/v1/auth/google/link` | 자체 계정 비밀번호 재확인 후 Google 연결 시작 |
+| POST | `/api/v1/auth/password` | Google 전용 회원의 자체 비밀번호 등록 시작; Google 재인증 필요 |
+| POST | `/api/v1/auth/logout-all` | 현재 회원의 모든 로그인 무효화 |
+| GET | `/api/v1/me` | 인증된 현재 회원 조회 |
+| GET/DELETE | `/api/v1/me/sessions` `/{id}` | 로그인 세션 목록 · 개별 세션 폐기 |
 | GET/POST/DELETE | `/api/v1/me/subscriptions` | 내 구독 |
 | POST | `/api/v1/me/payments/import` | 결제내역 업로드 |
 | GET | `/api/v1/me/detections` | 탐지 결과 |
@@ -116,7 +134,27 @@ AI 서버가 죽어도 필터 경로는 정상 동작해야 한다.
 | GET | `/api/v1/me/switch-timing` | 변경 시점 (회수기간) |
 | GET | `/api/v1/me/alerts` | 종료 예정 목록 |
 
+### 개인정보 (V5 — 구현)
+| Method | Path | 설명 |
+|---|---|---|
+| GET | `/api/v1/privacy-policy` | 처리방침·처리 인벤토리(공개) — 항목·목적·보유기간·정보주체 권리 |
+| DELETE | `/api/v1/me` | 회원 탈퇴 — 개인 데이터 전부 파기(FK cascade), 세션 무효화·쿠키 삭제 |
+| GET | `/api/v1/me/consent` | 내 수집·이용 동의 조회 |
+| POST | `/api/v1/me/consent/marketing` | 선택(마케팅) 동의/철회 `{agree}` |
+
+처리방침·인벤토리·보유기간은 `docs/privacy.md`. 보유기간·동의 항목은 정책값이라 확정 시 함께 갱신한다.
+
 ### 요청 / 응답
+
+회원 인증 계약(2026-09-10 사용자 승인 1~4): `docs/auth.md`.
+추천·계산기·카탈로그·단일 발화 챗봇은 비회원에게 공개한다. 개인 데이터 저장·관리는 회원 전용이다.
+자체·Google 로그인 모두 동일한 내부 `userId`와 15분 JWT를 사용한다(refresh 없음, 만료 후 재로그인). JWT는 HttpOnly 쿠키로만 전달하며
+별도 브라우저 확인 쿠키와 DB 발급 지문을 함께 검사한다. 회원 요청은 `credentials: include`, 변경 요청은 CSRF 헤더가 필요하다.
+자체 가입은 `/auth/email/verification`으로 발송한 10분·단일 사용 토큰으로만 완료되며 검증된 이메일 계정으로 저장한다. 비밀번호 재설정도 같은 메일 소유 확인을 거친다.
+메일 요청만으로 계정/비밀번호를 만들지 않으며 재설정은 CSRF 필수·자동 로그인 없음이다.
+미존재·Google 전용 계정에도 동일한 메일 경로를 사용하되 연결된 회원/버전이 없어 재설정 토큰은 사용할 수 없다.
+이메일만 같다고 계정을 합치지 않는다. 자체 계정에서 비밀번호 재확인 후 같은 이메일의 Google 계정을 명시적으로 연결한다.
+Google 전용 계정은 동일 Google `sub` 재인증으로 자체 비밀번호를 추가한다. 연결 완료 시 기존 세션을 모두 무효화한다.
 
 ```jsonc
 // POST /api/v1/recommendations
@@ -193,6 +231,22 @@ CREATE INDEX idx_plan_benefit_plan ON plan_benefit(mobile_plan_id);
 
 ### Phase 2 (스키마만 선반영)
 `contract` · `promotion` · `alert_schedule`
+
+### 회원 인증 (V3·V4 마이그레이션)
+`app_user.password_hash`는 Google 전용 회원에서 null 가능, `google_sub`는 UNIQUE, 정규화 이메일 UNIQUE, 로그인 수단 최소 1개.
+V4에서 `email_verified`(자체 가입은 검증 토큰 소비 시 TRUE), `credential_version`(비밀번호·연결 변경 시 증가 → 이전 발급 토큰 무효화 기준) 추가.
+`auth_session`(token_hash PK, user_id FK, binding_hash, expires_at + V4: id UUID, created_at, last_seen_at, user_agent):
+원문 JWT·브라우저 확인값은 저장하지 않고 SHA-256 지문만. 15분 만료·5분 유휴로 정리하며 `/me/sessions`로 조회·폐기한다.
+`auth_email_token`(token_hash PK, purpose SIGNUP|RESET, email, user_id, credential_version, expires_at): 10분·단일 사용 본인 확인 토큰.
+이메일별 트랜잭션 잠금 후 소비해 동시 링크 정리의 교착을 방지한다.
+자격 증명 변경과 세션 발급은 회원 행/버전을 검사하며 재설정 전 로그인 결과의 뒤늦은 발급을 차단한다.
+`auth_rate_limit`(bucket PK, expires_at, attempts): IP 40·이메일 로그인 10·재인증 10·메일 3, 15분 창. 만료 행은 요청 시 정리.
+
+### 개인정보 (V5 마이그레이션)
+삭제권(파기): V2 개인 테이블(`user_subscription`·`payment_record`·`detection_result`) FK에 `ON DELETE CASCADE` 부여.
+`DELETE app_user` 한 번으로 개인 데이터가 전부 파기된다(auth_session·auth_email_token은 V3/V4에서 이미 cascade).
+`user_consent`(id, user_id FK cascade, item `ESSENTIAL|MARKETING`, policy_version, agreed_at, withdrawn_at, UNIQUE(user_id,item)):
+필수는 가입 시 자동 기록(계약 이행), 선택은 `/me/consent/marketing`로 동의/철회. 보유기간 초과분은 `RetentionService`가 파기.
 
 ### 초기 구현 범위 (D-07)
 V1은 위 MVP 테이블 8개를 생성한다. P1/P2 테이블은 해당 단계에서 새 마이그레이션으로 추가한다.

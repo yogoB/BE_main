@@ -63,6 +63,10 @@
 | 탐지 결과 | `DetectionResult` | |
 | 가맹점 별칭 | `MerchantAlias` | |
 | 약정 / 프로모션 | `Contract` / `Promotion` | Phase 2 |
+| 개인정보 처리방침·인벤토리 | `PrivacyPolicy` | 항목·목적·보유기간 단일 출처, 공개 조회. 보유기간 상수는 파기 기준 재사용 |
+| 수집·이용 동의 | `user_consent` / `ConsentService` | 필수(`ESSENTIAL`)·선택(`MARKETING`). `Consent` `Agreement` 단독 식별자 금지 |
+| 보유기간 파기 | `RetentionService` | 보유기간 초과 개인데이터·만료 인증 흔적 자동 파기(@Scheduled) |
+| 회원 탈퇴(삭제권) | `AuthService.deleteAccount` | `app_user` 삭제가 FK cascade 로 개인데이터 전파 파기 |
 
 ### 초기 데이터 적재
 
@@ -70,6 +74,7 @@
 |---|---|---|
 | 카탈로그 시드 로더 | `CatalogSeedLoader` | `catalog` 내부, CSV 스냅샷 적재 |
 | AI 서버 게이트웨이 | `AiGateway` | `/parse`·`/narrate` HTTP 호출과 응답 검증 |
+| 서버 간 내부 토큰 | `AI_INTERNAL_TOKEN` | BE와 AI만 공유. 사용자 인증 토큰과 별도이며 프론트에 노출하지 않음 |
 | 챗봇 요청 진입점 | `ChatController` | 기존 추천 서비스 재사용, 추가 입력·필터 폴백 안내 |
 | 챗봇 응답 | `ChatResponse` | `status`, `message`, `recommendation` |
 | 통신 요금제 로더 | `loadMobilePlans` | 통신사 이름 파생·망 매핑·(carrier_id,name) 업서트, 파일 있을 때만 |
@@ -83,6 +88,16 @@
 | 활성 구독 | `ActiveSubscription` | 탐지 입력 — 현재 결제 중인 구독(서비스·티어·월액) |
 | 탐지 결과 | `DetectionFinding` | 규칙·대상·월 낭비액 (DB `DetectionResult`와 구분되는 도메인 값) |
 | 가맹점 정규화기 | `MerchantNormalizer` | `subscription` 순수 도메인, 가맹점 원문 → service_id (모르면 empty) |
+| 회원 인증 | `AuthService` / `AuthController` | 자체 가입·로그인, 회원 정보와 명시적 계정 연결 |
+| 이메일 본인 확인 | `AuthEmail` / `Proof` / `auth_email_token` | SIGNUP·RESET 목적, 10분·단일 사용, DB는 SHA-256만 저장 |
+| 이메일 확인 여부 | `email_verified` | 검증 완료만 자체 로그인. 기존 미검증 회원은 메일 재설정으로 복구 |
+| 자격 증명 버전 | `credential_version` | 비밀번호·계정 연결 변경 시 증가. 이전 확인 결과로 세션 발급 금지 |
+| 로그인 목록 항목 | `AuthTokens.Session` | UUID id·생성/사용/만료 시각·userAgent·current. 지문은 응답하지 않음 |
+| 인증 설정 점검 | `check_auth_config.py` | 비밀 값 출력·외부 통신 없는 운영 설정 정적 검사 |
+| 회원 토큰 | `AuthTokens` / `auth_session` | JWT + 브라우저 확인 쿠키. DB에는 SHA-256 지문만 저장 |
+| Google 로그인 | `GoogleLogin` / `google_sub` | 검증한 OIDC sub로 식별. 이메일 자동 병합 금지 |
+| 인증 접근 제어 | `SecurityConfig` | 비회원 API 공개, 회원 API는 현재 사용자만 |
+| 인증 시도 제한 | `AuthRateLimit` / `auth_rate_limit` | IP·정규화 이메일·재인증 사용자별 15분 제한 |
 | 별칭 매칭 방식 | `MatchType` | `CONTAINS` `PREFIX` (common enum) |
 | 대표 티어 | `findRepresentativeTiers` | 서비스 → 티어 선정: 스탠다드(광고 제외) → 광고 제외 최저가 → 최저가 |
 | 번들 구성 | `bundle_item` / `tier_ids` | DB 관계 테이블 / 시드 CSV의 티어 ID 목록 |

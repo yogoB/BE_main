@@ -1,6 +1,6 @@
 # 요고비 BE API 명세서
 
-> 현재 코드 기준(2026-09-09) 정리본. 계약 원본은 `docs/architecture.md §3`(사람 관리). 이 문서는 프론트 연동용 참고본이다.
+> 현재 코드 기준(2026-09-10) 정리본. 계약 원본은 `docs/architecture.md §3`(사람 관리). 이 문서는 프론트 연동용 참고본이다.
 
 ## 기본 정보
 
@@ -9,9 +9,13 @@
 | 배포 Base URL | `https://yogob.fly.dev` |
 | 로컬 Base URL | `http://localhost:8080` |
 | 공통 프리픽스 | `/api/v1` |
-| 인증 | **현재 없음** — 모든 엔드포인트 공개(비회원). `/me`·`/auth`(회원 기능)는 미구현 |
+| 인증 | 추천·계산기·카탈로그·챗봇은 비회원 공개. `/me`와 계정 관리는 HttpOnly JWT 쿠키 + CSRF. 상세 `docs/auth.md` |
 | 콘텐츠 타입 | `application/json` (UTF-8) |
-| CORS | 로컬 `localhost:*` + 배포 오리진(`https://yogob.fly.dev`) 허용. 프론트 도메인은 env `YOGOBI_CORS_ALLOWED_ORIGINS`로 추가 |
+| CORS | 정확한 프론트 오리진만 허용(`YOGOBI_CORS_ALLOWED_ORIGINS`). 회원 요청은 `credentials: include`; wildcard 금지 |
+
+**프론트는 이 문서의 BE API만 호출한다.** AI의 `/parse`·`/narrate`·`/ocr`를 직접 호출하지 않는다.
+AI 연결과 내부 인증은 BE가 담당하며 프론트에는 AI 주소·내부 토큰·모델 API 키가 필요 없다.
+사용자 인증·대화 이력 저장도 BE 책임이다. 자체·Google 회원 인증은 구현됐고 대화 이력 저장은 후속 작업이다.
 
 ---
 
@@ -257,6 +261,9 @@
 
 > AI 서버(`AI_SERVER_URL`, 기본 `http://localhost:8000`)가 필요하다. AI가 죽어도 앱은 정상이며 아래처럼 폴백한다.
 
+서버 운영 설정: BE와 AI에 동일한 `AI_INTERNAL_TOKEN`이 필요하다. 프론트 요청에는 이 값을 넣지 않는다.
+내부 토큰이 없거나 불일치해도 프론트 응답은 아래 상태 형식을 유지하며 `FILTER_FALLBACK`으로 안내한다.
+
 ### 요청
 
 ```json
@@ -292,14 +299,23 @@
 
 ---
 
+## 회원 인증
+
+자체 가입·로그인, Google 로그인, 현재 회원 조회, 로그아웃·모든 기기 로그아웃, 명시적 계정 연결,
+이메일 검증 가입, 비밀번호 재설정, 로그인 세션 조회/폐기가 구현됐다. `/account.html`에서 확인할 수 있다.
+가입은 메일의 토큰과 본인이 정한 비밀번호로 완료한다. 재설정은 CSRF 필수이며 자동 로그인하지 않는다.
+JWT 절대 수명 15분·유휴 제한 5분. 상세 실행법·설정 점검은 `docs/auth.md`, 공격 검증은 `docs/auth-security.md`.
+자체 가입은 이메일 검증 토큰이 필요하다(`AUTH_EMAIL_ENABLED=false`면 자체 가입·재설정은 503, Google만 동작).
+요청 예시·엔드포인트·CSRF·쿠키·Google·SMTP 설정·에러 코드는 [회원 인증 명세](auth.md)를 따른다.
+회원 JWT는 15분 만료(refresh 없음)이며 `GET /api/v1/me`는 현재 로그인한 회원만 반환한다.
+
 ## 아직 없는 것 (예정)
 
 | 예정 엔드포인트 | 상태 |
 |---|---|
-| `POST /api/v1/auth/signup` · `login` · `logout` | 인증(JWT) — 미구현 |
 | `GET/POST/DELETE /api/v1/me/subscriptions` | 내 구독 — 미구현 |
 | `POST /api/v1/me/payments/import` | 결제내역 업로드 — 미구현 |
 | `GET /api/v1/me/detections` | 중복 결제 탐지 조회 — 서비스 로직은 있음, HTTP 노출 전 |
 | `GET /api/v1/me/switch-timing` · `alerts` | Phase 2 |
 
-`/me` 계열은 인증(JWT)이 붙은 뒤 공개된다.
+`/me` 계열은 인증된 회원만 접근 가능하다. 위 기능은 구현 후 현재 사용자 ID로 연결한다.

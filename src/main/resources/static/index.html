@@ -100,7 +100,8 @@
 </main>
 
 <script>
-const won = n => (n==null?'-':n.toLocaleString('ko-KR')+'원');
+const escapeHtml = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const won = n => (n==null?'-':escapeHtml(n.toLocaleString('ko-KR'))+'원');
 const base = () => document.getElementById('base').value.trim().replace(/\/$/,'');
 async function api(path, opts) {
   const res = await fetch(base()+path, opts);
@@ -111,9 +112,9 @@ function statusLine(r) {
   const cls = r.ok ? 'ok' : 'bad';
   const err = r.body && r.body.error;
   const msg = err ? `${err.code} · ${err.message}` : `${r.status}`;
-  return `<div class="status ${cls}">${r.ok?'✔':'✖'} ${msg}</div>`;
+  return `<div class="status ${cls}">${r.ok?'✔':'✖'} ${escapeHtml(msg)}</div>`;
 }
-function raw(r){ return `<details><summary>raw JSON</summary><pre>${JSON.stringify(r.body,null,2)}</pre></details>`; }
+function raw(r){ return `<details><summary>raw JSON</summary><pre>${escapeHtml(JSON.stringify(r.body,null,2))}</pre></details>`; }
 
 let SERVICES = [];
 async function loadServices() {
@@ -123,7 +124,7 @@ async function loadServices() {
   if (r.ok) {
     SERVICES = r.body.data;
     document.getElementById('recSvc').innerHTML = SERVICES.map(s =>
-      `<label class="chip"><input type="checkbox" value="${s.id}"> ${s.name}</label>`).join('');
+      `<label class="chip"><input type="checkbox" value="${escapeHtml(s.id)}"> ${escapeHtml(s.name)}</label>`).join('');
   }
 }
 async function loadPlans() {
@@ -131,17 +132,17 @@ async function loadPlans() {
   const r = await api('/api/v1/catalog/plans');
   let html = statusLine(r);
   if (r.ok) html += `<div class="miss">요금제 ${r.body.data.length}건</div>` +
-    r.body.data.map(p=>`<div class="plan"><div class="top"><span class="name">${p.name} <span class="carrier">${p.carrier} · ${p.networkType}</span></span><span class="total">${won(p.basePrice)}</span></div></div>`).join('');
+    r.body.data.map(p=>`<div class="plan"><div class="top"><span class="name">${escapeHtml(p.name)} <span class="carrier">${escapeHtml(p.carrier)} · ${escapeHtml(p.networkType)}</span></span><span class="total">${won(p.basePrice)}</span></div></div>`).join('');
   out.innerHTML = html + raw(r);
 }
 function renderResult(res) {
   return `<div class="plan"><div class="top">
-      <span><span class="name">${res.planName}</span> <span class="carrier">${res.carrier}</span></span>
+      <span><span class="name">${escapeHtml(res.planName)}</span> <span class="carrier">${escapeHtml(res.carrier)}</span></span>
       <span class="total">${won(res.monthlyTotal)}</span></div>
       <div class="save">baseline ${won(res.baseline)} · 월 -${won(res.monthlySavings)} · 연 -${won(res.annualSavings)}</div>
-      <table>${res.breakdown.map(b=>`<tr><td>${b.label}${b.note?` <span style="color:var(--mut)">(${b.note})</span>`:''}</td><td class="amt ${b.amount<0?'neg':''}">${won(b.amount)}</td></tr>`).join('')}</table></div>`;
+      <table>${res.breakdown.map(b=>`<tr><td>${escapeHtml(b.label)}${b.note?` <span style="color:var(--mut)">(${escapeHtml(b.note)})</span>`:''}</td><td class="amt ${b.amount<0?'neg':''}">${won(b.amount)}</td></tr>`).join('')}</table></div>`;
 }
-function missBox(m){ return m&&m.length?`<div class="miss">missingInputs: ${m.map(x=>x.field).join(', ')}</div>`:''; }
+function missBox(m){ return m&&m.length?`<div class="miss">missingInputs: ${m.map(x=>escapeHtml(x.field)).join(', ')}</div>`:''; }
 
 async function recommend() {
   const out = document.getElementById('recOut'); out.innerHTML = '요청 중…';
@@ -152,7 +153,7 @@ async function recommend() {
   const req = { required:{ monthlyDataGb:+document.getElementById('recData').value, wantedServiceIds:ids }, optional:opt };
   const r = await api('/api/v1/recommendations', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(req)});
   let html = statusLine(r);
-  if (r.ok) html += `<div class="miss">accuracy: ${r.body.data.accuracy}</div>` + missBox(r.body.data.missingInputs) + r.body.data.results.map(renderResult).join('');
+  if (r.ok) html += `<div class="miss">accuracy: ${escapeHtml(r.body.data.accuracy)}</div>` + missBox(r.body.data.missingInputs) + r.body.data.results.map(renderResult).join('');
   out.innerHTML = html + raw(r);
 }
 async function calculate() {
@@ -162,7 +163,7 @@ async function calculate() {
   const req = { planId:+document.getElementById('calPlan').value, tierIds:tiers, optional:opt };
   const r = await api('/api/v1/calculator', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(req)});
   let html = statusLine(r);
-  if (r.ok) html += `<div class="miss">accuracy: ${r.body.data.accuracy}</div>` + renderResult(r.body.data.result);
+  if (r.ok) html += `<div class="miss">accuracy: ${escapeHtml(r.body.data.accuracy)}</div>` + renderResult(r.body.data.result);
   out.innerHTML = html + raw(r);
 }
 async function ping() {
