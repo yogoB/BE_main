@@ -27,6 +27,8 @@ Compose는 PostgreSQL만 실행하며, 앱은 `.env`를 직접 읽고 기본 808
 
 회원 기능은 [회원 인증 명세](docs/auth.md)를 참고한다. 자체 가입·로그인과 Google OIDC를 제공하며,
 비회원 추천은 그대로 사용할 수 있다. 회원 쿠키 발급에는 독립 `JWT_SECRET` 설정이 필요하다.
+가입·재설정·세션 회수 화면은 `/account.html`이다. 이메일 소유 확인에는 SMTP 설정이 필요하다.
+`python3 scripts/check_auth_config.py`로 비밀 값 출력 없이 설정을 점검한다(로컬은 `--local`).
 Google은 OAuth 클라이언트 설정 후 활성화한다. [보안 시나리오 검증](docs/auth-security.md)에 검증 범위와 한계를 기록했다.
 
 `POST /api/v1/chat/messages`에 `{"text":"데이터 20기가 쓰고 넷플릭스 보고 싶어요"}`를 보낸다.
@@ -55,7 +57,7 @@ AI 연결은 HTTP/1.1, 연결 대기 5초·응답 대기 25초이며 자동 재�
 현재 게이트웨이는 한 발화만 처리한다. 추가 답변에도 추천 조건을 함께 보내야 하며,
 사용자별 대화 이력 저장·조건 병합은 아직 연결하지 않았다.
 
-검증: 백엔드 60개 테스트 통과. 별도 PostgreSQL·개발 시드·실제 AI HTTP 서버로
+검증: 백엔드 전체 112개 테스트·bootJar 통과(2026-09-11, 인증 50개 포함). 앞서 별도 PostgreSQL·개발 시드·실제 AI HTTP 서버로
 정상 추천, 되묻기, 모델 장애 시 필터 폴백을 검증했다(모델 응답만 스텁).
 
 테스트는 Testcontainers의 별도 PostgreSQL에서 초기 복원·재로딩·CSV 오류 시 롤백을 검증한다.
@@ -73,6 +75,7 @@ docker compose up -d --wait
 
 | 문서 | 내용 |
 |---|---|
+| [`docs/google-oauth-guide.md`](docs/google-oauth-guide.md) | 팀원용 Google Cloud·로컬/운영·프론트 OAuth 연동·오류 해결 |
 | [`AGENTS.md`](AGENTS.md) | 절대 원칙·코딩 규칙 — AI 에이전트가 자동 로드 |
 | [`docs/domain.md`](docs/domain.md) | 계산 규칙 + 용어↔코드 식별자 |
 | [`docs/testing.md`](docs/testing.md) | 골든 케이스 — **계산 코드보다 먼저 읽는다** |

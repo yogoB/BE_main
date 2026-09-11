@@ -141,6 +141,8 @@ AI의 `/parse`·`/narrate`·`/ocr`는 토큰 누락·불일치 시 401, 서버 �
 자체·Google 로그인 모두 동일한 내부 `userId`와 15분 JWT를 사용한다(refresh 없음, 만료 후 재로그인). JWT는 HttpOnly 쿠키로만 전달하며
 별도 브라우저 확인 쿠키와 DB 발급 지문을 함께 검사한다. 회원 요청은 `credentials: include`, 변경 요청은 CSRF 헤더가 필요하다.
 자체 가입은 `/auth/email/verification`으로 발송한 10분·단일 사용 토큰으로만 완료되며 검증된 이메일 계정으로 저장한다. 비밀번호 재설정도 같은 메일 소유 확인을 거친다.
+메일 요청만으로 계정/비밀번호를 만들지 않으며 재설정은 CSRF 필수·자동 로그인 없음이다.
+미존재·Google 전용 계정에도 동일한 메일 경로를 사용하되 연결된 회원/버전이 없어 재설정 토큰은 사용할 수 없다.
 이메일만 같다고 계정을 합치지 않는다. 자체 계정에서 비밀번호 재확인 후 같은 이메일의 Google 계정을 명시적으로 연결한다.
 Google 전용 계정은 동일 Google `sub` 재인증으로 자체 비밀번호를 추가한다. 연결 완료 시 기존 세션을 모두 무효화한다.
 
@@ -226,6 +228,8 @@ V4에서 `email_verified`(자체 가입은 검증 토큰 소비 시 TRUE), `cred
 `auth_session`(token_hash PK, user_id FK, binding_hash, expires_at + V4: id UUID, created_at, last_seen_at, user_agent):
 원문 JWT·브라우저 확인값은 저장하지 않고 SHA-256 지문만. 15분 만료·5분 유휴로 정리하며 `/me/sessions`로 조회·폐기한다.
 `auth_email_token`(token_hash PK, purpose SIGNUP|RESET, email, user_id, credential_version, expires_at): 10분·단일 사용 본인 확인 토큰.
+이메일별 트랜잭션 잠금 후 소비해 동시 링크 정리의 교착을 방지한다.
+자격 증명 변경과 세션 발급은 회원 행/버전을 검사하며 재설정 전 로그인 결과의 뒤늦은 발급을 차단한다.
 `auth_rate_limit`(bucket PK, expires_at, attempts): IP 40·이메일 로그인 10·재인증 10·메일 3, 15분 창. 만료 행은 요청 시 정리.
 
 ### 초기 구현 범위 (D-07)

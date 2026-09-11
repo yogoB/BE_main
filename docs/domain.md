@@ -85,6 +85,11 @@
 | 탐지 결과 | `DetectionFinding` | 규칙·대상·월 낭비액 (DB `DetectionResult`와 구분되는 도메인 값) |
 | 가맹점 정규화기 | `MerchantNormalizer` | `subscription` 순수 도메인, 가맹점 원문 → service_id (모르면 empty) |
 | 회원 인증 | `AuthService` / `AuthController` | 자체 가입·로그인, 회원 정보와 명시적 계정 연결 |
+| 이메일 본인 확인 | `AuthEmail` / `Proof` / `auth_email_token` | SIGNUP·RESET 목적, 10분·단일 사용, DB는 SHA-256만 저장 |
+| 이메일 확인 여부 | `email_verified` | 검증 완료만 자체 로그인. 기존 미검증 회원은 메일 재설정으로 복구 |
+| 자격 증명 버전 | `credential_version` | 비밀번호·계정 연결 변경 시 증가. 이전 확인 결과로 세션 발급 금지 |
+| 로그인 목록 항목 | `AuthTokens.Session` | UUID id·생성/사용/만료 시각·userAgent·current. 지문은 응답하지 않음 |
+| 인증 설정 점검 | `check_auth_config.py` | 비밀 값 출력·외부 통신 없는 운영 설정 정적 검사 |
 | 회원 토큰 | `AuthTokens` / `auth_session` | JWT + 브라우저 확인 쿠키. DB에는 SHA-256 지문만 저장 |
 | Google 로그인 | `GoogleLogin` / `google_sub` | 검증한 OIDC sub로 식별. 이메일 자동 병합 금지 |
 | 인증 접근 제어 | `SecurityConfig` | 비회원 API 공개, 회원 API는 현재 사용자만 |

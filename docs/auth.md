@@ -16,8 +16,8 @@ JWT·비밀번호·Google 토큰은 응답 JSON이나 URL에 넣지 않는다.
 | `POST /api/v1/auth/email/verification` | `{email}`, CSRF | `{message}`, 가입 본인 확인 메일 발송(존재/미존재 동일 응답) |
 | `POST /api/v1/auth/signup` | `{token,password}`, CSRF | 현재 회원 + 인증 쿠키. token은 위 메일의 10분·단일 사용 값 |
 | `POST /api/v1/auth/login` | `{email,password}`, CSRF | 현재 회원 + 인증 쿠키 |
-| `POST /api/v1/auth/password/reset-request` | `{email}`, CSRF | `{message}`, 재설정 메일 발송(자체 계정에만 실제 토큰) |
-| `POST /api/v1/auth/password/reset` | `{token,password}` | `{passwordReset:true}`, 비밀번호 변경·모든 세션 폐기·쿠키 삭제 |
+| `POST /api/v1/auth/password/reset-request` | `{email}`, CSRF | `{message}`, 재설정 안내 발송(자체 계정에만 사용 가능한 토큰) |
+| `POST /api/v1/auth/password/reset` | `{token,password}`, CSRF | `{passwordReset:true}`, 비밀번호 변경·모든 세션 폐기·쿠키 삭제 |
 | `GET /oauth2/authorization/google` | 브라우저 이동 | Google 인증 화면으로 이동 |
 | `GET /login/oauth2/code/google` | Google이 발급한 code/state | 고정 `AUTH_RETURN_URL#auth=success` 또는 `failed` / `account-conflict` |
 | `GET /api/v1/me` | 인증 쿠키 | 현재 회원 |
@@ -33,9 +33,19 @@ JWT·비밀번호·Google 토큰은 응답 JSON이나 URL에 넣지 않는다.
 이메일은 trim/lowercase 후 저장, 비밀번호는 15자 이상·UTF-8 72바이트 이하이며 BCrypt cost 12로 저장한다.
 자체 가입은 `/auth/email/verification`으로 발송한 본인 확인 메일의 10분·단일 사용 토큰으로만 완료된다.
 완료된 계정만 `email_verified`로 저장하며 로그인은 검증 완료 계정에 한한다. 이메일만으로 계정을 자동 병합하지 않는다.
-비밀번호 재설정은 자체 계정에만 실제 토큰을 발급하되, 미존재·Google 전용 계정에도 동일한 응답으로 계정 존재를 노출하지 않는다.
+재설정은 모든 주소에 동일한 응답·메일 발송 경로를 사용한다. 미존재·Google 전용 계정의 토큰은 회원/버전과 연결되지 않아 사용할 수 없다.
+가입 메일 요청만으로 이메일을 선점하거나 비밀번호를 저장하지 않는다. 링크를 받은 본인이 완료할 때 비밀번호를 정한다.
+V4 이전 미검증 자체 계정은 로그인을 막고 메일 재설정으로 소유자가 복구한다. Google 계정과 자동 병합하지 않는다.
+재설정은 모든 세션과 남은 링크를 폐기하고 자동 로그인하지 않으며 변경 안내 메일을 보낸다. 안내 발송 실패는 완료된 재설정을 되돌리지 않는다.
+이메일별 트랜잭션 잠금으로 여러 링크의 동시 사용을 직렬화한다. 자격 증명 버전 검사는 재설정 전 확인한 비밀번호로 뒤늦게 세션이 발급되는 것을 차단한다.
 
 ## 프론트 연결
+
+Google Cloud 설정부터 시작하는 팀원은 [Google OAuth 연동 가이드](google-oauth-guide.md)를 따른다.
+
+`/account.html`에서 가입 메일 요청·확인·재설정·로그인·계정 연결·세션 회수를 사용할 수 있다.
+메일 링크는 `#action=signup|reset&token=...` 형식이다. 페이지는 fragment를 읽은 즉시 주소에서 제거하고 메모리에만 보관한다.
+GET만으로 토큰을 소비하지 않는다. 비밀번호 확인 후 CSRF가 있는 POST로 완료하며 응답 문자열은 `textContent`로 출력한다.
 
 1. 비회원 추천은 기존대로 호출한다. 로그인할 때 `GET /api/v1/auth/csrf`를 `credentials:'include'`로 호출한다.
 2. 응답의 토큰을 `X-CSRF-TOKEN` 헤더에 넣고 signup/login POST를 호출한다. 모든 회원 요청은 `credentials:'include'`.
@@ -67,6 +77,22 @@ JWT·비밀번호·Google 토큰은 응답 JSON이나 URL에 넣지 않는다.
   단일 앱 인스턴스의 메모리 HTTP 세션을 사용하므로 앱 재시작 시 진행 중 OAuth/CSRF를 다시 시작한다.
 - IP는 소켓의 `remoteAddr`만 신뢰한다. 프록시가 모든 사용자를 같은 IP로 보이게 하면 인증 요청 제한도 공유된다.
   운영 프록시의 신뢰 범위를 확인하고 안전한 실제 IP 복원 설정을 적용해야 한다. 요청 헤더를 그대로 신뢰해 제한을 우회시키지 않는다.
+
+## 설정 사전 점검
+
+```bash
+python3 scripts/check_auth_config.py              # .env + 현재 환경 변수, 운영 기준
+python3 scripts/check_auth_config.py --local      # loopback 개발 구성
+python3 scripts/test_auth_config.py
+```
+
+표준 라이브러리만 사용한다. KEY=value 형식의 `.env`를 읽고 환경 변수를 우선 적용한다.
+복잡한 Java properties escape·치환 구문은 거부한다. 별도 Spring 프로파일/명령행 override까지 해석하지 않는다.
+JWT 길이·키 분리, Google 활성화·자격 증명·정확한 콜백 경로, HTTPS·쿠키 이름·CORS,
+SMTP 자격 증명·포트·필수 STARTTLS를 확인하며 실패하면 종료 코드 1이다. 값은 출력하지 않고 외부에 연결하지 않는다.
+정적 통과는 실제 Google 승인·SMTP 인증/배달·발신 도메인 설정·브라우저 쿠키·프록시 IP 검증을 대신하지 않는다.
+같은 사이트의 프론트/BE인지와 Google Console 등록 URL 일치는 실제 환경에서 확인한다. 키 무작위성은 생성·보관 과정에서 확보해야 한다.
+2026-09-11 로컬 실행은 JWT·Google·SMTP 미설정 및 개발 URL로 **15개 점검 실패**를 보고했다. 운영 준비 완료가 아니다.
 
 ## 에러
 

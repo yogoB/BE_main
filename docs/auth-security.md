@@ -8,11 +8,16 @@
 ```bash
 JAVA_HOME=/tmp/yogobi-jdk21/Contents/Home ./gradlew test bootJar --no-daemon
 node scripts/test_demo_security.mjs
+node scripts/test_account_security.mjs
+python3 scripts/test_auth_config.py
+python3 scripts/check_auth_config.py
 ```
 
 임시 JDK 경로는 이 개발 환경용이다. Java 21과 Docker가 필요하다.
 기존 로컬 개발 DB를 사용하지 않고 Testcontainers PostgreSQL에서 Flyway V1~V4를 적용한다.
-인증 40개를 포함한 Java 102개 테스트, 데모 출력 6개 시나리오를 검사한다.
+2026-09-11: 인증 50개를 포함한 Java 112개 테스트·bootJar 통과(실패·오류·스킵 0).
+데모 출력 6개, 계정 화면 가입/재설정 토큰·XSS·CSRF 검사, 설정 검사 31개 시나리오도 통과했다.
+정적 설정 점검은 현재 로컬 구성에서 15개 미비 항목을 보고한다(예상된 실패, 비밀 값 출력 없음).
 이메일 검증·재설정 흐름은 캡처용 JavaMailSender로 발송을 가로채 실제 SMTP 없이 토큰 왕복을 검사한다.
 Google은 테스트 전용 RSA 키와 HTTP token/JWKS 서버를 사용한다. `oauth2Login()`이나 인증 객체를
 성공으로 mocking하지 않고 실제 state·nonce·PKCE·서명 검증 경로를 통과한다.
@@ -48,6 +53,16 @@ Google은 테스트 전용 RSA 키와 HTTP token/JWKS 서버를 사용한다. `o
 | 비밀번호 재설정으로 세션 폐기·비밀번호 교체 | 재설정 시 기존 세션 전부 401, 옛 비밀번호 401·새 비밀번호 200 |
 | 미존재·Google 전용 계정 재설정, 잘못된 목적 토큰 | 토큰을 발급해도 사용 불가 400. 계정 존재 노출·비밀번호 주입 없음 |
 | 로그인 세션 목록·개별/현재 세션 폐기 | 회원 본인 세션만 조회(현재 표시), 폐기 시 해당 쿠키 401 |
+| 가입 메일로 이메일 선점 | app_user 생성 없음. 소유자의 Google 가입 가능, 대기 링크로 Google 계정에 비밀번호 주입 불가 |
+| 링크 미리보기·잘못된 비밀번호·만료 | GET/비밀번호 검증 실패는 토큰을 소비하지 않음. 만료 링크 400 |
+| SMTP 실패·민감한 오류 원문 | 요청 503, DB 토큰 롤백, 공급자 원문 비노출 |
+| 미검증 기존 계정·오래된 로그인 결과 | 메일 재설정으로 복구. 이전 credential_version의 세션 발급 거부, 쿠키 발급 없음 |
+| 재설정 후 안내 메일 실패 | 재설정은 유지되고 이전 세션 복구 없음 |
+| Google 연결 전 받은 재설정 링크 | 자격 증명 버전 불일치로 400, 연결된 세션 유지 |
+| 서로 다른 재설정 링크 동시 제출 | 200 한 건·400 한 건, 버전 증가 한 번, 교착/500 없음 |
+| 복사 쿠키의 유휴·절대 만료 | 15분 JWT/쿠키 수명 확인. 4분 유휴 요청은 갱신, 6분 유휴는 401·목록 제외 |
+| 다른 회원 세션 UUID 공격·CSRF 없는 회수 | 목록에 타인 세션/지문 없음, 타인 UUID DELETE 404, CSRF 누락 403 |
+| Google 콜백 오설정 | 다른 경로·query·fragment·외부 HTTP는 기동 구성에서 거부 |
 
 ## 점검 중 수정한 문제
 
@@ -55,6 +70,17 @@ Google은 테스트 전용 RSA 키와 HTTP token/JWKS 서버를 사용한다. `o
 악성 API/시드 문자열이 들어오면 회원과 같은 오리진에서 스크립트를 실행할 수 있었다.
 공통 HTML 이스케이프를 모든 동적 출력에 적용했다. `test_demo_security.mjs`가 img/onerror,
 svg/onload, 속성 따옴표 탈출 문자열을 실제 렌더 함수에 전달해 코드 대신 텍스트로 출력되는지 검사한다.
+
+서로 다른 재설정 링크가 각각 토큰 행을 잠근 뒤 남은 링크를 삭제하면 잠금 순서가 뒤집힐 수 있었다.
+`AuthEmail.consume`에서 이메일별 PostgreSQL 트랜잭션 advisory lock을 먼저 획득해 토큰 소비·정리를 직렬화했다.
+Google 콜백도 실제 처리 경로 `/login/oauth2/code/google`만 허용하고 query를 거부하도록 보강했다.
+
+## 세 위험의 대안과 적용 결과
+
+1. 두 쿠키 동시 탈취: 절대 15분·유휴 5분 제한, 로그인 목록·개별 회수·전체 로그아웃을 적용했다.
+   공격자가 계속 호출하면 유휴 시간은 갱신되지만 절대 만료는 늘어나지 않는다. 복사 자체를 막는 기기 키/패스키는 브라우저 연동이 필요하여 이번 범위에 추가하지 않았다.
+2. 이메일 선점·복구 불가: 가입 전 메일 소유 확인과 일회용 재설정으로 보완했다. 과거 미검증 회원은 소유자가 메일 재설정 후 복구한다.
+3. 실환경 미검증: 정적 설정 점검을 구현했다. 실키·SMTP·Google 계정 승인이 없으므로 외부 검증은 미완료다.
 
 ## 남는 위험과 검증하지 않은 범위
 
@@ -73,3 +99,6 @@ svg/onload, 속성 따옴표 탈출 문자열을 실제 렌더 함수에 전달�
 
 공식 구현 근거: [Google OIDC](https://developers.google.com/identity/openid-connect/openid-connect),
 [Spring CSRF](https://docs.spring.io/spring-security/reference/6.5/servlet/exploits/csrf.html).
+
+추가 구현 근거: [OWASP 비밀번호 복구](https://cheatsheetseries.owasp.org/cheatsheets/Forgot_Password_Cheat_Sheet.html),
+[PostgreSQL 잠금](https://www.postgresql.org/docs/current/explicit-locking.html).
