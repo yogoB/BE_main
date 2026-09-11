@@ -100,10 +100,14 @@ class AuthSecurityTest {
     }
     // Capture verification/reset mails instead of talking to SMTP; the token is read out of the message body.
     @TestConfiguration static class MailCapture {
+        static volatile boolean fail;
         static final List<SimpleMailMessage> SENT = new java.util.concurrent.CopyOnWriteArrayList<>();
         @Bean @Primary JavaMailSender capturingMailSender() {
             return new JavaMailSenderImpl() {
-                @Override public void send(SimpleMailMessage message) { SENT.add(message); }
+                @Override public void send(SimpleMailMessage message) {
+                    if (fail) throw new org.springframework.mail.MailSendException("upstream-secret-must-stay-private");
+                    SENT.add(new SimpleMailMessage(message));
+                }
             };
         }
     }
@@ -114,8 +118,9 @@ class AuthSecurityTest {
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;
     @Autowired AuthTokens tokens;
+    @Autowired AuthService members;
 
-    @BeforeEach void clear() { jdbc.execute("TRUNCATE app_user, auth_rate_limit CASCADE"); GRANTS.clear(); MailCapture.SENT.clear(); }
+    @BeforeEach void clear() { jdbc.execute("TRUNCATE app_user, auth_rate_limit CASCADE"); GRANTS.clear(); MailCapture.SENT.clear(); MailCapture.fail = false; jdbc.execute("TRUNCATE auth_email_token"); }
     @AfterAll static void stop() { PROVIDER.stop(0); }
 
     class Browser {
@@ -527,4 +532,134 @@ class AuthSecurityTest {
                 .andExpect(status().isOk());
         mvc.perform(get("/api/v1/me").cookie(a.cookies)).andExpect(status().isUnauthorized());
     }
+    @Test void requestingVerificationCannotReserveEmailOrChooseOwnersPassword() throws Exception {
+        Browser b = new Browser();
+        b.post("/api/v1/auth/email/verification", Map.of("email", "owner@example.com")).andExpect(status().isOk());
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM app_user", Integer.class));
+        String proof = mailToken("owner@example.com");
+        assertEquals(AuthTokens.hash(proof), jdbc.queryForObject("SELECT token_hash FROM auth_email_token", String.class));
+        b.post("/api/v1/auth/signup", Map.of("email", "owner@example.com", "password", PASSWORD)).andExpect(status().isBadRequest());
+        google("owner-google", "owner@example.com").me().andExpect(status().isOk());
+        b.post("/api/v1/auth/signup", Map.of("token", proof, "password", PASSWORD)).andExpect(status().isConflict());
+        assertNull(jdbc.queryForObject("SELECT password_hash FROM app_user", String.class));
+    }
+
+    @Test void expiredProofFailsAndLinkPreviewOrBadPasswordDoesNotConsumeProof() throws Exception {
+        Browser b = new Browser(); String proof = verificationToken("owner@example.com");
+        mvc.perform(get("/account.html")).andExpect(status().isOk());
+        b.post("/api/v1/auth/signup", Map.of("token", proof, "password", "short")).andExpect(status().isBadRequest());
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM auth_email_token", Integer.class));
+        jdbc.update("UPDATE auth_email_token SET expires_at=now()-interval '1 second'");
+        b.post("/api/v1/auth/signup", Map.of("token", proof, "password", PASSWORD)).andExpect(status().isBadRequest());
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM app_user", Integer.class));
+    }
+
+    @Test void smtpFailureRollsBackProofAndDoesNotDiscloseTransportSecrets() throws Exception {
+        MailCapture.fail = true;
+        var body = new Browser().post("/api/v1/auth/email/verification", Map.of("email", "owner@example.com"))
+                .andExpect(status().isServiceUnavailable()).andReturn().getResponse().getContentAsString();
+        assertFalse(body.contains("upstream-secret"));
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM auth_email_token", Integer.class));
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM app_user", Integer.class));
+    }
+
+    @Test void resetRecoversUnverifiedLegacyMemberAndRejectsLateOldLoginIssuance() throws Exception {
+        signup("legacy@example.com");
+        var before = members.login("legacy@example.com", PASSWORD);
+        jdbc.update("UPDATE app_user SET email_verified=FALSE");
+        new Browser().post("/api/v1/auth/login", Map.of("email", "legacy@example.com", "password", PASSWORD)).andExpect(status().isUnauthorized());
+        new Browser().post("/api/v1/auth/password/reset-request", Map.of("email", "legacy@example.com")).andExpect(status().isOk());
+        String proof = mailToken("legacy@example.com");
+        var reset = new Browser();
+        var result = reset.post("/api/v1/auth/password/reset", Map.of("token", proof, "password", "a different secure password!"))
+                .andExpect(status().isOk()).andReturn();
+        reset.accept(result); reset.me().andExpect(status().isUnauthorized()); // Reset never logs in.
+        assertTrue(members.member(before.id()).emailVerified());
+        var response = new org.springframework.mock.web.MockHttpServletResponse();
+        assertThrows(com.palsaekjo.yogobi.common.ApiException.class, () -> tokens.issue(before.id(), before.credentialVersion(),
+                new org.springframework.mock.web.MockHttpServletRequest(), response));
+        assertEquals(0, response.getCookies().length);
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM auth_session", Integer.class));
+        new Browser().post("/api/v1/auth/password/reset", Map.of("token", proof, "password", PASSWORD)).andExpect(status().isBadRequest());
+        assertTrue(MailCapture.SENT.getLast().getSubject().contains("비밀번호 변경"));
+    }
+
+    @Test void notificationFailureCannotUndoCommittedReset() throws Exception {
+        signup("alice@example.com");
+        new Browser().post("/api/v1/auth/password/reset-request", Map.of("email", "alice@example.com")).andExpect(status().isOk());
+        String proof = mailToken("alice@example.com"); MailCapture.fail = true;
+        new Browser().post("/api/v1/auth/password/reset", Map.of("token", proof, "password", "a replacement password!"))
+                .andExpect(status().isOk());
+        assertNotNull(members.login("alice@example.com", "a replacement password!"));
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM auth_session", Integer.class));
+    }
+
+    @Test void resetProofIsInvalidAfterGoogleLinkChangesCredentials() throws Exception {
+        Browser b = signup("alice@example.com");
+        b.post("/api/v1/auth/password/reset-request", Map.of("email", "alice@example.com")).andExpect(status().isOk());
+        String proof = mailToken("alice@example.com");
+        b.post("/api/v1/auth/google/link", Map.of("password", PASSWORD)).andExpect(status().isOk());
+        Flow flow = start(b);
+        b.accept(callback(flow, grant(flow, "google-1", "alice@example.com", c -> {}, RSA)).andReturn());
+        new Browser().post("/api/v1/auth/password/reset", Map.of("token", proof, "password", "attacker chosen password!"))
+                .andExpect(status().isBadRequest());
+        b.me().andExpect(status().isOk());
+        assertNotNull(members.login("alice@example.com", PASSWORD));
+    }
+
+    @Test void simultaneousResetLinksAllowOneWinnerWithoutDeadlock() throws Exception {
+        signup("alice@example.com");
+        Browser a = new Browser(), b = new Browser();
+        a.post("/api/v1/auth/password/reset-request", Map.of("email", "alice@example.com")).andExpect(status().isOk());
+        String first = mailToken("alice@example.com");
+        b.post("/api/v1/auth/password/reset-request", Map.of("email", "alice@example.com")).andExpect(status().isOk());
+        String second = mailToken("alice@example.com");
+        var start = new java.util.concurrent.CountDownLatch(1);
+        try (var pool = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            var one = pool.submit(() -> { start.await(); return a.post("/api/v1/auth/password/reset", Map.of("token", first, "password", PASSWORD)).andReturn().getResponse().getStatus(); });
+            var two = pool.submit(() -> { start.await(); return b.post("/api/v1/auth/password/reset", Map.of("token", second, "password", PASSWORD)).andReturn().getResponse().getStatus(); });
+            start.countDown();
+            var statuses = new ArrayList<>(List.of(one.get(15, java.util.concurrent.TimeUnit.SECONDS), two.get(15, java.util.concurrent.TimeUnit.SECONDS)));
+            Collections.sort(statuses); assertEquals(List.of(200, 400), statuses);
+        }
+        assertEquals(1L, jdbc.queryForObject("SELECT credential_version FROM app_user", Long.class));
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM auth_email_token", Integer.class));
+    }
+
+    @Test void sessionIdleTimeoutAndAbsoluteLifetimeLimitCopiedCookies() throws Exception {
+        Browser b = signup("alice@example.com");
+        var claims = SignedJWT.parse(b.cookies[0].getValue()).getJWTClaimsSet();
+        assertEquals(900_000, claims.getExpirationTime().getTime()-claims.getIssueTime().getTime());
+        for (Cookie cookie : b.cookies) assertEquals(900, cookie.getMaxAge());
+        jdbc.update("UPDATE auth_session SET last_seen_at=now()-interval '4 minutes'");
+        b.me().andExpect(status().isOk());
+        assertTrue(jdbc.queryForObject("SELECT last_seen_at>now()-interval '1 minute' FROM auth_session", Boolean.class));
+        jdbc.update("UPDATE auth_session SET last_seen_at=now()-interval '6 minutes'");
+        b.me().andExpect(status().isUnauthorized());
+        assertTrue(tokens.sessions(Long.parseLong(claims.getSubject()), new org.springframework.mock.web.MockHttpServletRequest()).isEmpty());
+    }
+
+    @Test void anotherMemberCannotListOrRevokeVictimsSessionAndCsrfIsRequired() throws Exception {
+        Browser victim = signup("alice@example.com"), attacker = signup("bob@example.com");
+        String id = jdbc.queryForObject("SELECT id::text FROM auth_session WHERE token_hash=?", String.class, AuthTokens.hash(victim.cookies[0].getValue()));
+        var listing = mvc.perform(get("/api/v1/me/sessions").cookie(attacker.cookies)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1)).andReturn().getResponse().getContentAsString();
+        assertFalse(listing.contains(id)); assertFalse(listing.contains("token_hash")); assertFalse(listing.contains("binding"));
+        attacker.csrf();
+        mvc.perform(delete("/api/v1/me/sessions/" + id).cookie(attacker.cookies).session(attacker.session).header("X-CSRF-TOKEN", attacker.csrf))
+                .andExpect(status().isNotFound());
+        mvc.perform(delete("/api/v1/me/sessions/" + id).cookie(victim.cookies)).andExpect(status().isForbidden());
+        victim.me().andExpect(status().isOk());
+        for (String path : List.of("email/verification", "password/reset-request", "password/reset"))
+            mvc.perform(postJson("/api/v1/auth/"+path, Map.of())).andExpect(status().isForbidden());
+    }
+
+    @Test void googleCallbackConfigurationRejectsUnreachablePathAndInjectedQuery() {
+        var config = new SecurityConfig();
+        for (String url : List.of("https://example.com/other", "https://example.com/login/oauth2/code/google?redirect=evil",
+                "https://example.com/login/oauth2/code/google#fragment", "http://example.com/login/oauth2/code/google"))
+            assertThrows(IllegalStateException.class, () -> config.googleRegistration("client", "secret", url));
+        assertNotNull(config.googleRegistration("client", "secret", "https://example.com/login/oauth2/code/google"));
+    }
+
 }

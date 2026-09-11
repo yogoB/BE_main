@@ -40,7 +40,8 @@ public class SecurityConfig {
             @Value("${GOOGLE_CLIENT_SECRET}") String secret, @Value("${GOOGLE_REDIRECT_URI}") String redirectUri) {
         if (clientId.isBlank() || secret.isBlank()) throw new IllegalStateException("Google credentials are required");
         var uri = java.net.URI.create(redirectUri);
-        if (uri.getHost() == null || uri.getUserInfo() != null || uri.getFragment() != null
+        if (uri.getHost() == null || uri.getUserInfo() != null || uri.getFragment() != null || uri.getQuery() != null
+                || !"/login/oauth2/code/google".equals(uri.getRawPath())
                 || !("https".equals(uri.getScheme()) || ("http".equals(uri.getScheme())
                 && java.util.Set.of("localhost", "127.0.0.1").contains(uri.getHost()))))
             throw new IllegalStateException("Google callback must be HTTPS (HTTP only for loopback development)");

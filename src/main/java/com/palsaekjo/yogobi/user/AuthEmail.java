@@ -64,6 +64,10 @@ public class AuthEmail {
     // Called inside the signup/reset transaction; DELETE RETURNING makes concurrent redemption single-use.
     Proof consume(String token, Purpose purpose) {
         if (token == null || !token.matches("[A-Za-z0-9_-]{43}")) throw invalid();
+        String email = jdbc.query("SELECT email FROM auth_email_token WHERE token_hash=? AND purpose=? AND expires_at>now()",
+                (rs, i) -> rs.getString(1), AuthTokens.hash(token), purpose.name()).stream().findFirst().orElseThrow(AuthEmail::invalid);
+        // Lock before consuming any proof: two links must not hold each other's rows during sibling cleanup.
+        jdbc.query("SELECT pg_advisory_xact_lock(hashtextextended(?,0))", (rs, i) -> 0, "auth-email:" + email);
         return jdbc.query("DELETE FROM auth_email_token WHERE token_hash=? AND purpose=? AND expires_at>now() RETURNING email,user_id,credential_version",
                 (rs, i) -> new Proof(rs.getString(1), rs.getObject(2, Long.class), rs.getObject(3, Long.class)),
                 AuthTokens.hash(token), purpose.name()).stream().findFirst().orElseThrow(AuthEmail::invalid);
