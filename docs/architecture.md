@@ -134,6 +134,16 @@ AI의 `/parse`·`/narrate`·`/ocr`는 토큰 누락·불일치 시 401, 서버 �
 | GET | `/api/v1/me/switch-timing` | 변경 시점 (회수기간) |
 | GET | `/api/v1/me/alerts` | 종료 예정 목록 |
 
+### 개인정보 (V5 — 구현)
+| Method | Path | 설명 |
+|---|---|---|
+| GET | `/api/v1/privacy-policy` | 처리방침·처리 인벤토리(공개) — 항목·목적·보유기간·정보주체 권리 |
+| DELETE | `/api/v1/me` | 회원 탈퇴 — 개인 데이터 전부 파기(FK cascade), 세션 무효화·쿠키 삭제 |
+| GET | `/api/v1/me/consent` | 내 수집·이용 동의 조회 |
+| POST | `/api/v1/me/consent/marketing` | 선택(마케팅) 동의/철회 `{agree}` |
+
+처리방침·인벤토리·보유기간은 `docs/privacy.md`. 보유기간·동의 항목은 정책값이라 확정 시 함께 갱신한다.
+
 ### 요청 / 응답
 
 회원 인증 계약(2026-09-10 사용자 승인 1~4): `docs/auth.md`.
@@ -231,6 +241,12 @@ V4에서 `email_verified`(자체 가입은 검증 토큰 소비 시 TRUE), `cred
 이메일별 트랜잭션 잠금 후 소비해 동시 링크 정리의 교착을 방지한다.
 자격 증명 변경과 세션 발급은 회원 행/버전을 검사하며 재설정 전 로그인 결과의 뒤늦은 발급을 차단한다.
 `auth_rate_limit`(bucket PK, expires_at, attempts): IP 40·이메일 로그인 10·재인증 10·메일 3, 15분 창. 만료 행은 요청 시 정리.
+
+### 개인정보 (V5 마이그레이션)
+삭제권(파기): V2 개인 테이블(`user_subscription`·`payment_record`·`detection_result`) FK에 `ON DELETE CASCADE` 부여.
+`DELETE app_user` 한 번으로 개인 데이터가 전부 파기된다(auth_session·auth_email_token은 V3/V4에서 이미 cascade).
+`user_consent`(id, user_id FK cascade, item `ESSENTIAL|MARKETING`, policy_version, agreed_at, withdrawn_at, UNIQUE(user_id,item)):
+필수는 가입 시 자동 기록(계약 이행), 선택은 `/me/consent/marketing`로 동의/철회. 보유기간 초과분은 `RetentionService`가 파기.
 
 ### 초기 구현 범위 (D-07)
 V1은 위 MVP 테이블 8개를 생성한다. P1/P2 테이블은 해당 단계에서 새 마이그레이션으로 추가한다.
