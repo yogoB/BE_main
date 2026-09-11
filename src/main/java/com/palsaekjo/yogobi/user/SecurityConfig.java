@@ -59,7 +59,7 @@ public class SecurityConfig {
                 .requestCache(c -> c.disable()).formLogin(c -> c.disable()).httpBasic(c -> c.disable()).logout(c -> c.disable())
                 .csrf(c -> c.ignoringRequestMatchers("/api/v1/recommendations", "/api/v1/calculator", "/api/v1/chat/messages"))
                 .authorizeHttpRequests(a -> a
-                        .requestMatchers(HttpMethod.GET, "/", "/index.html", "/account.html", "/account.js", "/favicon.ico", "/api/v1/catalog/**", "/api/v1/auth/csrf").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/", "/index.html", "/account.html", "/account.js", "/favicon.ico", "/api/v1/catalog/**", "/api/v1/auth/csrf", "/api/v1/privacy-policy").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/recommendations", "/api/v1/calculator", "/api/v1/chat/messages",
                                 "/api/v1/auth/signup", "/api/v1/auth/login", "/api/v1/auth/email/verification",
                                 "/api/v1/auth/password/reset-request", "/api/v1/auth/password/reset").permitAll()

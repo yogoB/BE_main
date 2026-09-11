@@ -35,8 +35,21 @@ public class AuthService {
             long id = jdbc.queryForObject("INSERT INTO app_user(email,password_hash,email_verified) VALUES (?,?,TRUE) RETURNING id",
                     Long.class, proof.email(), hash);
             jdbc.update("DELETE FROM auth_email_token WHERE email=?", proof.email());
+            recordEssentialConsent(id);
             return member(id);
         } catch (DuplicateKeyException e) { throw conflict(); }
+    }
+
+    /** 회원 탈퇴 — 개인 데이터를 전부 파기한다(app_user 삭제가 FK ON DELETE CASCADE 로 전파, V5). */
+    @Transactional
+    public void deleteAccount(long id) {
+        if (jdbc.update("DELETE FROM app_user WHERE id=?", id) != 1) throw unauthorized();
+    }
+
+    // 가입 시 필수 처리(계약 이행) 동의를 현재 처리방침 버전으로 기록한다. 같은 트랜잭션에서 실행.
+    private void recordEssentialConsent(long id) {
+        jdbc.update("INSERT INTO user_consent(user_id,item,policy_version) VALUES (?,'ESSENTIAL',?)",
+                id, com.palsaekjo.yogobi.privacy.PrivacyPolicy.VERSION);
     }
 
     public Member login(String email, String password) {
@@ -79,6 +92,7 @@ public class AuthService {
         try {
             long id = jdbc.queryForObject("INSERT INTO app_user(email,google_sub,email_verified) VALUES (?,?,TRUE) RETURNING id",
                     Long.class, email, google.getSubject());
+            recordEssentialConsent(id);
             return member(id);
         } catch (DuplicateKeyException e) { throw conflict(); } // Never auto-link by email.
     }

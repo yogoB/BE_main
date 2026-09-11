@@ -76,6 +76,15 @@ public class AuthController {
         return ApiResponse.ok(members.member(Long.parseLong(principal.getName())));
     }
 
+    @DeleteMapping("/me")
+    public ApiResponse<Map<String, Boolean>> deleteAccount(Principal principal, HttpServletRequest request,
+                                                           HttpServletResponse response) {
+        members.deleteAccount(Long.parseLong(principal.getName()));
+        tokens.clear(response);
+        GoogleLogin.invalidate(request);
+        return ApiResponse.ok(Map.of("deleted", true));
+    }
+
     @PostMapping({"/auth/logout", "/auth/logout-all"})
     public ApiResponse<Map<String, Boolean>> logout(Principal principal, HttpServletRequest request,
                                                    HttpServletResponse response) {
