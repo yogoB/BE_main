@@ -76,6 +76,9 @@
 |---|---|---|
 | 카탈로그 시드 로더 | `CatalogSeedLoader` | `catalog` 내부, CSV 스냅샷 적재 |
 | AI 서버 게이트웨이 | `AiGateway` | `/parse`·`/narrate` HTTP 호출과 응답 검증 |
+| 스마트초이스 어댑터 | `SmartChoiceClient` | Open API 단건 조회(추천 3건)·XML 파싱·fail-soft. `SmartChoiceRecommendation` |
+| 스마트초이스 격자 스윕 | `SmartChoiceSweepService` | data×type×dis 격자 호출·dedup 업서트·하루 3회 @Scheduled |
+| 요금제 라이브 시세 | `smartchoice_plan_snapshot` | 교차검증·시세 스냅샷(카탈로그 대체 아님). 유니크 (carrier,plan_name,network_type,contract_months) |
 | 서버 간 내부 토큰 | `AI_INTERNAL_TOKEN` | BE와 AI만 공유. 사용자 인증 토큰과 별도이며 프론트에 노출하지 않음 |
 | 챗봇 요청 진입점 | `ChatController` | 기존 추천 서비스 재사용, 추가 입력·필터 폴백 안내 |
 | 챗봇 응답 | `ChatResponse` | `status`, `message`, `recommendation` |

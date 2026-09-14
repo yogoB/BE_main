@@ -255,6 +255,11 @@ V4에서 `email_verified`(자체 가입은 검증 토큰 소비 시 TRUE), `cred
 `PaymentRetentionService.preserve`는 원본 생성/분류 트랜잭션에서 명시적으로 호출하고, 일반 반입/탈퇴가 자동으로 사본을 생성하지 않는다.
 `RetentionService`는 사본의 확정 기한에만 파기한다. 회원 API·추천·AI에 사본 접근 경로 없음. 익명화를 보장하지 않으며 상세 조건은 `docs/privacy.md`.
 
+### 통신요금 라이브 시세 (V7 마이그레이션, D-12)
+`smartchoice_plan_snapshot`(carrier, plan_name, network_type, contract_months, plan_price, discounted_price, display_data, source, source_url, collected_at,
+UNIQUE(carrier,plan_name,network_type,contract_months)): 스마트초이스 Open API 격자 스윕(`SmartChoiceSweepService`, 하루 3회 @Scheduled)이 dedup 업서트로 채운다.
+**카탈로그(시드)를 대체하지 않는다** — 교차검증·시세 참고용(요금제 ID·OTT·정확 스펙 없음). fail-soft(키 없으면 스윕 비활성). 추천 응답 연결은 §3 계약 결정 후.
+
 ### 초기 구현 범위 (D-07)
 V1은 위 MVP 테이블 8개를 생성한다. P1/P2 테이블은 해당 단계에서 새 마이그레이션으로 추가한다.
 시드 원문 보존을 위해 `subscription_tier.note`, `bundle_product.provider`를 저장하고,
