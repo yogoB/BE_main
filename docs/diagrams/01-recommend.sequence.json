@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {"title": "요고비 · 추천과 직접 계산", "quality_profile": "showcase", "column_fit": "spread", "viewBox": [1080, 780]},
+  "participants": [
+    {"id":"visitor","type":"frontend","label":"사용자 화면","sublabel":"비회원도 이용"},
+    {"id":"endpoint","type":"backend","label":"추천·계산 API","sublabel":"각 Controller"},
+    {"id":"recommend","type":"backend","label":"RecommendationService","sublabel":"공통 처리"},
+    {"id":"catalog","type":"database","label":"CatalogReader","sublabel":"PostgreSQL 조회"},
+    {"id":"pricing","type":"backend","label":"CostCalculator","sublabel":"순수 Java · pricing"}
+  ],
+  "messages": [
+    {"id":"submit","from":"visitor","to":"endpoint","y":190,"label":"추천 또는 계산 요청","note":"POST /api/v1/recommendations 또는 POST /api/v1/calculator","variant":"emphasis"},
+    {"id":"dispatch","from":"endpoint","to":"recommend","y":245,"label":"recommend / calculate"},
+    {"id":"load","from":"recommend","to":"catalog","y":300,"label":"요금제·티어·혜택·번들 조회"},
+    {"id":"inputs","from":"catalog","to":"recommend","y":355,"label":"계산할 조합 반환","variant":"return"},
+    {"id":"compute","from":"recommend","to":"pricing","y":410,"label":"조합별 calculate 호출","note":"추천은 후보마다 반복, 계산기는 지정한 조합 1회","variant":"emphasis"},
+    {"id":"breakdown","from":"pricing","to":"recommend","y":465,"label":"총액·절감액·항목별 출처","variant":"return"},
+    {"id":"result","from":"recommend","to":"endpoint","y":535,"label":"추천 상위 5개 / 계산 1개","note":"monthlyTotal 오름차순 추천. accuracy와 missingInputs를 함께 반환","variant":"return"},
+    {"id":"render","from":"endpoint","to":"visitor","y":605,"label":"결과와 부족한 조건 표시","variant":"return"}
+  ],
+  "cards": [
+    {"dot":"emerald","title":"계산 원칙","items":["원하는 서비스만 혜택 반영 · 금액 계산은 pricing 전담","필터와 챗봇은 같은 RecommendationService 사용"]},
+    {"dot":"amber","title":"현재 계산 범위","items":["후보 없음은 422 · 잘못된 입력은 400","번들은 first-fit 적용이며 전역 최적 조합 탐색은 미구현"]}
+  ]
+}
