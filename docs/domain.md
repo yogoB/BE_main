@@ -76,6 +76,8 @@
 |---|---|---|
 | 카탈로그 시드 로더 | `CatalogSeedLoader` | `catalog` 내부, CSV 스냅샷 적재 |
 | AI 서버 게이트웨이 | `AiGateway` | `/parse`·`/narrate` HTTP 호출과 응답 검증 |
+| 우체국알뜰폰 어댑터 | `PostOfficeMvnoClient` | 우정사업본부 Open API 조회·XML 파싱·fail-soft. `MvnoPlan` |
+| 알뜰폰 카탈로그 적재 | `MvnoCatalogLoader` | MVNO 요금제 → carrier(MVNO)+mobile_plan upsert(캐시), 무효행 스킵·하루 1회 @Scheduled |
 | 스마트초이스 어댑터 | `SmartChoiceClient` | Open API 단건 조회(추천 3건)·XML 파싱·fail-soft. `SmartChoiceRecommendation` |
 | 스마트초이스 격자 스윕 | `SmartChoiceSweepService` | data×type×dis 격자 호출·dedup 업서트·하루 3회 @Scheduled |
 | 요금제 라이브 시세 | `smartchoice_plan_snapshot` | 교차검증·시세 스냅샷(카탈로그 대체 아님). 유니크 (carrier,plan_name,network_type,contract_months) |
@@ -188,6 +190,12 @@
 | `ESTIMATED` | 추정 | 위약금, OCR 추출값 |
 
 `ESTIMATED`가 포함된 결과는 화면에 "추정치예요" 표기가 붙는다.
+
+### 소스 우선순위 (데이터 소싱, D-13)
+
+같은 값에 여러 소스가 있으면 **`OFFICIAL`/`DERIVED`(인가 API·공식·계산) > `USER_PROVIDED`(사용자 확정) > `ESTIMATED`(AI추출·크롤 미확인)** 순으로 채택한다.
+`ESTIMATED`는 표시·보조만 — 계산 우선순위 최하이며, 확인되면 상위로 승격한다. **금액을 만드는 건 pricing 단독(D-03)**: AI·크롤은 소스 후보만 제공하고, 런타임 크롤·AI 실시간 가격 소싱은 하지 않는다(D-05, 배치/오프라인만).
+소스별: MVNO 요금제=우체국 API(주)+CSV/사용자, MNO 요금제=CSV(팀)+사용자입력(공개 API 없음), 시세=SmartChoice(교차검증·표시), OTT 티어·번들·제휴혜택=CSV/오프라인 크롤.
 
 ---
 

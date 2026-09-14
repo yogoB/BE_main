@@ -47,6 +47,13 @@ GET http://api.smartchoice.or.kr/openAPI.xml
 
 **추천 연결(교차검증 오버레이):** `SmartChoiceSnapshotReader`가 추천 결과의 (통신사, 요금제명)으로 스냅샷 정상가를 찾아 `results[].priceCrossCheck`(livePrice·seedPrice·matches·source·collectedAt)로 붙인다. **계산은 시드 그대로, 표시만.** 매칭 없으면 null. AI `/narrate`로는 전달하지 않는다(extra=forbid). 가격 override(시드 갱신)는 명명 충돌·계산 정합 위험으로 하지 않음.
 
+## 2-A. 우체국알뜰폰 요금제조회 API (알뜰폰 주 소스)
+
+우정사업본부 Open API(공공데이터포털, 무료·자동승인·10,000회/일·이용허락 제한 없음). `ServiceKey` 하나로 우체국 입점 알뜰폰 전체를 1회 XML 조회.
+필드: 통신망·업체명(bizName)·요금제명·통신상품구분(5G/LTE/3G)·요금제구분(무약정/약정/선불)·기본료·기본음성/문자/데이터(MB)·초과단가.
+구현: `PostOfficeMvnoClient`(fail-soft·XXE 차단) + `MvnoCatalogLoader`(carrier(MVNO)+mobile_plan 캐시 upsert, 무효행 스킵, 하루 1회). MNO 3사 전용 공개 API는 없음 → CSV/오프라인 크롤.
+엔드포인트: `openapi.epost.go.kr/postal/retrieveAlddlChargeService/retrieveAlddlChargeService/getAlddlChargeList`. **파서 가정(무제한 표기·단위·wrapper)은 실 응답으로 확정 필요.**
+
 ## 3. 제휴 혜택 크롤링 (D3) — 1회성
 
 대상: `https://www.smartchoice.or.kr/smc/plan/ottPdt.do`
@@ -91,6 +98,8 @@ OTT 아이콘(넷플·티빙·웨이브·디즈니+·유튜브프리미엄) 선�
 구현 순서: **A → B → E**. C·D는 안 해도 된다.
 
 ## 5. 마이데이터 판정
+
+> 라이브 연동을 왜 안 넣었는지 상세 근거·대안·전환 경로: `docs/mydata.md`.
 
 ### ❌ 불가 — 제3자 전송
 개인정보 마이데이터는 전문기관 지정 또는 일반수신자 등록, 금융 마이데이터는
