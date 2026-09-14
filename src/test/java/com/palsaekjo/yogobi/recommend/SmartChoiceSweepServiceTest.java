@@ -82,6 +82,16 @@ class SmartChoiceSweepServiceTest {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM smartchoice_plan_snapshot", Integer.class)).isZero();
     }
 
+    @Test void abortsAfterConsecutiveUnreachable() {
+        // 도달성 가드: 서버 미응답이 연속되면 격자 전체(54회)를 두드리지 않고 조기 중단.
+        var sweep = new SmartChoiceSweepService(
+                new SmartChoiceClient(RestClient.builder(), "k", "http://127.0.0.1:1/openAPI.xml"), jdbc, "x");
+        var result = sweep.sweep();
+        assertThat(result.enabled()).isTrue();
+        assertThat(result.calls()).isEqualTo(SmartChoiceSweepService.MAX_CONSECUTIVE_UNREACHABLE);
+        assertThat(result.rowsUpserted()).isZero();
+    }
+
     @Test void failSoftOnHttpError() throws Exception {
         var sweep = sweepAgainst(500, "");
         var result = sweep.sweep();

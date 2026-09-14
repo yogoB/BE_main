@@ -11,6 +11,7 @@ public record CostResult(
         long baseline,
         long monthlySavings,
         long annualSavings,
-        List<BreakdownLine> breakdown
+        List<BreakdownLine> breakdown,
+        PriceCrossCheck priceCrossCheck // 스마트초이스 라이브 시세 대조. 매칭 없으면 null. /narrate 로는 전달하지 않는다.
 ) {
 }

@@ -13,6 +13,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.w3c.dom.Document;
 import org.w3c.dom.NodeList;
@@ -61,10 +62,18 @@ public class SmartChoiceClient {
                             .build())
                     .retrieve().body(String.class);
             return parse(xml);
+        } catch (ResourceAccessException e) {
+            // 연결·읽기 타임아웃·DNS 등 = 서버 미응답(등록 IP·한국망 제한 포함). 스윕이 도달성 가드로 조기 중단하도록 신호.
+            throw new Unreachable();
         } catch (RuntimeException e) {
-            log.warn("스마트초이스 호출 실패 — 건너뜀 (fail-soft): data={}MB type={} dis={}", dataMb, type, dis);
+            // 도달은 했으나 실패(HTTP 오류·파싱 오류) — fail-soft로 건너뛴다.
+            log.warn("스마트초이스 응답 실패 — 건너뜀 (fail-soft): data={}MB type={} dis={}", dataMb, type, dis);
             return List.of();
         }
+    }
+
+    /** 서버에 도달하지 못했음(연결/읽기 타임아웃). {@link SmartChoiceSweepService}의 도달성 가드가 잡는다. */
+    public static class Unreachable extends RuntimeException {
     }
 
     /** 응답 XML을 추천 목록으로 파싱한다. resultCode≠100·오류면 빈 목록. 외부 XML이므로 XXE 차단. */

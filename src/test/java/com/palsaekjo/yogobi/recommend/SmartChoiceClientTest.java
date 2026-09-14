@@ -1,6 +1,7 @@
 package com.palsaekjo.yogobi.recommend;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.sun.net.httpserver.HttpServer;
 import java.net.InetSocketAddress;
@@ -65,6 +66,13 @@ class SmartChoiceClientTest {
         } finally {
             server.stop(0);
         }
+    }
+
+    @Test void unreachableEndpointThrowsUnreachable() {
+        // 연결 거부/타임아웃 = 도달 실패 → Unreachable (스윕이 도달성 가드로 잡음). HTTP 오류(fail-soft)와 구분.
+        var client = new SmartChoiceClient(RestClient.builder(), "k", "http://127.0.0.1:1/openAPI.xml");
+        assertThatThrownBy(() -> client.recommend(3000, 100, 50, 20, 3, 24))
+                .isInstanceOf(SmartChoiceClient.Unreachable.class);
     }
 
     @Test void httpErrorIsFailSoft() throws Exception {

@@ -40,7 +40,9 @@ class ChatControllerTest {
              "optional":{"currentCarrier":null,"networkType":null,"contractType":null,"hasFamilyBundle":null}}
             """;
     private final CostResult cost = new CostResult(42, "넷플플랜", "SKT", 55000, 68500, 13500, 162000,
-            List.of(new BreakdownLine("기본료", 55000, "OFFICIAL", null)));
+            List.of(new BreakdownLine("기본료", 55000, "OFFICIAL", null)),
+            // 교차검증 표시값이 있어도 /narrate 로는 전달되지 않아야 한다(아래 본문 대조로 검증).
+            new com.palsaekjo.yogobi.recommend.PriceCrossCheck(54000, 55000, false, "스마트초이스(KTOA)", "2026-09-14"));
     private final RecommendationResponse recommendation = new RecommendationResponse(Accuracy.PARTIAL,
             List.of(new MissingInput("hasFamilyBundle", "확인 필요", "통신사 마이페이지")), List.of(cost));
 
@@ -81,6 +83,7 @@ class ChatControllerTest {
         assertEquals(List.of("Bearer test-backend-only-token", "Bearer test-backend-only-token"), authorizations);
         assertEquals(json.readTree("{\"text\":\"데이터 20기가 넷플릭스\"}"), bodies.getFirst());
         var expected = json.valueToTree(cost).deepCopy();
+        ((com.fasterxml.jackson.databind.node.ObjectNode) expected).remove("priceCrossCheck"); // AI 로 전달 안 함
         ((com.fasterxml.jackson.databind.node.ObjectNode) expected)
                 .set("missingInputs", json.valueToTree(recommendation.missingInputs()));
         assertEquals(json.readTree(json.writeValueAsString(expected)), bodies.get(1));

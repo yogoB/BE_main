@@ -26,6 +26,7 @@ public class SmartChoiceSweepService {
     static final int VOICE = SmartChoiceClient.UNLIMITED;
     static final int SMS = SmartChoiceClient.UNLIMITED;
     static final int MAX_CALLS = 2000;    // 격자 확장 시 폭주 방지 상한
+    static final int MAX_CONSECUTIVE_UNREACHABLE = 3; // 도달성 가드: 연속 미응답 시 조기 중단(9분 헛돎 방지)
 
     private final SmartChoiceClient client;
     private final JdbcTemplate jdbc;
@@ -49,6 +50,7 @@ public class SmartChoiceSweepService {
         }
         int calls = 0;
         int rows = 0;
+        int consecutiveUnreachable = 0;
         outer:
         for (int type : TYPES) {
             for (int dis : DIS) {
@@ -58,9 +60,18 @@ public class SmartChoiceSweepService {
                         break outer;
                     }
                     calls++;
-                    List<SmartChoiceRecommendation> recs = client.recommend(data, VOICE, SMS, AGE, type, dis);
-                    for (SmartChoiceRecommendation rec : recs) {
-                        rows += upsert(rec, networkName(type), dis);
+                    try {
+                        List<SmartChoiceRecommendation> recs = client.recommend(data, VOICE, SMS, AGE, type, dis);
+                        consecutiveUnreachable = 0;
+                        for (SmartChoiceRecommendation rec : recs) {
+                            rows += upsert(rec, networkName(type), dis);
+                        }
+                    } catch (SmartChoiceClient.Unreachable e) {
+                        // 도달성 가드: 연속 미응답이면 나머지 격자를 계속 두드리지 않고 중단(등록 IP·한국망 제한 등).
+                        if (++consecutiveUnreachable >= MAX_CONSECUTIVE_UNREACHABLE) {
+                            log.warn("스마트초이스 연속 {}회 도달 실패 — 스윕 중단(도달성 가드). 등록 IP·한국망 확인 필요", consecutiveUnreachable);
+                            break outer;
+                        }
                     }
                 }
             }

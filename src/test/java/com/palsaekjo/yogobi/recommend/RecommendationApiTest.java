@@ -44,6 +44,7 @@ class RecommendationApiTest {
         jdbc.execute("DELETE FROM plan_benefit");
         jdbc.execute("DELETE FROM mobile_plan");
         jdbc.execute("DELETE FROM carrier");
+        jdbc.execute("TRUNCATE smartchoice_plan_snapshot");
         jdbc.execute("INSERT INTO carrier(id,name,carrier_type) VALUES (1,'SKT','MNO'),(2,'KT','MNO')");
         // P1형: 넷플릭스 무료 55,000 / P2형: 웨이브 무료 45,000 (docs/testing.md G-01)
         jdbc.execute("""
@@ -107,6 +108,25 @@ class RecommendationApiTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.code").value("YGB-REQ-001"))
                 .andExpect(jsonPath("$.error.field").value("wantedServiceIds"));
+    }
+
+    @Test
+    void livePriceCrossCheckAttachedOnlyWhenSnapshotMatches() throws Exception {
+        // 넷플플랜에 매칭되는 스마트초이스 스냅샷(정상가 54,000 ≠ 시드 55,000). 웨이브플랜은 스냅샷 없음.
+        jdbc.execute("""
+                INSERT INTO smartchoice_plan_snapshot(carrier,plan_name,network_type,contract_months,plan_price,discounted_price,display_data,source_url)
+                VALUES ('SKT','넷플플랜','5G',0,54000,40500,'무제한','http://api.smartchoice.or.kr/openAPI.xml')""");
+        mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
+                {"required":{"monthlyDataGb":20,"wantedServiceIds":[1]},"optional":{"contractType":"NONE"}}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.results[0].planName").value("넷플플랜"))
+                .andExpect(jsonPath("$.data.results[0].monthlyTotal").value(55000)) // 계산은 시드 그대로(교차검증은 표시만)
+                .andExpect(jsonPath("$.data.results[0].priceCrossCheck.livePrice").value(54000))
+                .andExpect(jsonPath("$.data.results[0].priceCrossCheck.seedPrice").value(55000))
+                .andExpect(jsonPath("$.data.results[0].priceCrossCheck.matches").value(false))
+                .andExpect(jsonPath("$.data.results[0].priceCrossCheck.source").value("스마트초이스(KTOA)"))
+                .andExpect(jsonPath("$.data.results[1].planName").value("웨이브플랜"))
+                .andExpect(jsonPath("$.data.results[1].priceCrossCheck.livePrice").doesNotExist());
     }
 
     @Test
