@@ -133,6 +133,33 @@ class MeApiTest {
                 .andExpect(jsonPath("$.data").isArray());
     }
 
+    @Test void switchTimingComparesCurrentVsTarget() throws Exception {
+        jdbc.execute("INSERT INTO carrier(id,name,carrier_type) VALUES (1,'SKT','MNO')");
+        jdbc.execute("""
+                INSERT INTO mobile_plan(id,carrier_id,name,network_type,base_price,data_mb,voice_min,sms_cnt,source_url,collected_at)
+                VALUES (1,1,'현재요금제','FIVE_G',55000,100000,999999,9999,'http://seed','2026-09-14'),
+                       (2,1,'대상요금제','FIVE_G',45000,100000,999999,9999,'http://seed','2026-09-14')""");
+        Browser a = new Browser(); long id = signup("alice@example.com", a);
+        jdbc.update("INSERT INTO user_subscription(user_id,tier_id,monthly_price) VALUES (?,2,13500)", id); // 티어 2 정가 13,500
+        a.send(post("/api/v1/me/current-plan").contentType("application/json").content("{\"planId\":1}"));
+
+        // 현재=55000+13500=68500, 대상=45000+13500=58500, 절감=10000, 회수=ceil(60000/10000)=6 < 10 → SWITCH_NOW
+        mvc.perform(get("/api/v1/me/switch-timing").cookie(a.cookies)
+                        .param("targetPlanId", "2").param("switchingCost", "60000").param("remainingContractMonths", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.currentMonthlyCost").value(68500))
+                .andExpect(jsonPath("$.data.targetMonthlyCost").value(58500))
+                .andExpect(jsonPath("$.data.monthlySavings").value(10000))
+                .andExpect(jsonPath("$.data.paybackMonths").value(6))
+                .andExpect(jsonPath("$.data.status").value("SWITCH_NOW"));
+    }
+
+    @Test void switchTimingRequiresCurrentPlanSet() throws Exception {
+        Browser a = new Browser(); signup("alice@example.com", a);
+        mvc.perform(get("/api/v1/me/switch-timing").cookie(a.cookies).param("targetPlanId", "1"))
+                .andExpect(status().isBadRequest()); // 현재 요금제 미설정
+    }
+
     @Test void guestCannotAccessMe() throws Exception {
         mvc.perform(get("/api/v1/me/subscriptions")).andExpect(status().isUnauthorized());
         mvc.perform(get("/api/v1/me/detections")).andExpect(status().isUnauthorized());

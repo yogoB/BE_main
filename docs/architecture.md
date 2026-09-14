@@ -132,7 +132,7 @@ AI의 `/parse`·`/narrate`·`/ocr`는 토큰 누락·불일치 시 401, 서버 �
 ### Phase 2
 | Method | Path | 설명 |
 |---|---|---|
-| GET | `/api/v1/me/switch-timing` | 변경 시점 (회수기간) |
+| GET | `/api/v1/me/switch-timing` | 변경 시점 (회수기간) — 구현. `?targetPlanId&switchingCost&remainingContractMonths`, 현재 요금제(저장)+구독 대비 회수개월·SWITCH_NOW/WAIT/NO_BENEFIT |
 | GET | `/api/v1/me/alerts` | 종료 예정 목록 |
 
 ### 개인정보 (V5 — 구현)
