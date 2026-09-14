@@ -43,7 +43,9 @@ GET http://api.smartchoice.or.kr/openAPI.xml
 
 `data` 파라미터가 **MB 단위**다. 사용자 입력은 GB이므로 변환한다.
 
-**구현(2026-09-14, D-12):** `SmartChoiceClient`(단건 조회·XXE 차단·fail-soft) + `SmartChoiceSweepService`(data×type×dis 격자 스윕·dedup 업서트·하루 3회 `@Scheduled`) → `smartchoice_plan_snapshot`(V7) 라이브 시세 스냅샷. 하루 호출 162회(10,000 제한 내). **카탈로그(시드)를 대체하지 않으며 추천 응답에는 아직 연결하지 않았다**(스냅샷엔 요금제 ID·OTT·정확 스펙 없음 — 교차검증/시세 참고용). `SMARTCHOICE_API_KEY` 없으면 스윕 비활성(추천은 시드 기반으로 정상).
+**구현(2026-09-14, D-12):** `SmartChoiceClient`(단건 조회·XXE 차단·fail-soft) + `SmartChoiceSweepService`(data×type×dis 격자 스윕·dedup 업서트·하루 3회 `@Scheduled`) → `smartchoice_plan_snapshot`(V7) 라이브 시세 스냅샷. 하루 호출 162회(10,000 제한 내). **카탈로그(시드)를 대체하지 않는다**(스냅샷엔 요금제 ID·OTT·정확 스펙 없음). `SMARTCHOICE_API_KEY` 없으면 스윕 비활성(추천은 시드 기반으로 정상).
+
+**추천 연결(교차검증 오버레이):** `SmartChoiceSnapshotReader`가 추천 결과의 (통신사, 요금제명)으로 스냅샷 정상가를 찾아 `results[].priceCrossCheck`(livePrice·seedPrice·matches·source·collectedAt)로 붙인다. **계산은 시드 그대로, 표시만.** 매칭 없으면 null. AI `/narrate`로는 전달하지 않는다(extra=forbid). 가격 override(시드 갱신)는 명명 충돌·계산 정합 위험으로 하지 않음.
 
 ## 3. 제휴 혜택 크롤링 (D3) — 1회성
 

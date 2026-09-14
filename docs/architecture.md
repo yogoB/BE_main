@@ -183,12 +183,17 @@ Google 전용 계정은 동일 Google `sub` 재인증으로 자체 비밀번호�
       { "label": "선택약정 25% 할인", "amount": -13750, "provenance": "DERIVED" },
       { "label": "넷플릭스 스탠다드", "amount": 13500, "provenance": "OFFICIAL",
         "note": "제휴 혜택으로 4,000원 할인 적용" }
-    ]
+    ],
+    "priceCrossCheck": {                       // 스마트초이스 라이브 시세 대조(D-12). 매칭 스냅샷 없으면 null
+      "livePrice": 54000, "seedPrice": 55000, "matches": false,
+      "source": "스마트초이스(KTOA)", "collectedAt": "2026-09-14"
+    }
   }]
 }
 ```
 
 `baseline`은 아무 할인 없이 정가로만 냈을 때다. 절감액 표시의 기준선.
+`priceCrossCheck`는 시드 기본료를 스마트초이스 라이브 시세와 대조한 **표시용**이며 계산에 쓰지 않는다(매칭 없으면 null). AI `/narrate`로는 전달하지 않는다.
 
 ---
 

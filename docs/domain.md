@@ -79,6 +79,8 @@
 | 스마트초이스 어댑터 | `SmartChoiceClient` | Open API 단건 조회(추천 3건)·XML 파싱·fail-soft. `SmartChoiceRecommendation` |
 | 스마트초이스 격자 스윕 | `SmartChoiceSweepService` | data×type×dis 격자 호출·dedup 업서트·하루 3회 @Scheduled |
 | 요금제 라이브 시세 | `smartchoice_plan_snapshot` | 교차검증·시세 스냅샷(카탈로그 대체 아님). 유니크 (carrier,plan_name,network_type,contract_months) |
+| 시세 스냅샷 읽기 | `SmartChoiceSnapshotReader` | (통신사,요금제명)→정상가 조회. 무약정·최신 우선 |
+| 시세 교차검증 | `PriceCrossCheck` | 추천 결과의 시드 기본료↔라이브 시세 대조(표시용, 계산 미사용). `/narrate` 미전달 |
 | 서버 간 내부 토큰 | `AI_INTERNAL_TOKEN` | BE와 AI만 공유. 사용자 인증 토큰과 별도이며 프론트에 노출하지 않음 |
 | 챗봇 요청 진입점 | `ChatController` | 기존 추천 서비스 재사용, 추가 입력·필터 폴백 안내 |
 | 챗봇 응답 | `ChatResponse` | `status`, `message`, `recommendation` |
