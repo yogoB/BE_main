@@ -42,6 +42,7 @@ class PrivacyApiTest {
 
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;
+    @Autowired PaymentRetentionService paymentRetention;
 
     Cookie[] cookies = {};
     MockHttpSession session;
@@ -49,6 +50,7 @@ class PrivacyApiTest {
 
     @BeforeEach void clear() {
         jdbc.execute("TRUNCATE app_user CASCADE");
+        jdbc.execute("TRUNCATE retained_payment_record");
         cookies = new Cookie[0]; session = null; csrf = null;
     }
 
@@ -140,5 +142,33 @@ class PrivacyApiTest {
         long id = signup("alice@example.com");
         mvc.perform(delete("/api/v1/me").cookie(cookies)).andExpect(status().isForbidden());
         assertThat(jdbc.queryForObject("SELECT count(*) FROM app_user WHERE id=?", Integer.class, id)).isEqualTo(1);
+    }
+
+    @Test void deletionErasesImportedDataButKeepsExplicitEvidenceWithoutAccountLink() throws Exception {
+        long id = signup("alice@example.com");
+        long paymentId = jdbc.queryForObject("INSERT INTO payment_record(user_id,merchant_raw,amount,paid_at,source) VALUES (?,'MERCHANT',1000,CURRENT_DATE,'TEST') RETURNING id", Long.class, id);
+        jdbc.update("INSERT INTO payment_record(user_id,merchant_raw,amount,paid_at,source) VALUES (?,'ORDINARY IMPORT',2000,CURRENT_DATE,'TEST')", id);
+        var today = java.time.LocalDate.now();
+        paymentRetention.preserve(paymentId, "TEST: confirmed statutory basis", today, today.plusYears(5).plusDays(1));
+
+        csrf();
+        mvc.perform(delete("/api/v1/me").session(session).cookie(cookies).header("X-CSRF-TOKEN", csrf))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.deleted").value(true));
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM payment_record", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM app_user", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM retained_payment_record", Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT amount FROM retained_payment_record", Long.class)).isEqualTo(1000L);
+        assertThat(jdbc.queryForList("SELECT column_name FROM information_schema.columns WHERE table_name='retained_payment_record'", String.class))
+                .doesNotContain("user_id", "email", "password_hash", "google_sub", "token_hash");
+        mvc.perform(get("/api/v1/me").cookie(cookies)).andExpect(status().isUnauthorized());
+    }
+
+    @Test void statutoryArchiveIsNotAvailableThroughMemberApi() throws Exception {
+        signup("alice@example.com");
+        mvc.perform(get("/api/v1/retained-payment-records").cookie(cookies)).andExpect(status().isForbidden());
+        csrf();
+        mvc.perform(post("/api/v1/retained-payment-records").session(session).cookie(cookies).header("X-CSRF-TOKEN", csrf)
+                .contentType("application/json").content("{}" )).andExpect(status().isForbidden());
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM retained_payment_record", Integer.class)).isZero();
     }
 }

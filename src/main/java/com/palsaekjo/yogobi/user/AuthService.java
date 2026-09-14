@@ -40,7 +40,7 @@ public class AuthService {
         } catch (DuplicateKeyException e) { throw conflict(); }
     }
 
-    /** 회원 탈퇴 — 개인 데이터를 전부 파기한다(app_user 삭제가 FK ON DELETE CASCADE 로 전파, V5). */
+    /** 회원 탈퇴 — 이용 데이터는 파기하며 별도 법정 보존 사본에는 회원 FK가 없어 삭제가 전파되지 않는다. */
     @Transactional
     public void deleteAccount(long id) {
         if (jdbc.update("DELETE FROM app_user WHERE id=?", id) != 1) throw unauthorized();
