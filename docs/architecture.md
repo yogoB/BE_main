@@ -123,9 +123,10 @@ AI의 `/parse`·`/narrate`·`/ocr`는 토큰 누락·불일치 시 401, 서버 �
 | POST | `/api/v1/auth/logout-all` | 현재 회원의 모든 로그인 무효화 |
 | GET | `/api/v1/me` | 인증된 현재 회원 조회 |
 | GET/DELETE | `/api/v1/me/sessions` `/{id}` | 로그인 세션 목록 · 개별 세션 폐기 |
-| GET/POST/DELETE | `/api/v1/me/subscriptions` | 내 구독 |
+| GET/POST/DELETE | `/api/v1/me/subscriptions` `/{id}` | 내 구독 (구현) |
+| POST | `/api/v1/me/current-plan` | 현재 요금제 설정 (구현) |
 | POST | `/api/v1/me/payments/import` | 결제내역 업로드 |
-| GET | `/api/v1/me/detections` | 탐지 결과 |
+| GET | `/api/v1/me/detections` | 탐지 결과 (구현 — 요청 시 재탐지) |
 | POST | `/api/v1/chat/messages` | 챗봇 |
 
 ### Phase 2
