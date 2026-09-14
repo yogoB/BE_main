@@ -164,4 +164,40 @@ class MeApiTest {
         mvc.perform(get("/api/v1/me/subscriptions")).andExpect(status().isUnauthorized());
         mvc.perform(get("/api/v1/me/detections")).andExpect(status().isUnauthorized());
     }
+
+    @Test void paymentImportRequiresMemberAndCsrfAndStoresOnlyOwnAnalysis() throws Exception {
+        String payload = """
+                {"approved_list":[
+                  {"status":"01","merchant_name":"NETFLIX","approved_amt":13500,"currency_code":"KRW","approved_dtime":"20260914123000"},
+                  {"status":"01","merchant_name":"Unknown merchant","approved_amt":2000,"currency_code":"KRW","approved_dtime":"20260914123100"},
+                  {"status":"02"}]}
+                """;
+        mvc.perform(post("/api/v1/me/payments/import").contentType("application/json").content(payload))
+                .andExpect(status().isForbidden());
+        Browser guest = new Browser(); guest.csrf();
+        mvc.perform(post("/api/v1/me/payments/import").session(guest.session).header("X-CSRF-TOKEN",guest.csrf)
+                .contentType("application/json").content(payload)).andExpect(status().isUnauthorized());
+
+        Browser a = new Browser(); long alice = signup("alice@example.com", a);
+        Browser b = new Browser(); long bob = signup("bob@example.com", b);
+        mvc.perform(post("/api/v1/me/payments/import").cookie(a.cookies)
+                .contentType("application/json").content(payload)).andExpect(status().isForbidden());
+        var response = a.send(post("/api/v1/me/payments/import").contentType("application/json").content(payload));
+        assertThat(response.getResponse().getStatus()).isEqualTo(200);
+        var data = JSON.readTree(response.getResponse().getContentAsString()).path("data");
+        assertThat(data.path("imported").asInt()).isEqualTo(2);
+        assertThat(data.path("recognized").asInt()).isEqualTo(1);
+        assertThat(data.path("unrecognized").get(0).asText()).isEqualTo("Unknown merchant");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM payment_record WHERE user_id=?",Integer.class,alice)).isEqualTo(2);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM payment_record WHERE user_id=?",Integer.class,bob)).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM payment_record WHERE service_id IS NULL",Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM user_subscription",Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM retained_payment_record",Integer.class)).isZero();
+
+        // 전체 입력 검증이 끝나기 전에는 유효한 앞 항목도 저장하면 안 된다.
+        String invalidBatch = payload.replace("\"approved_amt\":2000", "\"approved_amt\":2.5");
+        assertThat(a.send(post("/api/v1/me/payments/import").contentType("application/json").content(invalidBatch))
+                .getResponse().getStatus()).isEqualTo(400);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM payment_record WHERE user_id=?",Integer.class,alice)).isEqualTo(2);
+    }
 }

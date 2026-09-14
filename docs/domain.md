@@ -101,6 +101,8 @@
 | 활성 구독 | `ActiveSubscription` | 탐지 입력 — 현재 결제 중인 구독(서비스·티어·월액) |
 | 탐지 결과 | `DetectionFinding` | 규칙·대상·월 낭비액 (DB `DetectionResult`와 구분되는 도메인 값) |
 | 가맹점 정규화기 | `MerchantNormalizer` | `subscription` 순수 도메인, 가맹점 원문 → service_id (모르면 empty) |
+| 결제내역 업로드 | `PaymentImportService` / `MePaymentController` | 업로드분 → `payment_record` 적재+가맹점 정규화. 미매칭은 null·묻는 목록(G-10). 자동 구독 생성 안 함. `POST /me/payments/import` |
+| 결제내역 프로바이더 | `PaymentHistoryProvider` / `MockMydataProvider` | 소스별 파서(port). Mock 마이데이터: 승인(01)만·취소 제외·KRW·yyyyMMddHHmmss |
 | 회원 인증 | `AuthService` / `AuthController` | 자체 가입·로그인, 회원 정보와 명시적 계정 연결 |
 | 이메일 본인 확인 | `AuthEmail` / `Proof` / `auth_email_token` | SIGNUP·RESET 목적, 10분·단일 사용, DB는 SHA-256만 저장 |
 | 이메일 확인 여부 | `email_verified` | 검증 완료만 자체 로그인. 기존 미검증 회원은 메일 재설정으로 복구 |
