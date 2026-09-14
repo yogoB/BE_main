@@ -14,7 +14,8 @@ python3 scripts/check_auth_config.py
 ```
 
 임시 JDK 경로는 이 개발 환경용이다. Java 21과 Docker가 필요하다.
-기존 로컬 개발 DB를 사용하지 않고 Testcontainers PostgreSQL에서 Flyway V1~V4를 적용한다.
+기존 로컬 개발 DB를 사용하지 않고 Testcontainers PostgreSQL에서 현재 Flyway V1~V6를 적용한다.
+2026-09-12 최신 전체 회귀: Java 123개·bootJar 통과(실패·오류·스킵 0). 인증 50개는 유지하며 법정 보존 예외의 추가 검증은 `docs/privacy.md`를 참고한다.
 2026-09-11: 인증 50개를 포함한 Java 112개 테스트·bootJar 통과(실패·오류·스킵 0).
 데모 출력 6개, 계정 화면 가입/재설정 토큰·XSS·CSRF 검사, 설정 검사 31개 시나리오도 통과했다.
 정적 설정 점검은 현재 로컬 구성에서 15개 미비 항목을 보고한다(예상된 실패, 비밀 값 출력 없음).

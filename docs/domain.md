@@ -67,6 +67,8 @@
 | 수집·이용 동의 | `user_consent` / `ConsentService` | 필수(`ESSENTIAL`)·선택(`MARKETING`). `Consent` `Agreement` 단독 식별자 금지 |
 | 보유기간 파기 | `RetentionService` | 보유기간 초과 개인데이터·만료 인증 흔적 자동 파기(@Scheduled) |
 | 회원 탈퇴(삭제권) | `AuthService.deleteAccount` | `app_user` 삭제가 FK cascade 로 개인데이터 전파 파기 |
+| 법정 보존 결제 사본 | `retained_payment_record` / `PaymentRetentionService` | 확인된 보존 의무만 분리 보관. 회원 FK·이메일·인증 정보는 복사하지 않음 |
+| 보존 근거·기간 | `legal_basis` / `retention_start` / `retain_until` | 담당자가 확정한 근거와 기간. 일반 외부 구독 분석 내역에는 자동 적용하지 않음 |
 
 ### 초기 데이터 적재
 

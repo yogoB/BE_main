@@ -138,7 +138,7 @@ AI의 `/parse`·`/narrate`·`/ocr`는 토큰 누락·불일치 시 401, 서버 �
 | Method | Path | 설명 |
 |---|---|---|
 | GET | `/api/v1/privacy-policy` | 처리방침·처리 인벤토리(공개) — 항목·목적·보유기간·정보주체 권리 |
-| DELETE | `/api/v1/me` | 회원 탈퇴 — 개인 데이터 전부 파기(FK cascade), 세션 무효화·쿠키 삭제 |
+| DELETE | `/api/v1/me` | 회원 탈퇴 — 일반 이용 데이터 파기·세션 무효화·쿠키 삭제. 법정 보존 사본은 별도 확정 기한 적용 |
 | GET | `/api/v1/me/consent` | 내 수집·이용 동의 조회 |
 | POST | `/api/v1/me/consent/marketing` | 선택(마케팅) 동의/철회 `{agree}` |
 
@@ -244,9 +244,16 @@ V4에서 `email_verified`(자체 가입은 검증 토큰 소비 시 TRUE), `cred
 
 ### 개인정보 (V5 마이그레이션)
 삭제권(파기): V2 개인 테이블(`user_subscription`·`payment_record`·`detection_result`) FK에 `ON DELETE CASCADE` 부여.
-`DELETE app_user` 한 번으로 개인 데이터가 전부 파기된다(auth_session·auth_email_token은 V3/V4에서 이미 cascade).
+`DELETE app_user`로 일반 이용 데이터가 파기된다(auth_session·auth_email_token은 V3/V4에서 이미 cascade). V6의 별도 법정 보존 사본은 이 FK 경로에 연결하지 않는다.
 `user_consent`(id, user_id FK cascade, item `ESSENTIAL|MARKETING`, policy_version, agreed_at, withdrawn_at, UNIQUE(user_id,item)):
 필수는 가입 시 자동 기록(계약 이행), 선택은 `/me/consent/marketing`로 동의/철회. 보유기간 초과분은 `RetentionService`가 파기.
+
+### 법정 보존 예외 (V6, 2026-09-12 팀원 리뷰 반영)
+`payment_record`는 사용자 반입 외부 구독 분석 내역이며 CASCADE·12개월 보유 정책을 유지한다.
+법정 의무가 확인된 예외 사본만 `retained_payment_record`에 분리 저장한다. 원본 거래 ID·가맹점·서비스·금액·결제일·출처,
+`legal_basis`·`retention_start`·`retain_until`·저장 시각을 보관하며 회원 ID·이메일·인증 정보·회원/원본 FK는 없다.
+`PaymentRetentionService.preserve`는 원본 생성/분류 트랜잭션에서 명시적으로 호출하고, 일반 반입/탈퇴가 자동으로 사본을 생성하지 않는다.
+`RetentionService`는 사본의 확정 기한에만 파기한다. 회원 API·추천·AI에 사본 접근 경로 없음. 익명화를 보장하지 않으며 상세 조건은 `docs/privacy.md`.
 
 ### 초기 구현 범위 (D-07)
 V1은 위 MVP 테이블 8개를 생성한다. P1/P2 테이블은 해당 단계에서 새 마이그레이션으로 추가한다.
