@@ -1,0 +1,111 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "요고비 · 중복 결제 탐지",
+    "quality_profile": "showcase",
+    "column_fit": "spread",
+    "viewBox": [
+      1080,
+      560
+    ]
+  },
+  "participants": [
+    {
+      "id": "screen",
+      "type": "frontend",
+      "label": "로그인한 회원",
+      "sublabel": "현재 구독 기준"
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "DetectionController",
+      "sublabel": "Principal의 userId"
+    },
+    {
+      "id": "service",
+      "type": "backend",
+      "label": "DetectionService",
+      "sublabel": "재탐지 트랜잭션"
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "CatalogReader 포함"
+    },
+    {
+      "id": "detector",
+      "type": "backend",
+      "label": "DuplicateDetector",
+      "sublabel": "순수 Java 규칙"
+    }
+  ],
+  "messages": [
+    {
+      "id": "y11-detection-m1",
+      "from": "screen",
+      "to": "api",
+      "y": 170.0,
+      "label": "GET /api/v1/me/detections",
+      "variant": "security",
+      "note": "회원 인증 필요. GET이지만 조회할 때 탐지 결과를 다시 저장하는 현재 구현"
+    },
+    {
+      "id": "y11-detection-m2",
+      "from": "api",
+      "to": "service",
+      "y": 210.0,
+      "label": "detectForUser(본인 userId)"
+    },
+    {
+      "id": "y11-detection-m3",
+      "from": "service",
+      "to": "db",
+      "y": 250.0,
+      "label": "활성 구독·현재 혜택·번들 조회"
+    },
+    {
+      "id": "y11-detection-m4",
+      "from": "db",
+      "to": "service",
+      "y": 290.0,
+      "label": "탐지 입력 반환",
+      "variant": "return"
+    },
+    {
+      "id": "y11-detection-m5",
+      "from": "service",
+      "to": "detector",
+      "y": 330.0,
+      "label": "detect(구독, 혜택, 번들)",
+      "variant": "emphasis"
+    },
+    {
+      "id": "y11-detection-m6",
+      "from": "detector",
+      "to": "service",
+      "y": 370.0,
+      "label": "세 규칙의 findings",
+      "variant": "return",
+      "note": "BENEFIT_OVERLAP: 무료 혜택과 직접 결제. TIER_DUPLICATE: 같은 서비스 중복. BUNDLE_OVERLAP: 더 싼 번들"
+    },
+    {
+      "id": "y11-detection-m7",
+      "from": "service",
+      "to": "db",
+      "y": 410.0,
+      "label": "본인 기존 결과 삭제 · 새 결과 저장"
+    },
+    {
+      "id": "y11-detection-m8",
+      "from": "api",
+      "to": "screen",
+      "y": 450.0,
+      "label": "탐지 규칙·대상·wastedAmount",
+      "variant": "return",
+      "note": "일반 추천 금액 엔진과 별도로 DuplicateDetector가 낭비액을 산출하는 현재 구현"
+    }
+  ]
+}

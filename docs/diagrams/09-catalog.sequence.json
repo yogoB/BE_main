@@ -1,0 +1,114 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "요고비 · 시드 적재와 공개 카탈로그",
+    "quality_profile": "showcase",
+    "column_fit": "spread",
+    "viewBox": [
+      1080,
+      560
+    ]
+  },
+  "participants": [
+    {
+      "id": "boot",
+      "type": "backend",
+      "label": "앱 시작",
+      "sublabel": "Flyway 이후"
+    },
+    {
+      "id": "loader",
+      "type": "backend",
+      "label": "CatalogSeedLoader",
+      "sublabel": "CSV 스냅샷"
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "카탈로그"
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "CatalogController",
+      "sublabel": "CatalogReader 경유"
+    },
+    {
+      "id": "screen",
+      "type": "frontend",
+      "label": "사용자 화면",
+      "sublabel": "비회원도 이용"
+    }
+  ],
+  "messages": [
+    {
+      "id": "y09-catalog-m1",
+      "from": "boot",
+      "to": "loader",
+      "y": 170.0,
+      "label": "ApplicationRunner 실행"
+    },
+    {
+      "id": "y09-catalog-m2",
+      "from": "loader",
+      "to": "db",
+      "y": 210.0,
+      "label": "서비스·티어·번들 업서트",
+      "variant": "emphasis",
+      "note": "임시 테이블 COPY 후 병합. 해당 load 트랜잭션 실패 시 롤백"
+    },
+    {
+      "id": "y09-catalog-m3",
+      "from": "loader",
+      "to": "db",
+      "y": 250.0,
+      "label": "CSV가 있으면 요금제 → 혜택 적재",
+      "variant": "emphasis",
+      "note": "요금제는 통신사+이름 자연키. 혜택은 해당 요금제별 교체. 각 적재 작업은 별도 트랜잭션"
+    },
+    {
+      "id": "y09-catalog-m4",
+      "from": "db",
+      "to": "loader",
+      "y": 290.0,
+      "label": "적재 완료",
+      "variant": "return",
+      "note": "dev 프로파일은 DevSeedLoader가 추가 로컬 더미 CSV를 적재"
+    },
+    {
+      "id": "y09-catalog-m5",
+      "from": "screen",
+      "to": "api",
+      "y": 330.0,
+      "label": "GET /api/v1/catalog/...",
+      "variant": "emphasis",
+      "note": "이후 독립 요청: /services, /plans, /plans/{id}/benefits"
+    },
+    {
+      "id": "y09-catalog-m6",
+      "from": "api",
+      "to": "db",
+      "y": 370.0,
+      "label": "CatalogReader로 저장 자료 조회"
+    },
+    {
+      "id": "y09-catalog-m7",
+      "from": "db",
+      "to": "api",
+      "y": 410.0,
+      "label": "서비스·티어 / 요금제 / 혜택",
+      "variant": "return"
+    },
+    {
+      "id": "y09-catalog-m8",
+      "from": "api",
+      "to": "screen",
+      "y": 450.0,
+      "label": "ApiResponse로 목록 반환",
+      "variant": "return",
+      "note": "존재하지 않는 요금제 혜택 조회 404. 런타임 크롤링 없음"
+    }
+  ]
+}

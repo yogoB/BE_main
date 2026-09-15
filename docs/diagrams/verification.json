@@ -1,0 +1,385 @@
+{
+  "checked_at": "2026-09-15T02:11:02.234696+00:00",
+  "diagram_count": 15,
+  "validation_scope": "Archify HTML artifact only; not backend integration or live OAuth validation",
+  "browser_viewports": [
+    [
+      1440,
+      900
+    ],
+    [
+      1600,
+      1000
+    ],
+    [
+      1920,
+      1080
+    ],
+    [
+      2048,
+      1320
+    ]
+  ],
+  "diagrams": [
+    {
+      "diagram_type": "sequence",
+      "output": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/01-recommend.html",
+      "specification_sha256": "4f39e7577f3238d86b2ab783cd2b1918d21c5255c35dd8353dc55f32de19f005",
+      "artifact_sha256": "7e97b3b82123e4edd327bf468fbfe57985a60a92ed9785721fdd8f4c033845cf",
+      "validation": {
+        "checksPassed": 9,
+        "checkCount": 9,
+        "compositionProfile": "showcase",
+        "compositionStatus": "pass",
+        "errors": 0,
+        "warnings": 0
+      },
+      "browser_evidence": "passed",
+      "visual_review": "passed",
+      "correction_rounds": 1,
+      "reviewed_images": [
+        "01-recommend.visual-check.1440x900.dark.png",
+        "01-recommend.visual-check.2048x1320.light.png"
+      ],
+      "observations": "실제 이미지에서 두 테마의 라벨·화살표·노드·하단 범례·조작부 및 큰 화면 균형 확인. 화면 잘림과 의미를 가리는 겹침 없음.",
+      "delivery_receipt": "01-recommend.receipt.json",
+      "browser_receipt": "01-recommend.visual-check.json"
+    },
+    {
+      "diagram_type": "sequence",
+      "output": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/02-chat.html",
+      "specification_sha256": "0608f0e7a2bb99e4770630cd627dd234dc9e4938bc0cc857d19087c410135fa7",
+      "artifact_sha256": "fe03455a56cd1778a7a9044fd34bb7bfaa496869e066e420fb2efaec2a852c66",
+      "validation": {
+        "checksPassed": 9,
+        "checkCount": 9,
+        "compositionProfile": "showcase",
+        "compositionStatus": "pass",
+        "errors": 0,
+        "warnings": 0
+      },
+      "browser_evidence": "passed",
+      "visual_review": "passed",
+      "correction_rounds": 0,
+      "reviewed_images": [
+        "02-chat.visual-check.1440x900.dark.png",
+        "02-chat.visual-check.2048x1320.light.png"
+      ],
+      "observations": "실제 이미지에서 두 테마의 라벨·화살표·노드·하단 범례·조작부 및 큰 화면 균형 확인. 화면 잘림과 의미를 가리는 겹침 없음.",
+      "delivery_receipt": "02-chat.receipt.json",
+      "browser_receipt": "02-chat.visual-check.json"
+    },
+    {
+      "diagram_type": "sequence",
+      "output": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/03-email.html",
+      "specification_sha256": "6ca7ba5bc2e651376623124adf9caa06ba300ff06dc373fd0b8058aa3e78b108",
+      "artifact_sha256": "dc5f72b2959c07d2ec136ccd74224175207c09db55d8fabb25f976f1bd2dbcb7",
+      "validation": {
+        "checksPassed": 9,
+        "checkCount": 9,
+        "compositionProfile": "showcase",
+        "compositionStatus": "pass",
+        "errors": 0,
+        "warnings": 0
+      },
+      "browser_evidence": "passed",
+      "visual_review": "passed",
+      "correction_rounds": 0,
+      "reviewed_images": [
+        "03-email.visual-check.1440x900.dark.png",
+        "03-email.visual-check.2048x1320.light.png"
+      ],
+      "observations": "실제 이미지에서 두 테마의 라벨·화살표·노드·하단 범례·조작부 및 큰 화면 균형 확인. 화면 잘림과 의미를 가리는 겹침 없음.",
+      "delivery_receipt": "03-email.receipt.json",
+      "browser_receipt": "03-email.visual-check.json"
+    },
+    {
+      "diagram_type": "sequence",
+      "output": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/04-google.html",
+      "specification_sha256": "2e801724ff8de6fcbf54d208284450dd74a11294353606420fd23ad6a4efc75e",
+      "artifact_sha256": "dd005bf2df3a69c89d7300926bb167b74b111c8f0af54f568dd41eedce6bfedd",
+      "validation": {
+        "checksPassed": 9,
+        "checkCount": 9,
+        "compositionProfile": "showcase",
+        "compositionStatus": "pass",
+        "errors": 0,
+        "warnings": 0
+      },
+      "browser_evidence": "passed",
+      "visual_review": "passed",
+      "correction_rounds": 0,
+      "reviewed_images": [
+        "04-google.visual-check.1440x900.dark.png",
+        "04-google.visual-check.2048x1320.light.png"
+      ],
+      "observations": "실제 이미지에서 두 테마의 라벨·화살표·노드·하단 범례·조작부 및 큰 화면 균형 확인. 화면 잘림과 의미를 가리는 겹침 없음.",
+      "delivery_receipt": "04-google.receipt.json",
+      "browser_receipt": "04-google.visual-check.json"
+    },
+    {
+      "diagram_type": "sequence",
+      "output": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/05-link.html",
+      "specification_sha256": "da60b8f7e4a5ff31320633661f5a19e7e36c06746591e1d8e4f18dfcb572b408",
+      "artifact_sha256": "746e6503da51ba1be78f0c565961ef16224c95a059ef273643d39cf2dae9d917",
+      "validation": {
+        "checksPassed": 9,
+        "checkCount": 9,
+        "compositionProfile": "showcase",
+        "compositionStatus": "pass",
+        "errors": 0,
+        "warnings": 0
+      },
+      "browser_evidence": "passed",
+      "visual_review": "passed",
+      "correction_rounds": 0,
+      "reviewed_images": [
+        "05-link.visual-check.1440x900.dark.png",
+        "05-link.visual-check.2048x1320.light.png"
+      ],
+      "observations": "실제 이미지에서 두 테마의 라벨·화살표·노드·하단 범례·조작부 및 큰 화면 균형 확인. 화면 잘림과 의미를 가리는 겹침 없음.",
+      "delivery_receipt": "05-link.receipt.json",
+      "browser_receipt": "05-link.visual-check.json"
+    },
+    {
+      "diagram_type": "sequence",
+      "output": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/06-sessions.html",
+      "specification_sha256": "517e781fb5042b19a8473b3eb6a0023affb6f774d7b6994b8119d9bc7580c6a2",
+      "artifact_sha256": "cd37ae3a3a7e07400bc024886dc333bf4b93413e270609426fab2a23bf3fbd32",
+      "validation": {
+        "checksPassed": 9,
+        "checkCount": 9,
+        "compositionProfile": "showcase",
+        "compositionStatus": "pass",
+        "errors": 0,
+        "warnings": 0
+      },
+      "browser_evidence": "passed",
+      "visual_review": "passed",
+      "correction_rounds": 0,
+      "reviewed_images": [
+        "06-sessions.visual-check.1440x900.dark.png",
+        "06-sessions.visual-check.2048x1320.light.png"
+      ],
+      "observations": "실제 이미지에서 두 테마의 라벨·화살표·노드·하단 범례·조작부 및 큰 화면 균형 확인. 화면 잘림과 의미를 가리는 겹침 없음.",
+      "delivery_receipt": "06-sessions.receipt.json",
+      "browser_receipt": "06-sessions.visual-check.json"
+    },
+    {
+      "diagram_type": "sequence",
+      "output": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/07-privacy.html",
+      "specification_sha256": "e00b913be2d3556ee13bac736c19d648485f00cf2c64317cebdebfee0ce0ca8e",
+      "artifact_sha256": "1deb76da2a0a77fee4c275c8c2e61dac939656658efd04de2a2cf3f4e4ce38f1",
+      "validation": {
+        "checksPassed": 9,
+        "checkCount": 9,
+        "compositionProfile": "showcase",
+        "compositionStatus": "pass",
+        "errors": 0,
+        "warnings": 0
+      },
+      "browser_evidence": "passed",
+      "visual_review": "passed",
+      "correction_rounds": 0,
+      "reviewed_images": [
+        "07-privacy.visual-check.1440x900.dark.png",
+        "07-privacy.visual-check.2048x1320.light.png"
+      ],
+      "observations": "실제 이미지에서 두 테마의 라벨·화살표·노드·하단 범례·조작부 및 큰 화면 균형 확인. 화면 잘림과 의미를 가리는 겹침 없음.",
+      "delivery_receipt": "07-privacy.receipt.json",
+      "browser_receipt": "07-privacy.visual-check.json"
+    },
+    {
+      "diagram_type": "sequence",
+      "output": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/08-retention.html",
+      "specification_sha256": "b1e871300b1cd13664e2d68f343c9fcf9b7981f85413bce43055563ed9db43d9",
+      "artifact_sha256": "6fee93114ee00752b6269a573dab55de96e8e56b6cfef7545959ac91d8e9c13f",
+      "validation": {
+        "checksPassed": 9,
+        "checkCount": 9,
+        "compositionProfile": "showcase",
+        "compositionStatus": "pass",
+        "errors": 0,
+        "warnings": 0
+      },
+      "browser_evidence": "passed",
+      "visual_review": "passed",
+      "correction_rounds": 0,
+      "reviewed_images": [
+        "08-retention.visual-check.1440x900.dark.png",
+        "08-retention.visual-check.2048x1320.light.png"
+      ],
+      "observations": "실제 이미지에서 두 테마의 라벨·화살표·노드·하단 범례·조작부 및 큰 화면 균형 확인. 화면 잘림과 의미를 가리는 겹침 없음.",
+      "delivery_receipt": "08-retention.receipt.json",
+      "browser_receipt": "08-retention.visual-check.json"
+    },
+    {
+      "diagram_type": "sequence",
+      "output": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/09-catalog.html",
+      "specification_sha256": "d6c0e167696bc64269908ed97e97300687f6bcc51e25e2a4aa05ba3fab4dcce0",
+      "artifact_sha256": "e69dc47f96095b2b378616f7644fd1b622fe9ca60741427a74eb5524560ad29e",
+      "validation": {
+        "checksPassed": 9,
+        "checkCount": 9,
+        "compositionProfile": "showcase",
+        "compositionStatus": "pass",
+        "errors": 0,
+        "warnings": 0
+      },
+      "browser_evidence": "passed",
+      "visual_review": "passed",
+      "correction_rounds": 0,
+      "reviewed_images": [
+        "09-catalog.visual-check.1440x900.dark.png",
+        "09-catalog.visual-check.2048x1320.light.png"
+      ],
+      "observations": "실제 이미지에서 두 테마의 라벨·화살표·노드·하단 범례·조작부 및 큰 화면 균형 확인. 화면 잘림과 의미를 가리는 겹침 없음.",
+      "delivery_receipt": "09-catalog.receipt.json",
+      "browser_receipt": "09-catalog.visual-check.json"
+    },
+    {
+      "diagram_type": "sequence",
+      "output": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/10-member-data.html",
+      "specification_sha256": "547b89d2c5379610ab8475ed75f24dd5bfab24799f1ba0c49424b270bc21bcd7",
+      "artifact_sha256": "9b17104366f2426bc0a4c0639b5216057a480ed0f946fd4a91f5aab5ec25e7d2",
+      "validation": {
+        "checksPassed": 9,
+        "checkCount": 9,
+        "compositionProfile": "showcase",
+        "compositionStatus": "pass",
+        "errors": 0,
+        "warnings": 0
+      },
+      "browser_evidence": "passed",
+      "visual_review": "passed",
+      "correction_rounds": 0,
+      "reviewed_images": [
+        "10-member-data.visual-check.1440x900.dark.png",
+        "10-member-data.visual-check.2048x1320.light.png"
+      ],
+      "observations": "실제 이미지에서 두 테마의 라벨·화살표·노드·하단 범례·조작부 및 큰 화면 균형 확인. 화면 잘림과 의미를 가리는 겹침 없음.",
+      "delivery_receipt": "10-member-data.receipt.json",
+      "browser_receipt": "10-member-data.visual-check.json"
+    },
+    {
+      "diagram_type": "sequence",
+      "output": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/11-detection.html",
+      "specification_sha256": "d796e320ab18b37ee84bfa6382be28ef9ec85dae8f9f6be06c0be57fc87cefc2",
+      "artifact_sha256": "2c103a1e3fb9960b62edc92e7f0e321ca71b56d2a9b32b43fd554ee497eaa94d",
+      "validation": {
+        "checksPassed": 9,
+        "checkCount": 9,
+        "compositionProfile": "showcase",
+        "compositionStatus": "pass",
+        "errors": 0,
+        "warnings": 0
+      },
+      "browser_evidence": "passed",
+      "visual_review": "passed",
+      "correction_rounds": 0,
+      "reviewed_images": [
+        "11-detection.visual-check.1440x900.dark.png",
+        "11-detection.visual-check.2048x1320.light.png"
+      ],
+      "observations": "실제 이미지에서 두 테마의 라벨·화살표·노드·하단 범례·조작부 및 큰 화면 균형 확인. 화면 잘림과 의미를 가리는 겹침 없음.",
+      "delivery_receipt": "11-detection.receipt.json",
+      "browser_receipt": "11-detection.visual-check.json"
+    },
+    {
+      "diagram_type": "sequence",
+      "output": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/12-switch.html",
+      "specification_sha256": "3452b4043af39852ad5ac4955efc93fa4988b6391882c6fb26762fc789bd345b",
+      "artifact_sha256": "087874379406fc5c07a49180058573da7f8b953686a4b696820b75040ed7d4f1",
+      "validation": {
+        "checksPassed": 9,
+        "checkCount": 9,
+        "compositionProfile": "showcase",
+        "compositionStatus": "pass",
+        "errors": 0,
+        "warnings": 0
+      },
+      "browser_evidence": "passed",
+      "visual_review": "passed",
+      "correction_rounds": 0,
+      "reviewed_images": [
+        "12-switch.visual-check.1440x900.dark.png",
+        "12-switch.visual-check.2048x1320.light.png"
+      ],
+      "observations": "실제 이미지에서 두 테마의 라벨·화살표·노드·하단 범례·조작부 및 큰 화면 균형 확인. 화면 잘림과 의미를 가리는 겹침 없음.",
+      "delivery_receipt": "12-switch.receipt.json",
+      "browser_receipt": "12-switch.visual-check.json"
+    },
+    {
+      "diagram_type": "sequence",
+      "output": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/13-ocr.html",
+      "specification_sha256": "1a0127b560434cd5f1737a310df15fb24988035cd5aa237c2521b1381360909d",
+      "artifact_sha256": "1d6441e3c0229b12221cedbf94f1501daebd3d876998599e17874774e45f644d",
+      "validation": {
+        "checksPassed": 9,
+        "checkCount": 9,
+        "compositionProfile": "showcase",
+        "compositionStatus": "pass",
+        "errors": 0,
+        "warnings": 0
+      },
+      "browser_evidence": "passed",
+      "visual_review": "passed",
+      "correction_rounds": 0,
+      "reviewed_images": [
+        "13-ocr.visual-check.1440x900.dark.png",
+        "13-ocr.visual-check.2048x1320.light.png"
+      ],
+      "observations": "실제 이미지에서 두 테마의 라벨·화살표·노드·하단 범례·조작부 및 큰 화면 균형 확인. 화면 잘림과 의미를 가리는 겹침 없음.",
+      "delivery_receipt": "13-ocr.receipt.json",
+      "browser_receipt": "13-ocr.visual-check.json"
+    },
+    {
+      "diagram_type": "sequence",
+      "output": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/14-payment-import.html",
+      "specification_sha256": "cc52c868ebfc1b2273a5eedd06a14a67fb58087fd4a26b6379b68ee90bd79378",
+      "artifact_sha256": "be92b0024f1f29a1e385296aeb8acd5611b13e958d25c6cbe56a4219df2564e6",
+      "validation": {
+        "checksPassed": 9,
+        "checkCount": 9,
+        "compositionProfile": "showcase",
+        "compositionStatus": "pass",
+        "errors": 0,
+        "warnings": 0
+      },
+      "browser_evidence": "passed",
+      "visual_review": "passed",
+      "correction_rounds": 0,
+      "reviewed_images": [
+        "14-payment-import.visual-check.1440x900.dark.png",
+        "14-payment-import.visual-check.2048x1320.light.png"
+      ],
+      "observations": "실제 이미지에서 두 테마의 라벨·화살표·노드·하단 범례·조작부 및 큰 화면 균형 확인. 화면 잘림과 의미를 가리는 겹침 없음.",
+      "delivery_receipt": "14-payment-import.receipt.json",
+      "browser_receipt": "14-payment-import.visual-check.json"
+    },
+    {
+      "diagram_type": "sequence",
+      "output": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/15-catalog-refresh.html",
+      "specification_sha256": "11866698b76b77e6ad5992647cc085635e567f43b0c334b4535a2230bc4f0bea",
+      "artifact_sha256": "27eb30dd31ca6dc651bb314c87c63b3dd5dacd454aac2ad2c12fe492e5ef6cb1",
+      "validation": {
+        "checksPassed": 9,
+        "checkCount": 9,
+        "compositionProfile": "showcase",
+        "compositionStatus": "pass",
+        "errors": 0,
+        "warnings": 0
+      },
+      "browser_evidence": "passed",
+      "visual_review": "passed",
+      "correction_rounds": 0,
+      "reviewed_images": [
+        "15-catalog-refresh.visual-check.1440x900.dark.png",
+        "15-catalog-refresh.visual-check.2048x1320.light.png"
+      ],
+      "observations": "실제 이미지에서 두 테마의 라벨·화살표·노드·하단 범례·조작부 및 큰 화면 균형 확인. 화면 잘림과 의미를 가리는 겹침 없음.",
+      "delivery_receipt": "15-catalog-refresh.receipt.json",
+      "browser_receipt": "15-catalog-refresh.visual-check.json"
+    }
+  ]
+}

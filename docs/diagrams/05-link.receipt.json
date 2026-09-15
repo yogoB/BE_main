@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "deliver",
+  "type": "sequence",
+  "input": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/05-link.sequence.json",
+  "output": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/05-link.html",
+  "specification": {
+    "sha256": "da60b8f7e4a5ff31320633661f5a19e7e36c06746591e1d8e4f18dfcb572b408",
+    "bytes": 3493
+  },
+  "artifact": {
+    "sha256": "746e6503da51ba1be78f0c565961ef16224c95a059ef273643d39cf2dae9d917",
+    "bytes": 805501
+  },
+  "validation": {
+    "checksPassed": 9,
+    "checkCount": 9,
+    "compositionProfile": "showcase",
+    "compositionStatus": "pass",
+    "errors": 0,
+    "warnings": 0
+  }
+}

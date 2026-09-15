@@ -123,22 +123,23 @@ AI의 `/parse`·`/narrate`·`/ocr`는 토큰 누락·불일치 시 401, 서버 �
 | POST | `/api/v1/auth/logout-all` | 현재 회원의 모든 로그인 무효화 |
 | GET | `/api/v1/me` | 인증된 현재 회원 조회 |
 | GET/DELETE | `/api/v1/me/sessions` `/{id}` | 로그인 세션 목록 · 개별 세션 폐기 |
-| GET/POST/DELETE | `/api/v1/me/subscriptions` | 내 구독 |
+| GET/POST/DELETE | `/api/v1/me/subscriptions` `/{id}` | 내 구독 (구현) |
+| POST | `/api/v1/me/current-plan` | 현재 요금제 설정 (구현) |
 | POST | `/api/v1/me/payments/import` | 결제내역 업로드 |
-| GET | `/api/v1/me/detections` | 탐지 결과 |
+| GET | `/api/v1/me/detections` | 탐지 결과 (구현 — 요청 시 재탐지) |
 | POST | `/api/v1/chat/messages` | 챗봇 |
 
 ### Phase 2
 | Method | Path | 설명 |
 |---|---|---|
-| GET | `/api/v1/me/switch-timing` | 변경 시점 (회수기간) |
+| GET | `/api/v1/me/switch-timing` | 변경 시점 (회수기간) — 구현. `?targetPlanId&switchingCost&remainingContractMonths`, 현재 요금제(저장)+구독 대비 회수개월·SWITCH_NOW/WAIT/NO_BENEFIT |
 | GET | `/api/v1/me/alerts` | 종료 예정 목록 |
 
 ### 개인정보 (V5 — 구현)
 | Method | Path | 설명 |
 |---|---|---|
 | GET | `/api/v1/privacy-policy` | 처리방침·처리 인벤토리(공개) — 항목·목적·보유기간·정보주체 권리 |
-| DELETE | `/api/v1/me` | 회원 탈퇴 — 개인 데이터 전부 파기(FK cascade), 세션 무효화·쿠키 삭제 |
+| DELETE | `/api/v1/me` | 회원 탈퇴 — 일반 이용 데이터 파기·세션 무효화·쿠키 삭제. 법정 보존 사본은 별도 확정 기한 적용 |
 | GET | `/api/v1/me/consent` | 내 수집·이용 동의 조회 |
 | POST | `/api/v1/me/consent/marketing` | 선택(마케팅) 동의/철회 `{agree}` |
 
@@ -183,12 +184,17 @@ Google 전용 계정은 동일 Google `sub` 재인증으로 자체 비밀번호�
       { "label": "선택약정 25% 할인", "amount": -13750, "provenance": "DERIVED" },
       { "label": "넷플릭스 스탠다드", "amount": 13500, "provenance": "OFFICIAL",
         "note": "제휴 혜택으로 4,000원 할인 적용" }
-    ]
+    ],
+    "priceCrossCheck": {                       // 스마트초이스 라이브 시세 대조(D-12). 매칭 스냅샷 없으면 null
+      "livePrice": 54000, "seedPrice": 55000, "matches": false,
+      "source": "스마트초이스(KTOA)", "collectedAt": "2026-09-14"
+    }
   }]
 }
 ```
 
 `baseline`은 아무 할인 없이 정가로만 냈을 때다. 절감액 표시의 기준선.
+`priceCrossCheck`는 시드 기본료를 스마트초이스 라이브 시세와 대조한 **표시용**이며 계산에 쓰지 않는다(매칭 없으면 null). AI `/narrate`로는 전달하지 않는다.
 
 ---
 
@@ -244,9 +250,21 @@ V4에서 `email_verified`(자체 가입은 검증 토큰 소비 시 TRUE), `cred
 
 ### 개인정보 (V5 마이그레이션)
 삭제권(파기): V2 개인 테이블(`user_subscription`·`payment_record`·`detection_result`) FK에 `ON DELETE CASCADE` 부여.
-`DELETE app_user` 한 번으로 개인 데이터가 전부 파기된다(auth_session·auth_email_token은 V3/V4에서 이미 cascade).
+`DELETE app_user`로 일반 이용 데이터가 파기된다(auth_session·auth_email_token은 V3/V4에서 이미 cascade). V6의 별도 법정 보존 사본은 이 FK 경로에 연결하지 않는다.
 `user_consent`(id, user_id FK cascade, item `ESSENTIAL|MARKETING`, policy_version, agreed_at, withdrawn_at, UNIQUE(user_id,item)):
 필수는 가입 시 자동 기록(계약 이행), 선택은 `/me/consent/marketing`로 동의/철회. 보유기간 초과분은 `RetentionService`가 파기.
+
+### 법정 보존 예외 (V6, 2026-09-12 팀원 리뷰 반영)
+`payment_record`는 사용자 반입 외부 구독 분석 내역이며 CASCADE·12개월 보유 정책을 유지한다.
+법정 의무가 확인된 예외 사본만 `retained_payment_record`에 분리 저장한다. 원본 거래 ID·가맹점·서비스·금액·결제일·출처,
+`legal_basis`·`retention_start`·`retain_until`·저장 시각을 보관하며 회원 ID·이메일·인증 정보·회원/원본 FK는 없다.
+`PaymentRetentionService.preserve`는 원본 생성/분류 트랜잭션에서 명시적으로 호출하고, 일반 반입/탈퇴가 자동으로 사본을 생성하지 않는다.
+`RetentionService`는 사본의 확정 기한에만 파기한다. 회원 API·추천·AI에 사본 접근 경로 없음. 익명화를 보장하지 않으며 상세 조건은 `docs/privacy.md`.
+
+### 통신요금 라이브 시세 (V7 마이그레이션, D-12)
+`smartchoice_plan_snapshot`(carrier, plan_name, network_type, contract_months, plan_price, discounted_price, display_data, source, source_url, collected_at,
+UNIQUE(carrier,plan_name,network_type,contract_months)): 스마트초이스 Open API 격자 스윕(`SmartChoiceSweepService`, 하루 3회 @Scheduled)이 dedup 업서트로 채운다.
+**카탈로그(시드)를 대체하지 않는다** — 교차검증·시세 참고용(요금제 ID·OTT·정확 스펙 없음). fail-soft(키 없으면 스윕 비활성). 추천 응답 연결은 §3 계약 결정 후.
 
 ### 초기 구현 범위 (D-07)
 V1은 위 MVP 테이블 8개를 생성한다. P1/P2 테이블은 해당 단계에서 새 마이그레이션으로 추가한다.

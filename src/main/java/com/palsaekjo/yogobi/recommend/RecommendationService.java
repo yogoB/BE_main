@@ -28,10 +28,12 @@ public class RecommendationService {
     private static final int MB_PER_GB = 1024;
 
     private final CatalogReader catalog;
+    private final SmartChoiceSnapshotReader snapshots;
     private final CostCalculator calculator = new CostCalculator();
 
-    public RecommendationService(CatalogReader catalog) {
+    public RecommendationService(CatalogReader catalog, SmartChoiceSnapshotReader snapshots) {
         this.catalog = catalog;
+        this.snapshots = snapshots;
     }
 
     public RecommendationResponse recommend(RecommendationRequest request) {
@@ -104,11 +106,20 @@ public class RecommendationService {
         return new CalculatorResponse(accuracy, missing, result);
     }
 
-    private static CostResult toResult(CandidatePlan candidate, CostBreakdown breakdown) {
+    private CostResult toResult(CandidatePlan candidate, CostBreakdown breakdown) {
         var lines = breakdown.lines().stream().map(RecommendationService::toLine).toList();
         return new CostResult(candidate.plan().id(), candidate.plan().name(), candidate.carrier(),
                 breakdown.effectiveMonthlyCost(), breakdown.baseline(),
-                breakdown.monthlySavings(), breakdown.annualSavings(), lines);
+                breakdown.monthlySavings(), breakdown.annualSavings(), lines,
+                crossCheck(candidate));
+    }
+
+    /** 시드 기본료를 스마트초이스 라이브 시세와 대조한다. 매칭 스냅샷이 없으면 null(교차검증 생략) — 계산에는 영향 없음. */
+    private PriceCrossCheck crossCheck(CandidatePlan candidate) {
+        return snapshots.find(candidate.carrier(), candidate.plan().name())
+                .map(s -> new PriceCrossCheck(s.planPrice(), candidate.plan().basePrice(),
+                        s.planPrice() == candidate.plan().basePrice(), s.source(), s.collectedAt()))
+                .orElse(null);
     }
 
     private static BreakdownLine toLine(CostLine line) {

@@ -1,0 +1,128 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "요고비 · 자체 로그인과 세션 관리",
+    "quality_profile": "showcase",
+    "column_fit": "spread",
+    "viewBox": [
+      1080,
+      560
+    ]
+  },
+  "participants": [
+    {
+      "id": "screen",
+      "type": "frontend",
+      "label": "계정 화면",
+      "sublabel": "쿠키 + CSRF"
+    },
+    {
+      "id": "auth",
+      "type": "backend",
+      "label": "AuthController",
+      "sublabel": "AuthService 경유"
+    },
+    {
+      "id": "tokens",
+      "type": "security",
+      "label": "AuthTokens",
+      "sublabel": "SecurityConfig 경유"
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "회원·auth_session"
+    }
+  ],
+  "messages": [
+    {
+      "id": "y06-sessions-m1",
+      "from": "screen",
+      "to": "auth",
+      "y": 170.0,
+      "label": "POST /auth/login + CSRF",
+      "variant": "security",
+      "note": "전체 경로 /api/v1/auth/login. {email,password}, IP·이메일 제한, BCrypt 검사·email_verified 확인"
+    },
+    {
+      "id": "y06-sessions-m2",
+      "from": "auth",
+      "to": "tokens",
+      "y": 201.1,
+      "label": "issue(회원, 확인한 버전)"
+    },
+    {
+      "id": "y06-sessions-m3",
+      "from": "tokens",
+      "to": "db",
+      "y": 232.2,
+      "label": "회원 잠금·버전 확인·해시 저장",
+      "variant": "security",
+      "note": "비밀번호 재설정과 경쟁하는 늦은 세션 발급 차단"
+    },
+    {
+      "id": "y06-sessions-m4",
+      "from": "tokens",
+      "to": "screen",
+      "y": 263.3,
+      "label": "JWT·브라우저 확인 쿠키 발급",
+      "variant": "return",
+      "note": "절대 수명 15분, 갱신 토큰 없음"
+    },
+    {
+      "id": "y06-sessions-m5",
+      "from": "screen",
+      "to": "tokens",
+      "y": 294.4,
+      "label": "회원 API마다 쿠키 검증",
+      "variant": "security",
+      "note": "SecurityConfig가 AuthTokens.authenticate 호출. JWT 서명·iss/aud·만료 검증"
+    },
+    {
+      "id": "y06-sessions-m6",
+      "from": "tokens",
+      "to": "db",
+      "y": 325.6,
+      "label": "토큰+binding 해시·유휴 5분 확인",
+      "variant": "security",
+      "note": "유효할 때만 last_seen_at 갱신·MEMBER 부여"
+    },
+    {
+      "id": "y06-sessions-m7",
+      "from": "screen",
+      "to": "auth",
+      "y": 356.7,
+      "label": "GET /me · GET /me/sessions",
+      "variant": "emphasis",
+      "note": "전체 경로 /api/v1 접두사. 본인 정보와 본인 활성 세션만"
+    },
+    {
+      "id": "y06-sessions-m8",
+      "from": "auth",
+      "to": "screen",
+      "y": 387.8,
+      "label": "현재 회원·세션 목록",
+      "variant": "return"
+    },
+    {
+      "id": "y06-sessions-m9",
+      "from": "screen",
+      "to": "auth",
+      "y": 418.9,
+      "label": "세션 삭제 / 로그아웃 + CSRF",
+      "variant": "security",
+      "note": "DELETE /me/sessions/{id}, POST /auth/logout 또는 /auth/logout-all"
+    },
+    {
+      "id": "y06-sessions-m10",
+      "from": "auth",
+      "to": "db",
+      "y": 450.0,
+      "label": "선택·현재·전체 세션 폐기",
+      "variant": "security",
+      "note": "AuthTokens 경유. 선택 세션은 id와 user_id 모두 일치해야 삭제. 현재 세션이면 쿠키도 제거"
+    }
+  ]
+}

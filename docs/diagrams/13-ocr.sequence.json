@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "요고비 · OCR 내부 API",
+    "quality_profile": "showcase",
+    "column_fit": "spread",
+    "viewBox": [
+      1080,
+      560
+    ]
+  },
+  "participants": [
+    {
+      "id": "caller",
+      "type": "backend",
+      "label": "내부 호출자",
+      "sublabel": "BE 화면 연결 전"
+    },
+    {
+      "id": "guard",
+      "type": "security",
+      "label": "AI 인증 경계",
+      "sublabel": "require_backend"
+    },
+    {
+      "id": "ocr",
+      "type": "backend",
+      "label": "OCR 라우터",
+      "sublabel": "FastAPI /ocr"
+    },
+    {
+      "id": "llm",
+      "type": "external",
+      "label": "이미지 모델",
+      "sublabel": "구조화 사용량"
+    }
+  ],
+  "messages": [
+    {
+      "id": "y13-ocr-m1",
+      "from": "caller",
+      "to": "guard",
+      "y": 170.0,
+      "label": "POST /ocr · 내부 Bearer",
+      "variant": "security",
+      "note": "AI 서버 전용 API. 현재 BE 프론트 이미지 수신 API는 미연결"
+    },
+    {
+      "id": "y13-ocr-m2",
+      "from": "guard",
+      "to": "ocr",
+      "y": 216.7,
+      "label": "내부 토큰 일치 시 진입",
+      "note": "이후 OCR 라우터 내부에서 base64 크기, 허용 이미지 형식, 치수, 애니메이션·압축폭탄 검증"
+    },
+    {
+      "id": "y13-ocr-m4",
+      "from": "ocr",
+      "to": "llm",
+      "y": 290.0,
+      "label": "검증한 이미지 → 사용량 추출"
+    },
+    {
+      "id": "y13-ocr-m5",
+      "from": "llm",
+      "to": "ocr",
+      "y": 370.0,
+      "label": "사용량 응답 → 스키마·신뢰도 검증",
+      "variant": "return",
+      "note": "OCR 라우터가 검증: confidence<0.7 또는 사용량 전부 없음이면 422. 모델 장애 503·응답 오류 502"
+    },
+    {
+      "id": "y13-ocr-m7",
+      "from": "ocr",
+      "to": "caller",
+      "y": 450.0,
+      "label": "사용량 추정값 반환",
+      "variant": "return",
+      "note": "금액 계산·회원 데이터 저장 안 함. AI /health는 토큰 없이 확인 가능"
+    }
+  ]
+}

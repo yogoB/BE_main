@@ -12,7 +12,8 @@ public final class PrivacyPolicy {
     }
 
     /** 처리방침·동의 기록의 버전. 항목·보유기간이 바뀌면 올린다. */
-    public static final String VERSION = "2026-09-11";
+    public static final String VERSION = "2026-09-12";
+    public static final String RETENTION_ZONE = "Asia/Seoul";
     public static final int PAYMENT_RETENTION_MONTHS = 12;
     public static final int DETECTION_RETENTION_MONTHS = 6;
 
@@ -30,7 +31,10 @@ public final class PrivacyPolicy {
                         List.of("current_plan_id", "user_subscription", "payment_record(merchant_raw, amount, paid_at)"),
                         "실질 지불 총액 계산·중복 결제 탐지", "정보주체 동의·계약 이행",
                         "결제내역 " + PAYMENT_RETENTION_MONTHS + "개월·탐지결과 " + DETECTION_RETENTION_MONTHS
-                                + "개월 후 파기, 탈퇴 시 즉시 파기"),
+                                + "개월 후 파기, 탈퇴 시 즉시 파기. 법정 보존 의무가 확인된 증빙만 별도 보관"),
+                new Item("법정 보존 결제 사본", List.of("거래 식별자", "가맹점·서비스", "금액·결제일·출처", "보존 근거·기산일·만료일"),
+                        "확인된 법정 기록 보존 의무 이행", "개별 기록에 확인된 법령 근거",
+                        "탈퇴와 무관하게 확정 만료일까지 분리 보관 후 파기. 회원 ID·이메일·인증 정보는 복사하지 않음"),
                 new Item("인증 세션", List.of("auth_session(SHA-256 지문)", "user_agent"),
                         "로그인 유지·세션 관리", "계약 이행", "만료 15분·유휴 5분 후 파기"),
                 new Item("동의 증빙", List.of("user_consent"),

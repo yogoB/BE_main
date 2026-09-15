@@ -71,6 +71,15 @@ public class CatalogSeedLoader implements ApplicationRunner {
                         DELETE FROM bundle_item WHERE bundle_id IN (SELECT id FROM seed_bundle_product);
                         INSERT INTO bundle_item (bundle_id, tier_id)
                         SELECT id, unnest(string_to_array(tier_ids, ','))::BIGINT FROM seed_bundle_product;
+                        -- 가맹점 별칭(data.md §6, G-10). 소량 고정 참조데이터라 서비스 적재 직후 인라인 시드(패턴은 대문자·한글 원문).
+                        INSERT INTO merchant_alias (service_id, pattern, match_type) VALUES
+                            (1,'NETFLIX','CONTAINS'),(1,'넷플릭스','CONTAINS'),
+                            (2,'DISNEY','CONTAINS'),(2,'디즈니','CONTAINS'),
+                            (3,'TVING','CONTAINS'),(3,'티빙','CONTAINS'),
+                            (4,'WAVVE','CONTAINS'),(4,'콘텐츠웨이브','CONTAINS'),
+                            (5,'WATCHA','CONTAINS'),(5,'왓챠','CONTAINS'),
+                            (6,'GOOGLE *YOUTUBE','PREFIX')
+                        ON CONFLICT (pattern, match_type) DO NOTHING;
                         """);
                 for (String table : TABLES) {
                     execute(connection, "SELECT setval(pg_get_serial_sequence('" + table + "', 'id'), "

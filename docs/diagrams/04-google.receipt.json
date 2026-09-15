@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "deliver",
+  "type": "sequence",
+  "input": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/04-google.sequence.json",
+  "output": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/04-google.html",
+  "specification": {
+    "sha256": "2e801724ff8de6fcbf54d208284450dd74a11294353606420fd23ad6a4efc75e",
+    "bytes": 3384
+  },
+  "artifact": {
+    "sha256": "dd005bf2df3a69c89d7300926bb167b74b111c8f0af54f568dd41eedce6bfedd",
+    "bytes": 805998
+  },
+  "validation": {
+    "checksPassed": 9,
+    "checkCount": 9,
+    "compositionProfile": "showcase",
+    "compositionStatus": "pass",
+    "errors": 0,
+    "warnings": 0
+  }
+}

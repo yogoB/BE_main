@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "요고비 · 명시적 보존과 정기 파기",
+    "quality_profile": "showcase",
+    "column_fit": "spread",
+    "viewBox": [
+      1080,
+      560
+    ]
+  },
+  "participants": [
+    {
+      "id": "internal",
+      "type": "backend",
+      "label": "내부 호출자",
+      "sublabel": "preserve 연결 전"
+    },
+    {
+      "id": "preserve",
+      "type": "backend",
+      "label": "PaymentRetentionService",
+      "sublabel": "명시적 분류만"
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "분석본·별도 사본"
+    },
+    {
+      "id": "retention",
+      "type": "backend",
+      "label": "RetentionService",
+      "sublabel": "유형별 파기"
+    },
+    {
+      "id": "clock",
+      "type": "backend",
+      "label": "스케줄러",
+      "sublabel": "매일 한국시간 04시"
+    }
+  ],
+  "messages": [
+    {
+      "id": "y08-retention-m1",
+      "from": "internal",
+      "to": "preserve",
+      "y": 170.0,
+      "label": "preserve(원본, 근거, 시작, 만료)",
+      "variant": "emphasis",
+      "note": "현재 일반 회원 API와 자동 수집 경로에는 연결되지 않은 내부 서비스. 확정된 보존 대상만 삭제 전에 명시 호출"
+    },
+    {
+      "id": "y08-retention-m2",
+      "from": "preserve",
+      "to": "db",
+      "y": 210.0,
+      "label": "원본 FOR SHARE · 별도 사본 생성",
+      "variant": "security",
+      "note": "retained_payment_record에 회원 FK·이메일·인증 정보 복사 안 함. unlink는 익명화 보장이 아님"
+    },
+    {
+      "id": "y08-retention-m3",
+      "from": "db",
+      "to": "preserve",
+      "y": 250.0,
+      "label": "사본 저장 / 원본 없음·중복 오류",
+      "variant": "return"
+    },
+    {
+      "id": "y08-retention-m4",
+      "from": "preserve",
+      "to": "internal",
+      "y": 290.0,
+      "label": "보존 처리 완료",
+      "variant": "return",
+      "note": "일괄 5년 자동 부여 없음. 담당자가 근거와 정확한 기산·만료를 확정"
+    },
+    {
+      "id": "y08-retention-m5",
+      "from": "clock",
+      "to": "retention",
+      "y": 330.0,
+      "label": "독립된 정기 실행 → purge",
+      "variant": "emphasis",
+      "note": "위 preserve 호출이 스케줄러를 시작하지 않음. 별도 주기 실행"
+    },
+    {
+      "id": "y08-retention-m6",
+      "from": "retention",
+      "to": "db",
+      "y": 370.0,
+      "label": "분석 12개월 · 탐지 6개월 파기"
+    },
+    {
+      "id": "y08-retention-m7",
+      "from": "retention",
+      "to": "db",
+      "y": 410.0,
+      "label": "사본 확정 만료일·인증 만료 파기",
+      "variant": "security",
+      "note": "보존 사본은 한국시간 오늘 >= retain_until. 인증 토큰·세션은 expires_at 기준"
+    },
+    {
+      "id": "y08-retention-m8",
+      "from": "db",
+      "to": "retention",
+      "y": 450.0,
+      "label": "유형별 삭제 건수",
+      "variant": "return"
+    }
+  ]
+}

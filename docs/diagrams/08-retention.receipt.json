@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "deliver",
+  "type": "sequence",
+  "input": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/08-retention.sequence.json",
+  "output": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/08-retention.html",
+  "specification": {
+    "sha256": "b1e871300b1cd13664e2d68f343c9fcf9b7981f85413bce43055563ed9db43d9",
+    "bytes": 3091
+  },
+  "artifact": {
+    "sha256": "6fee93114ee00752b6269a573dab55de96e8e56b6cfef7545959ac91d8e9c13f",
+    "bytes": 804288
+  },
+  "validation": {
+    "checksPassed": 9,
+    "checkCount": 9,
+    "compositionProfile": "showcase",
+    "compositionStatus": "pass",
+    "errors": 0,
+    "warnings": 0
+  }
+}

@@ -1,0 +1,128 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "요고비 · 동의 관리와 회원 탈퇴",
+    "quality_profile": "showcase",
+    "column_fit": "spread",
+    "viewBox": [
+      1080,
+      560
+    ]
+  },
+  "participants": [
+    {
+      "id": "screen",
+      "type": "frontend",
+      "label": "회원 화면",
+      "sublabel": "변경 요청은 CSRF"
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "회원·개인정보 API",
+      "sublabel": "인증된 userId"
+    },
+    {
+      "id": "consent",
+      "type": "backend",
+      "label": "ConsentService",
+      "sublabel": "현재 정책 버전"
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "회원 연결 테이블"
+    },
+    {
+      "id": "tokens",
+      "type": "security",
+      "label": "AuthTokens",
+      "sublabel": "쿠키·OAuth 세션"
+    }
+  ],
+  "messages": [
+    {
+      "id": "y07-privacy-m1",
+      "from": "screen",
+      "to": "api",
+      "y": 170.0,
+      "label": "GET /privacy-policy",
+      "variant": "emphasis",
+      "note": "전체 경로 /api/v1/privacy-policy. 비회원도 조회 가능"
+    },
+    {
+      "id": "y07-privacy-m2",
+      "from": "api",
+      "to": "screen",
+      "y": 201.1,
+      "label": "처리 항목·목적·보유기간",
+      "variant": "return"
+    },
+    {
+      "id": "y07-privacy-m3",
+      "from": "screen",
+      "to": "api",
+      "y": 232.2,
+      "label": "동의 조회 / 마케팅 변경",
+      "variant": "security",
+      "note": "GET /api/v1/me/consent 또는 POST /api/v1/me/consent/marketing {agree}. 변경은 CSRF 필수"
+    },
+    {
+      "id": "y07-privacy-m4",
+      "from": "api",
+      "to": "consent",
+      "y": 263.3,
+      "label": "본인 userId로 조회·설정"
+    },
+    {
+      "id": "y07-privacy-m5",
+      "from": "consent",
+      "to": "db",
+      "y": 294.4,
+      "label": "동의 저장 / 철회 시각 기록"
+    },
+    {
+      "id": "y07-privacy-m6",
+      "from": "api",
+      "to": "screen",
+      "y": 325.6,
+      "label": "현재 동의 또는 변경 결과",
+      "variant": "return"
+    },
+    {
+      "id": "y07-privacy-m7",
+      "from": "screen",
+      "to": "api",
+      "y": 356.7,
+      "label": "DELETE /api/v1/me + CSRF",
+      "variant": "security",
+      "note": "별개의 사용자 행동인 회원 탈퇴"
+    },
+    {
+      "id": "y07-privacy-m8",
+      "from": "api",
+      "to": "db",
+      "y": 387.8,
+      "label": "AuthService → 회원 삭제",
+      "variant": "emphasis",
+      "note": "CASCADE: 구독·외부 결제 분석본·탐지·동의·회원 연결 인증 자료. 독립 법정 보존 사본은 영향 없음"
+    },
+    {
+      "id": "y07-privacy-m9",
+      "from": "api",
+      "to": "tokens",
+      "y": 418.9,
+      "label": "인증 쿠키 삭제 · 세션 무효화"
+    },
+    {
+      "id": "y07-privacy-m10",
+      "from": "api",
+      "to": "screen",
+      "y": 450.0,
+      "label": "deleted: true",
+      "variant": "return"
+    }
+  ]
+}

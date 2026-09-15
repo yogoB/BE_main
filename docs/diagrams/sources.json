@@ -1,0 +1,237 @@
+{
+  "checked_at": "2026-09-15T02:11:02.233684+00:00",
+  "repository_revision": "78e3921ed1fe324ff70b695517f980e42ebe759e",
+  "scope": "78e3921 및 작업 트리 경계값 보완을 포함한 실제 코드 스냅샷. 설정된 외부 서비스의 코드 경로이며 실연동 성공 여부는 별도.",
+  "diagrams": {
+    "01-recommend": [
+      {
+        "path": "src/main/java/com/palsaekjo/yogobi/recommend/RecommendationService.java",
+        "sha256": "396da4874db0d8ace98e436009e141c1240721e66a0f9dad0c7628a0ac775ffa"
+      },
+      {
+        "path": "src/main/java/com/palsaekjo/yogobi/recommend/SmartChoiceSnapshotReader.java",
+        "sha256": "bd7cda6c297436c660853bef34b55c3ff074167c5a3df9c2da1ad91208b05587"
+      },
+      {
+        "path": "src/main/java/com/palsaekjo/yogobi/recommend/PriceCrossCheck.java",
+        "sha256": "d0add0314c50050bbc9cab8d2b5047ef3300c302f771b35d2f1311ddb5a83cae"
+      },
+      {
+        "path": "src/main/java/com/palsaekjo/yogobi/pricing/CostCalculator.java",
+        "sha256": "008cb96a1ec019c456600aba3d29071ff8217256d5a31275399d0d258cf80ce1"
+      }
+    ],
+    "02-chat": [
+      {
+        "path": "src/main/java/com/palsaekjo/yogobi/chat/ChatController.java",
+        "sha256": "04fe41b53d3e30537af15b1406a0e4380ec475d232e3b123df7fbc47d9ddb084"
+      },
+      {
+        "path": "src/main/java/com/palsaekjo/yogobi/chat/AiGateway.java",
+        "sha256": "ee1b6681f9c8d94a1617825b73512220479e91911c3d46235202ebf498d837ce"
+      },
+      {
+        "path": "../AI-/app/main.py",
+        "sha256": "9992c2a748a5137625571393084a1cb742284f8a797a924e113a343a115a3938"
+      },
+      {
+        "path": "../AI-/app/parse.py",
+        "sha256": "2ea5e459460aff57b3a0c794e716b1d249a23c948c50fd123446978e41e84305"
+      },
+      {
+        "path": "../AI-/app/narrate.py",
+        "sha256": "0eebff8a5fbd0e23be37282569aab7fa8b4b2ead9d0b97518adfa6ba3eb4b04e"
+      }
+    ],
+    "03-email": [
+      {
+        "path": "src/main/java/com/palsaekjo/yogobi/user/AuthController.java",
+        "sha256": "414b6f61b26cea2654c16b51de5bc86a06bb86b3976fddc68e7f09661b90b417"
+      },
+      {
+        "path": "src/main/java/com/palsaekjo/yogobi/user/AuthService.java",
+        "sha256": "219884252be097b40ac25cd601c2b559ae061e44bf7e6027ae0eef7ac20b834a"
+      },
+      {
+        "path": "src/main/java/com/palsaekjo/yogobi/user/AuthEmail.java",
+        "sha256": "a7075de42f0aba0f56b44450c84f2397bfe2b123a602eca0c49a2699642e78e5"
+      }
+    ],
+    "04-google": [
+      {
+        "path": "src/main/java/com/palsaekjo/yogobi/user/SecurityConfig.java",
+        "sha256": "3c6e22bf91f79869f999f61fc435e49567e7ebd4cba3087ad350350b6bbc7489"
+      },
+      {
+        "path": "src/main/java/com/palsaekjo/yogobi/user/GoogleLogin.java",
+        "sha256": "38342f40fb2f0dd6f21c882055560a2c9399404417f296a0a5acdfbe3bbe4698"
+      },
+      {
+        "path": "src/main/java/com/palsaekjo/yogobi/user/AuthService.java",
+        "sha256": "219884252be097b40ac25cd601c2b559ae061e44bf7e6027ae0eef7ac20b834a"
+      },
+      {
+        "path": "src/main/java/com/palsaekjo/yogobi/user/AuthTokens.java",
+        "sha256": "738a3160f91fbdb51018b3650ad8f721cde10ecba38e28258b9f5ace7120a848"
+      }
+    ],
+    "05-link": [
+      {
+        "path": "src/main/java/com/palsaekjo/yogobi/user/GoogleLogin.java",
+        "sha256": "38342f40fb2f0dd6f21c882055560a2c9399404417f296a0a5acdfbe3bbe4698"
+      },
+      {
+        "path": "src/main/java/com/palsaekjo/yogobi/user/AuthService.java",
+        "sha256": "219884252be097b40ac25cd601c2b559ae061e44bf7e6027ae0eef7ac20b834a"
+      },
+      {
+        "path": "src/main/java/com/palsaekjo/yogobi/user/AuthTokens.java",
+        "sha256": "738a3160f91fbdb51018b3650ad8f721cde10ecba38e28258b9f5ace7120a848"
+      }
+    ],
+    "06-sessions": [
+      {
+        "path": "src/main/java/com/palsaekjo/yogobi/user/AuthController.java",
+        "sha256": "414b6f61b26cea2654c16b51de5bc86a06bb86b3976fddc68e7f09661b90b417"
+      },
+      {
+        "path": "src/main/java/com/palsaekjo/yogobi/user/AuthTokens.java",
+        "sha256": "738a3160f91fbdb51018b3650ad8f721cde10ecba38e28258b9f5ace7120a848"
+      },
+      {
+        "path": "src/main/java/com/palsaekjo/yogobi/user/SecurityConfig.java",
+        "sha256": "3c6e22bf91f79869f999f61fc435e49567e7ebd4cba3087ad350350b6bbc7489"
+      }
+    ],
+    "07-privacy": [
+      {
+        "path": "src/main/java/com/palsaekjo/yogobi/privacy/PrivacyController.java",
+        "sha256": "0407720c779ba2dbd6cd5b93d533508c2c7f0f9bc467cb74f1f8f778fa5b1a78"
+      },
+      {
+        "path": "src/main/java/com/palsaekjo/yogobi/privacy/ConsentService.java",
+        "sha256": "62c7ac9ae60aa689d266926d3b7f3badd05e1ca2cfcb1f859ad5c0a662c0243a"
+      },
+      {
+        "path": "src/main/java/com/palsaekjo/yogobi/user/AuthService.java",
+        "sha256": "219884252be097b40ac25cd601c2b559ae061e44bf7e6027ae0eef7ac20b834a"
+      }
+    ],
+    "08-retention": [
+      {
+        "path": "src/main/java/com/palsaekjo/yogobi/privacy/PaymentRetentionService.java",
+        "sha256": "744ec150ef489d137021b5f207bda34582c05b94cd413773a329d18cc9333887"
+      },
+      {
+        "path": "src/main/java/com/palsaekjo/yogobi/privacy/RetentionService.java",
+        "sha256": "14b99a95bb02fe0240e99c262ee98e75434e14fe3622957e2d40d5f29363c910"
+      },
+      {
+        "path": "src/main/java/com/palsaekjo/yogobi/privacy/PrivacyPolicy.java",
+        "sha256": "5488c79b9dae1236f41dada53ac2cdd7c792049330eb7fd81fb3d93b35a04e5f"
+      },
+      {
+        "path": "db/migration/V6__separate_statutory_payment_retention.sql",
+        "sha256": "9fb88a645069b10ada71c4e57074465a35b50df2c9219863d1e3a8d4754a3cb2"
+      }
+    ],
+    "09-catalog": [
+      {
+        "path": "src/main/java/com/palsaekjo/yogobi/catalog/CatalogSeedLoader.java",
+        "sha256": "4c9450ea390fd85f466817a5deac40547a337d0549a2ad6df1ec301a536b7a53"
+      },
+      {
+        "path": "src/main/java/com/palsaekjo/yogobi/catalog/DevSeedLoader.java",
+        "sha256": "d93ad43c69addabf88af46b09af3fe5302ea5a4f4ca195b4a7086c0e8690e115"
+      },
+      {
+        "path": "src/main/java/com/palsaekjo/yogobi/catalog/CatalogController.java",
+        "sha256": "5b63551a3e6b8006b7081a4d0951ef84064b97a4f6d5938960975a83b94abcf5"
+      }
+    ],
+    "10-member-data": [
+      {
+        "path": "src/main/java/com/palsaekjo/yogobi/subscription/MeSubscriptionController.java",
+        "sha256": "973fc39d434cf666febe1d9250143e063209e7b0615da9353ac452f302c43d6c"
+      },
+      {
+        "path": "src/main/java/com/palsaekjo/yogobi/subscription/UserSubscriptionService.java",
+        "sha256": "fc58678c884afca4c1398e5a476f4cf8256a9025ee11ff1afdeb2f1fd765c0a6"
+      }
+    ],
+    "11-detection": [
+      {
+        "path": "src/main/java/com/palsaekjo/yogobi/detection/DetectionController.java",
+        "sha256": "6528188ed8444d0c7282d1dc2d0a243bf4c54d2098a2d5a87f431172f1a46436"
+      },
+      {
+        "path": "src/main/java/com/palsaekjo/yogobi/detection/DetectionService.java",
+        "sha256": "8c1681bea1ea69070c635a228274f2342b500e8a96a35ff2f5e9c5e9f1d7bd52"
+      },
+      {
+        "path": "src/main/java/com/palsaekjo/yogobi/detection/DuplicateDetector.java",
+        "sha256": "e1d82e8458be1e995f74ef35df0e76e517dd17676a3efa3649b64eaa20e40105"
+      }
+    ],
+    "12-switch": [
+      {
+        "path": "src/main/java/com/palsaekjo/yogobi/recommend/SwitchTimingController.java",
+        "sha256": "6817a43db250cb3858cac7d043054cbf6ab394c6e727f0f07c0687e426c3352e"
+      },
+      {
+        "path": "src/main/java/com/palsaekjo/yogobi/recommend/SwitchTimingService.java",
+        "sha256": "016c2f5cc7b1ab5107548619aae07d369edc243cb3a676374840836562e17d5b"
+      },
+      {
+        "path": "src/main/java/com/palsaekjo/yogobi/pricing/SwitchTiming.java",
+        "sha256": "eeef345e457692353c714d23fcf41df28206bf47b816585f7519fae3f048ec2b"
+      }
+    ],
+    "13-ocr": [
+      {
+        "path": "../AI-/app/main.py",
+        "sha256": "9992c2a748a5137625571393084a1cb742284f8a797a924e113a343a115a3938"
+      },
+      {
+        "path": "../AI-/app/ocr.py",
+        "sha256": "6330588db3d11e819a53c1b076b4d10a0a90612c600726d9d35e25a542c438f5"
+      }
+    ],
+    "14-payment-import": [
+      {
+        "path": "src/main/java/com/palsaekjo/yogobi/subscription/MePaymentController.java",
+        "sha256": "95dfdc8e3bb85661f10620b9e2b006f6c071bf8ecedc2b63b2ca623b332e4ce4"
+      },
+      {
+        "path": "src/main/java/com/palsaekjo/yogobi/subscription/PaymentImportService.java",
+        "sha256": "2e70da1cac96206737b4040da40549564bf8bb06b6d308f4ac65652441cd6ce3"
+      },
+      {
+        "path": "src/main/java/com/palsaekjo/yogobi/subscription/port/MockMydataProvider.java",
+        "sha256": "9dc25f342181360c63e7a913bf0cc8aa52539321165d4c09ff94c716213744dc"
+      },
+      {
+        "path": "src/main/java/com/palsaekjo/yogobi/subscription/MerchantNormalizer.java",
+        "sha256": "2b74e0a42529daec6b851e56514c7e0a48f003e0d564274b10b49f0a005654eb"
+      }
+    ],
+    "15-catalog-refresh": [
+      {
+        "path": "src/main/java/com/palsaekjo/yogobi/catalog/MvnoCatalogLoader.java",
+        "sha256": "6f21ff7c71d2a138d606320edc7577be66b42df2b4a4266b3bff7f37abf813b4"
+      },
+      {
+        "path": "src/main/java/com/palsaekjo/yogobi/catalog/PostOfficeMvnoClient.java",
+        "sha256": "e1fc99f6ec6470eead41f267d9ced94651f9006e60aa9821f5a080f028489f8d"
+      },
+      {
+        "path": "src/main/java/com/palsaekjo/yogobi/recommend/SmartChoiceSweepService.java",
+        "sha256": "482bb5b1fdc497b73a01c6da14628f3cd49f21e584d7fc1a6956a9c7257e537c"
+      },
+      {
+        "path": "src/main/java/com/palsaekjo/yogobi/recommend/SmartChoiceClient.java",
+        "sha256": "bc9283ba6702e36b7bc57e006d886a3ba80e6a0eb9745c3b7904a1158d2e91f4"
+      }
+    ]
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "deliver",
+  "type": "sequence",
+  "input": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/07-privacy.sequence.json",
+  "output": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/07-privacy.html",
+  "specification": {
+    "sha256": "e00b913be2d3556ee13bac736c19d648485f00cf2c64317cebdebfee0ce0ca8e",
+    "bytes": 3065
+  },
+  "artifact": {
+    "sha256": "1deb76da2a0a77fee4c275c8c2e61dac939656658efd04de2a2cf3f4e4ce38f1",
+    "bytes": 805549
+  },
+  "validation": {
+    "checksPassed": 9,
+    "checkCount": 9,
+    "compositionProfile": "showcase",
+    "compositionStatus": "pass",
+    "errors": 0,
+    "warnings": 0
+  }
+}

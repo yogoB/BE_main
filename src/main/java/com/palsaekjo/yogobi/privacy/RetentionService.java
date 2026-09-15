@@ -26,6 +26,10 @@ public class RetentionService {
         deleted.put("payment_record", jdbc.update(
                 "DELETE FROM payment_record WHERE paid_at < (now() - (? * interval '1 month'))::date",
                 PrivacyPolicy.PAYMENT_RETENTION_MONTHS));
+        // Separate confirmed evidence survives analysis expiry and account deletion; use its own deadline.
+        deleted.put("retained_payment_record", jdbc.update(
+                "DELETE FROM retained_payment_record WHERE retain_until <= ?",
+                java.time.LocalDate.now(java.time.ZoneId.of(PrivacyPolicy.RETENTION_ZONE))));
         deleted.put("detection_result", jdbc.update(
                 "DELETE FROM detection_result WHERE detected_at < now() - (? * interval '1 month')",
                 PrivacyPolicy.DETECTION_RETENTION_MONTHS));
@@ -34,7 +38,7 @@ public class RetentionService {
         return deleted;
     }
 
-    @Scheduled(cron = "${yogobi.retention.cron:0 0 4 * * *}")
+    @Scheduled(cron = "${yogobi.retention.cron:0 0 4 * * *}", zone = PrivacyPolicy.RETENTION_ZONE)
     public void scheduledPurge() {
         purge();
     }

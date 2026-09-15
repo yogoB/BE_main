@@ -1,6 +1,6 @@
 # 요고비 BE API 명세서
 
-> 현재 코드 기준(2026-09-10) 정리본. 계약 원본은 `docs/architecture.md §3`(사람 관리). 이 문서는 프론트 연동용 참고본이다.
+> 현재 코드 기준(2026-09-15) 정리본. 계약 원본은 `docs/architecture.md §3`(사람 관리). 이 문서는 프론트 연동용 참고본이다.
 
 ## 기본 정보
 
@@ -66,6 +66,9 @@ AI 연결과 내부 인증은 BE가 담당하며 프론트에는 AI 주소·내�
 | `networkType` | `5G` · `LTE` · `3G` | 망 종류(요청). 응답/DB는 `FIVE_G`·`LTE`·`THREE_G` |
 | `benefitType` | `FREE` · `FIXED_DISCOUNT` · `RATE_DISCOUNT` · `BUNDLE_INCLUDED` | 제휴 혜택 형태 |
 | chat `status` | `RECOMMENDED` · `NEEDS_INPUT` · `FILTER_FALLBACK` | 챗봇 응답 상태 |
+| detection `rule` | `BENEFIT_OVERLAP` · `TIER_DUPLICATE` · `BUNDLE_OVERLAP` | 중복/낭비 탐지 규칙 |
+| switch-timing `status` | `SWITCH_NOW` · `WAIT_UNTIL_EXPIRY` · `NO_BENEFIT` | 변경 시점 판정 |
+| consent `item` | `ESSENTIAL`(철회 불가) · `MARKETING` | 수집·이용 동의 항목 |
 
 **구독 서비스 ID 고정값**: 1 넷플릭스 · 2 디즈니+ · 3 티빙 · 4 웨이브 · 5 왓챠 · 6 유튜브 프리미엄
 
@@ -309,13 +312,128 @@ JWT 절대 수명 15분·유휴 제한 5분. 상세 실행법·설정 점검은 
 요청 예시·엔드포인트·CSRF·쿠키·Google·SMTP 설정·에러 코드는 [회원 인증 명세](auth.md)를 따른다.
 회원 JWT는 15분 만료(refresh 없음)이며 `GET /api/v1/me`는 현재 로그인한 회원만 반환한다.
 
-## 아직 없는 것 (예정)
+## 5. 회원 데이터 (`/api/v1/me/**`)
 
-| 예정 엔드포인트 | 상태 |
-|---|---|
-| `GET/POST/DELETE /api/v1/me/subscriptions` | 내 구독 — 미구현 |
-| `POST /api/v1/me/payments/import` | 결제내역 업로드 — 미구현 |
-| `GET /api/v1/me/detections` | 중복 결제 탐지 조회 — 서비스 로직은 있음, HTTP 노출 전 |
-| `GET /api/v1/me/switch-timing` · `alerts` | Phase 2 |
+모든 `/me` 계열은 **인증 필수**(ROLE_MEMBER, HttpOnly JWT 쿠키). 조회·변경은 **인증된 Principal의 userId만** 사용해
+객체 단위 권한을 강제한다(남의 데이터 조회·수정 불가). 상태를 바꾸는 요청(POST/DELETE)은 **CSRF 토큰**이 필요하다.
+미인증은 401, CSRF 누락은 403.
 
-`/me` 계열은 인증된 회원만 접근 가능하다. 위 기능은 구현 후 현재 사용자 ID로 연결한다.
+### 5-1. 본인 구독 — `GET/POST /api/v1/me/subscriptions`, `DELETE /api/v1/me/subscriptions/{id}`
+
+구독 금액(`monthlyPrice`)은 사용자가 실제 내는 값(`USER_PROVIDED`)이며 탐지·현재 지출 계산의 입력원이다.
+
+**GET** 응답 200 — `data`는 본인 구독 배열:
+
+```json
+{ "data": [
+  { "id": 12, "tierId": 2, "tierName": "넷플릭스 프리미엄", "monthlyPrice": 13500,
+    "startedAt": "2026-09-14", "endedAt": null }
+] }
+```
+
+**POST** 요청 `{ "tierId": 2, "monthlyPrice": 13500 }` → 응답 200 `data`는 생성된 구독 1건(위 View 형태).
+`tierId` 누락·미존재, `monthlyPrice` null·음수 → **400** `YGB-REQ-001`.
+
+**DELETE** `/subscriptions/{id}` → 응답 200 `{ "data": { "removed": true } }`.
+없거나 남의 구독이면 **404** `YGB-SUB-404`.
+
+### 5-2. 현재 요금제 설정 — `POST /api/v1/me/current-plan`
+
+요청 `{ "planId": 1 }` → 응답 200 `{ "data": { "updated": true } }`.
+`planId` 누락 → 400 `YGB-REQ-001`, 없는 요금제 → **404** `YGB-CAT-001`. 변경 시점(5-4)의 선행 조건이다.
+
+### 5-3. 결제내역 업로드 — `POST /api/v1/me/payments/import`
+
+요청 본문은 [데이터 문서 §6](data.md#6-mock-마이데이터-표준-형식-모방)의 Mock 마이데이터 JSON(카드 승인내역).
+`status=01`(승인)만 저장하고 취소·기타는 제외한다. 각 항목은 `currency_code=KRW`·0 이상 long 정수 금액·
+유효한 14자리 일시(`yyyyMMddHHmmss`)를 검증한다. 저장은 외부 결제 분석본(`payment_record`)에만 이뤄지고
+자동 구독 생성은 하지 않는다(가맹점 확인 전).
+
+응답 200:
+
+```json
+{ "data": { "imported": 2, "recognized": 1, "unrecognized": ["배달의민족"] } }
+```
+
+- `imported` 저장 건수(취소 제외), `recognized` 가맹점→서비스 매칭 성공 건수.
+- 미인식 가맹점은 `service_id=null`로 저장하고 `unrecognized`로 되돌려 **사용자에게 확인**을 요청한다(추측 매핑 금지).
+- 형식 오류는 **400** `YGB-REQ-001`이며 전체 입력을 저장하지 않는다(부분 저장 없음).
+- 재업로드 중복 제거는 미구현. 법정 보존 사본은 자동 생성하지 않는다.
+
+### 5-4. 변경 시점(회수기간) — `GET /api/v1/me/switch-timing`
+
+읽기 전용. 회원의 **현재 요금제(5-2 저장분) + 활성 구독**으로 계산한 현재 실질월비용을 대상 요금제와 같은 조건으로 비교한다.
+
+쿼리 파라미터:
+
+| 이름 | 필수 | 기본 | 설명 |
+|---|---|---|---|
+| `targetPlanId` | ✅ | — | 비교 대상 요금제 ID |
+| `switchingCost` | ✕ | 0 | 전환비용(위약금 등, 사용자 추정치) |
+| `remainingContractMonths` | ✕ | 0 | 약정 잔여 개월(사용자 추정치) |
+
+응답 200:
+
+```json
+{ "data": {
+  "currentMonthlyCost": 68500, "targetMonthlyCost": 58500, "monthlySavings": 10000,
+  "switchingCost": 0, "paybackMonths": 6, "remainingContractMonths": 12, "status": "SWITCH_NOW"
+} }
+```
+
+- `status` = `SWITCH_NOW`(회수개월 < 약정잔여) · `WAIT_UNTIL_EXPIRY`(회수개월 ≥ 약정잔여) · `NO_BENEFIT`(월 절감 ≤ 0, `paybackMonths=null`).
+- 현재 요금제 미설정 → **400** `YGB-REQ-001`(먼저 5-2 호출). `targetPlanId` 미존재 → 404 `YGB-CAT-001`.
+- `switchingCost`·`remainingContractMonths` 음수, 회수 개월 Integer 초과 → 400. 활성 구독이 없어도 비교 가능.
+- 현재 계산은 카탈로그 티어 가격 기준이며 저장한 실제 청구액·약정·가족결합을 완전히 반영하지 않는다.
+  항목별 출처를 포함한 개인화 응답은 [후속 검토안](proposals/2026-09-15-service-direction.md)에 기록했다.
+
+### 5-5. 중복 결제 탐지 — `GET /api/v1/me/detections`
+
+요청 시 현재 구독·요금제 기준으로 **재탐지해 저장·반환**한다. 응답 200 `data`는 탐지 결과 배열:
+
+```json
+{ "data": [
+  { "rule": "BENEFIT_OVERLAP", "targetRef": "넷플릭스", "wastedAmount": 13500 }
+] }
+```
+
+`rule` = `BENEFIT_OVERLAP`·`TIER_DUPLICATE`·`BUNDLE_OVERLAP`, `wastedAmount`는 월 단위 낭비 금액(원).
+
+### 5-6. 종료 예정 알림 — 미구현 (P2)
+
+---
+
+## 6. 개인정보·동의 (`/api/v1`)
+
+### 6-1. 처리방침 — `GET /api/v1/privacy-policy` (공개)
+
+인증 불필요. 응답 200 `data`:
+
+```json
+{ "data": {
+  "version": "2026-09-12",
+  "items": [ { "category": "...", "fields": ["..."], "purpose": "...", "legalBasis": "...", "retention": "결제내역 12개월·탐지결과 6개월..." } ],
+  "dataSubjectRights": ["열람", "삭제", "..."]
+} }
+```
+
+### 6-2. 내 동의 조회 — `GET /api/v1/me/consent` (인증)
+
+응답 200 `data`는 동의 항목 배열:
+
+```json
+{ "data": [
+  { "item": "ESSENTIAL", "policyVersion": "2026-09-12", "agreed": true, "agreedAt": "2026-09-14T...Z", "withdrawnAt": null },
+  { "item": "MARKETING", "policyVersion": "2026-09-12", "agreed": false, "agreedAt": null, "withdrawnAt": "..." }
+] }
+```
+
+`ESSENTIAL`(필수)은 가입 시 기록되며 **철회 불가**(계약 이행 근거). `MARKETING`(선택)만 아래로 변경한다.
+
+### 6-3. 마케팅 동의 변경 — `POST /api/v1/me/consent/marketing` (인증+CSRF)
+
+요청 `{ "agree": true }` → 응답 200 `{ "data": { "agreed": true } }`. `agree`가 boolean이 아니면 400 `YGB-REQ-001`.
+
+> **회원 탈퇴·데이터 삭제**는 `DELETE /api/v1/me`(회원 인증, [auth.md](auth.md)). 법정 보존 사본만 별도 보존.
+
+전체 호출 흐름은 [시퀀스 다이어그램](diagrams/index.html)에서 확인한다.

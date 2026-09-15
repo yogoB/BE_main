@@ -1,0 +1,134 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "요고비 · 로그인 방법 명시적 연결",
+    "quality_profile": "showcase",
+    "column_fit": "spread",
+    "viewBox": [
+      1080,
+      560
+    ]
+  },
+  "participants": [
+    {
+      "id": "screen",
+      "type": "frontend",
+      "label": "로그인한 회원",
+      "sublabel": "현재 세션 필요"
+    },
+    {
+      "id": "login",
+      "type": "security",
+      "label": "GoogleLogin",
+      "sublabel": "5분 연결 의도"
+    },
+    {
+      "id": "google",
+      "type": "external",
+      "label": "Google OIDC",
+      "sublabel": "04번 인증 흐름"
+    },
+    {
+      "id": "members",
+      "type": "backend",
+      "label": "AuthService",
+      "sublabel": "자격 정보 변경"
+    },
+    {
+      "id": "tokens",
+      "type": "security",
+      "label": "AuthTokens",
+      "sublabel": "세션 폐기·재발급"
+    }
+  ],
+  "messages": [
+    {
+      "id": "y05-link-m1",
+      "from": "screen",
+      "to": "login",
+      "y": 170.0,
+      "label": "연결 요청 · 비밀번호 · CSRF",
+      "variant": "security",
+      "note": "자체→Google: POST /api/v1/auth/google/link. Google→자체: POST /api/v1/auth/password"
+    },
+    {
+      "id": "y05-link-m2",
+      "from": "login",
+      "to": "members",
+      "y": 201.1,
+      "label": "기존 비밀번호 / 새 비밀번호 검사",
+      "variant": "security",
+      "note": "자체 계정은 기존 비밀번호 재확인. Google 전용은 새 비밀번호 해시만 준비"
+    },
+    {
+      "id": "y05-link-m3",
+      "from": "members",
+      "to": "login",
+      "y": 232.2,
+      "label": "현재 credential_version",
+      "variant": "return"
+    },
+    {
+      "id": "y05-link-m4",
+      "from": "login",
+      "to": "screen",
+      "y": 263.3,
+      "label": "연결 의도 저장 · 인가 URL",
+      "variant": "return",
+      "note": "5분 만료, userId·현재 토큰 해시·HTTP 세션에 결합. 세션 ID 교체"
+    },
+    {
+      "id": "y05-link-m5",
+      "from": "screen",
+      "to": "google",
+      "y": 294.4,
+      "label": "동일한 OIDC 인증 절차",
+      "variant": "security",
+      "note": "브라우저→Spring Security→Google 경유. 세부 절차는 04번"
+    },
+    {
+      "id": "y05-link-m6",
+      "from": "google",
+      "to": "login",
+      "y": 325.6,
+      "label": "검증된 인증 결과로 콜백",
+      "variant": "return",
+      "note": "Spring Security 검증 이후 success handler 진입"
+    },
+    {
+      "id": "y05-link-m7",
+      "from": "login",
+      "to": "tokens",
+      "y": 356.7,
+      "label": "회원·토큰·5분 의도 일치 확인",
+      "variant": "security"
+    },
+    {
+      "id": "y05-link-m8",
+      "from": "login",
+      "to": "members",
+      "y": 387.8,
+      "label": "linkGoogle / addPassword",
+      "variant": "security",
+      "note": "자체→Google은 같은 이메일, Google→자체는 같은 sub 필수. 버전 조건부 갱신"
+    },
+    {
+      "id": "y05-link-m9",
+      "from": "login",
+      "to": "tokens",
+      "y": 418.9,
+      "label": "기존 세션 전부 폐기 · 새 발급",
+      "variant": "security"
+    },
+    {
+      "id": "y05-link-m10",
+      "from": "login",
+      "to": "screen",
+      "y": 450.0,
+      "label": "쿠키 갱신 · 성공 화면 복귀",
+      "variant": "return",
+      "note": "의도·OAuth 세션 폐기. 충돌 또는 검증 실패는 연결하지 않음"
+    }
+  ]
+}

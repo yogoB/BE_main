@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "deliver",
+  "type": "sequence",
+  "input": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/09-catalog.sequence.json",
+  "output": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/09-catalog.html",
+  "specification": {
+    "sha256": "d6c0e167696bc64269908ed97e97300687f6bcc51e25e2a4aa05ba3fab4dcce0",
+    "bytes": 2799
+  },
+  "artifact": {
+    "sha256": "e69dc47f96095b2b378616f7644fd1b622fe9ca60741427a74eb5524560ad29e",
+    "bytes": 803667
+  },
+  "validation": {
+    "checksPassed": 9,
+    "checkCount": 9,
+    "compositionProfile": "showcase",
+    "compositionStatus": "pass",
+    "errors": 0,
+    "warnings": 0
+  }
+}

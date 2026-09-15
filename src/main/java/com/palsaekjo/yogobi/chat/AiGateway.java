@@ -91,6 +91,7 @@ public class AiGateway {
 
     public String narrate(CostResult cost, List<MissingInput> missingInputs) {
         ObjectNode request = json.valueToTree(cost);
+        request.remove("priceCrossCheck"); // 교차검증 표시값은 AI로 보내지 않는다(/narrate extra=forbid). 금액·근거만 전달.
         request.set("missingInputs", json.valueToTree(missingInputs));
         JsonNode result = post("/narrate", request);
         requireObject(result, "message");

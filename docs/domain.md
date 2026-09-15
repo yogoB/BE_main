@@ -67,6 +67,8 @@
 | 수집·이용 동의 | `user_consent` / `ConsentService` | 필수(`ESSENTIAL`)·선택(`MARKETING`). `Consent` `Agreement` 단독 식별자 금지 |
 | 보유기간 파기 | `RetentionService` | 보유기간 초과 개인데이터·만료 인증 흔적 자동 파기(@Scheduled) |
 | 회원 탈퇴(삭제권) | `AuthService.deleteAccount` | `app_user` 삭제가 FK cascade 로 개인데이터 전파 파기 |
+| 법정 보존 결제 사본 | `retained_payment_record` / `PaymentRetentionService` | 확인된 보존 의무만 분리 보관. 회원 FK·이메일·인증 정보는 복사하지 않음 |
+| 보존 근거·기간 | `legal_basis` / `retention_start` / `retain_until` | 담당자가 확정한 근거와 기간. 일반 외부 구독 분석 내역에는 자동 적용하지 않음 |
 
 ### 초기 데이터 적재
 
@@ -74,6 +76,13 @@
 |---|---|---|
 | 카탈로그 시드 로더 | `CatalogSeedLoader` | `catalog` 내부, CSV 스냅샷 적재 |
 | AI 서버 게이트웨이 | `AiGateway` | `/parse`·`/narrate` HTTP 호출과 응답 검증 |
+| 우체국알뜰폰 어댑터 | `PostOfficeMvnoClient` | 우정사업본부 Open API 조회·XML 파싱·fail-soft. `MvnoPlan` |
+| 알뜰폰 카탈로그 적재 | `MvnoCatalogLoader` | MVNO 요금제 → carrier(MVNO)+mobile_plan upsert(캐시), 무효행 스킵·하루 1회 @Scheduled |
+| 스마트초이스 어댑터 | `SmartChoiceClient` | Open API 단건 조회(추천 3건)·XML 파싱·fail-soft. `SmartChoiceRecommendation` |
+| 스마트초이스 격자 스윕 | `SmartChoiceSweepService` | data×type×dis 격자 호출·dedup 업서트·하루 3회 @Scheduled |
+| 요금제 라이브 시세 | `smartchoice_plan_snapshot` | 교차검증·시세 스냅샷(카탈로그 대체 아님). 유니크 (carrier,plan_name,network_type,contract_months) |
+| 시세 스냅샷 읽기 | `SmartChoiceSnapshotReader` | (통신사,요금제명)→정상가 조회. 무약정·최신 우선 |
+| 시세 교차검증 | `PriceCrossCheck` | 추천 결과의 시드 기본료↔라이브 시세 대조(표시용, 계산 미사용). `/narrate` 미전달 |
 | 서버 간 내부 토큰 | `AI_INTERNAL_TOKEN` | BE와 AI만 공유. 사용자 인증 토큰과 별도이며 프론트에 노출하지 않음 |
 | 챗봇 요청 진입점 | `ChatController` | 기존 추천 서비스 재사용, 추가 입력·필터 폴백 안내 |
 | 챗봇 응답 | `ChatResponse` | `status`, `message`, `recommendation` |
@@ -84,10 +93,16 @@
 | 개발용 더미 시드 로더 | `DevSeedLoader` | dev 프로파일 전용, `db/seed/dev/` 더미 적재 (로컬 bootRun) |
 | 중복 결제 탐지기 | `DuplicateDetector` | `detection` 순수 도메인, 세 규칙 독립 적용 |
 | 탐지 응용 서비스 | `DetectionService` | 활성 구독·현재 요금제 혜택·번들 로드 → 탐지 → 저장 |
+| 회원 구독·현재요금제 API | `UserSubscriptionService` / `MeSubscriptionController` | 본인만(userId 필터), 구독 CRUD·current_plan 설정 |
+| 탐지 조회 API | `DetectionController` | `GET /me/detections` → DetectionService 재탐지 |
+| 변경 시점 엔진 | `SwitchTiming` | 순수 도메인(§8). 전환비용·월절감·약정잔여 → 회수개월(정수 올림)·상태. 프로모종료 알림 공통 |
+| 변경 시점 API | `SwitchTimingService` / `SwitchTimingController` | 현재(저장 요금제+구독) vs 대상 실질비용 비교 → SwitchTiming. `GET /me/switch-timing` |
 | 사용자(예약어 회피) | `app_user` | `user` 는 PostgreSQL 예약어. `current_plan_id` 로 현재 요금제 |
 | 활성 구독 | `ActiveSubscription` | 탐지 입력 — 현재 결제 중인 구독(서비스·티어·월액) |
 | 탐지 결과 | `DetectionFinding` | 규칙·대상·월 낭비액 (DB `DetectionResult`와 구분되는 도메인 값) |
 | 가맹점 정규화기 | `MerchantNormalizer` | `subscription` 순수 도메인, 가맹점 원문 → service_id (모르면 empty) |
+| 결제내역 업로드 | `PaymentImportService` / `MePaymentController` | 업로드분 → `payment_record` 적재+가맹점 정규화. 미매칭은 null·묻는 목록(G-10). 자동 구독 생성 안 함. `POST /me/payments/import` |
+| 결제내역 프로바이더 | `PaymentHistoryProvider` / `MockMydataProvider` | 소스별 파서(port). Mock 마이데이터: 승인(01)만·취소 제외·KRW·yyyyMMddHHmmss |
 | 회원 인증 | `AuthService` / `AuthController` | 자체 가입·로그인, 회원 정보와 명시적 계정 연결 |
 | 이메일 본인 확인 | `AuthEmail` / `Proof` / `auth_email_token` | SIGNUP·RESET 목적, 10분·단일 사용, DB는 SHA-256만 저장 |
 | 이메일 확인 여부 | `email_verified` | 검증 완료만 자체 로그인. 기존 미검증 회원은 메일 재설정으로 복구 |
@@ -181,6 +196,12 @@
 | `ESTIMATED` | 추정 | 위약금, OCR 추출값 |
 
 `ESTIMATED`가 포함된 결과는 화면에 "추정치예요" 표기가 붙는다.
+
+### 소스 우선순위 (데이터 소싱, D-13)
+
+같은 값에 여러 소스가 있으면 **`OFFICIAL`/`DERIVED`(인가 API·공식·계산) > `USER_PROVIDED`(사용자 확정) > `ESTIMATED`(AI추출·크롤 미확인)** 순으로 채택한다.
+`ESTIMATED`는 표시·보조만 — 계산 우선순위 최하이며, 확인되면 상위로 승격한다. **금액을 만드는 건 pricing 단독(D-03)**: AI·크롤은 소스 후보만 제공하고, 런타임 크롤·AI 실시간 가격 소싱은 하지 않는다(D-05, 배치/오프라인만).
+소스별: MVNO 요금제=우체국 API(주)+CSV/사용자, MNO 요금제=CSV(팀)+사용자입력(공개 API 없음), 시세=SmartChoice(교차검증·표시), OTT 티어·번들·제휴혜택=CSV/오프라인 크롤.
 
 ---
 

@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "deliver",
+  "type": "sequence",
+  "input": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/03-email.sequence.json",
+  "output": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/03-email.html",
+  "specification": {
+    "sha256": "6ca7ba5bc2e651376623124adf9caa06ba300ff06dc373fd0b8058aa3e78b108",
+    "bytes": 3444
+  },
+  "artifact": {
+    "sha256": "dc5f72b2959c07d2ec136ccd74224175207c09db55d8fabb25f976f1bd2dbcb7",
+    "bytes": 806028
+  },
+  "validation": {
+    "checksPassed": 9,
+    "checkCount": 9,
+    "compositionProfile": "showcase",
+    "compositionStatus": "pass",
+    "errors": 0,
+    "warnings": 0
+  }
+}

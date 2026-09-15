@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "deliver",
+  "type": "sequence",
+  "input": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/12-switch.sequence.json",
+  "output": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/12-switch.html",
+  "specification": {
+    "sha256": "3452b4043af39852ad5ac4955efc93fa4988b6391882c6fb26762fc789bd345b",
+    "bytes": 3077
+  },
+  "artifact": {
+    "sha256": "087874379406fc5c07a49180058573da7f8b953686a4b696820b75040ed7d4f1",
+    "bytes": 804475
+  },
+  "validation": {
+    "checksPassed": 9,
+    "checkCount": 9,
+    "compositionProfile": "showcase",
+    "compositionStatus": "pass",
+    "errors": 0,
+    "warnings": 0
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "deliver",
+  "type": "sequence",
+  "input": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/13-ocr.sequence.json",
+  "output": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/13-ocr.html",
+  "specification": {
+    "sha256": "1a0127b560434cd5f1737a310df15fb24988035cd5aa237c2521b1381360909d",
+    "bytes": 2102
+  },
+  "artifact": {
+    "sha256": "1d6441e3c0229b12221cedbf94f1501daebd3d876998599e17874774e45f644d",
+    "bytes": 800473
+  },
+  "validation": {
+    "checksPassed": 9,
+    "checkCount": 9,
+    "compositionProfile": "showcase",
+    "compositionStatus": "pass",
+    "errors": 0,
+    "warnings": 0
+  }
+}
