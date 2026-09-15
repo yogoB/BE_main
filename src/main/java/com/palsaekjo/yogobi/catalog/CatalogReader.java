@@ -149,6 +149,9 @@ public class CatalogReader {
 
     /** 지정한 ID 의 티어들 (계산기 — 특정 조합). 존재하는 것만 반환하므로 호출부가 누락을 검증한다. */
     public List<SubscriptionTier> findTiersByIds(List<Long> tierIds) {
+        if (tierIds.isEmpty()) {
+            return List.of();
+        }
         return jdbc.query("""
                 SELECT id, service_id, name, price FROM subscription_tier WHERE id IN (:ids)
                 """, new MapSqlParameterSource("ids", tierIds),

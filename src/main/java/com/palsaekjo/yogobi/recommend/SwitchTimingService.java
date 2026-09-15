@@ -31,6 +31,12 @@ public class SwitchTimingService {
     }
 
     public Response evaluate(long userId, long targetPlanId, long switchingCost, int remainingContractMonths) {
+        if (switchingCost < 0) {
+            throw ApiException.requiredMissing("switchingCost", "전환비용은 0 이상이어야 합니다.");
+        }
+        if (remainingContractMonths < 0) {
+            throw ApiException.requiredMissing("remainingContractMonths", "약정 잔여 개월은 0 이상이어야 합니다.");
+        }
         Long currentPlanId = jdbc.queryForObject("SELECT current_plan_id FROM app_user WHERE id = ?", Long.class, userId);
         if (currentPlanId == null) {
             throw ApiException.requiredMissing("currentPlan", "현재 요금제를 먼저 설정하세요 (POST /me/current-plan).");
@@ -41,7 +47,12 @@ public class SwitchTimingService {
 
         long current = effectiveCost(currentPlanId, tierIds);
         long target = effectiveCost(targetPlanId, tierIds);
-        var result = SwitchTiming.evaluate(switchingCost, current - target, remainingContractMonths);
+        SwitchTiming.Result result;
+        try {
+            result = SwitchTiming.evaluate(switchingCost, current - target, remainingContractMonths);
+        } catch (ArithmeticException e) {
+            throw ApiException.requiredMissing("switchingCost", "전환비용이 너무 커 회수 개월을 계산할 수 없습니다.");
+        }
         return new Response(current, target, result.monthlySavings(), result.switchingCost(),
                 result.paybackMonths(), result.remainingContractMonths(), result.status().name());
     }

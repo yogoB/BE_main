@@ -31,7 +31,7 @@ public final class SwitchTiming {
         if (monthlySavings <= 0) {
             return new Result(switchingCost, monthlySavings, null, remainingContractMonths, Status.NO_BENEFIT);
         }
-        int paybackMonths = (int) ((switchingCost + monthlySavings - 1) / monthlySavings); // ceil, 정수 연산
+        int paybackMonths = Math.toIntExact(Math.ceilDiv(switchingCost, monthlySavings));
         Status status = paybackMonths < remainingContractMonths ? Status.SWITCH_NOW : Status.WAIT_UNTIL_EXPIRY;
         return new Result(switchingCost, monthlySavings, paybackMonths, remainingContractMonths, status);
     }

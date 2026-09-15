@@ -160,6 +160,29 @@ class MeApiTest {
                 .andExpect(status().isBadRequest()); // 현재 요금제 미설정
     }
 
+    @Test void switchTimingRejectsNegativeInputsAndUnrepresentablePayback() throws Exception {
+        jdbc.execute("INSERT INTO carrier(id,name,carrier_type) VALUES (1,'SKT','MNO')");
+        jdbc.execute("""
+                INSERT INTO mobile_plan(id,carrier_id,name,network_type,base_price,data_mb,voice_min,sms_cnt,source_url,collected_at)
+                VALUES (1,1,'현재','FIVE_G',55000,100000,999999,9999,'http://seed','2026-09-14'),
+                       (2,1,'대상','FIVE_G',45000,100000,999999,9999,'http://seed','2026-09-14')""");
+        Browser member = new Browser(); long id = signup("alice@example.com", member);
+        jdbc.update("UPDATE app_user SET current_plan_id=1 WHERE id=?", id);
+        mvc.perform(get("/api/v1/me/switch-timing").cookie(member.cookies).param("targetPlanId", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.monthlySavings").value(10000)); // 구독이 없는 회원도 비교 가능
+        for (var bad : Map.of("switchingCost", "-1", "remainingContractMonths", "-1").entrySet()) {
+            mvc.perform(get("/api/v1/me/switch-timing").cookie(member.cookies).param("targetPlanId", "2")
+                            .param(bad.getKey(), bad.getValue()))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.error.field").value(bad.getKey()));
+        }
+        mvc.perform(get("/api/v1/me/switch-timing").cookie(member.cookies).param("targetPlanId", "2")
+                        .param("switchingCost", Long.toString(Long.MAX_VALUE)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.field").value("switchingCost"));
+    }
+
     @Test void guestCannotAccessMe() throws Exception {
         mvc.perform(get("/api/v1/me/subscriptions")).andExpect(status().isUnauthorized());
         mvc.perform(get("/api/v1/me/detections")).andExpect(status().isUnauthorized());
