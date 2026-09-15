@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>요고비 구현 흐름</title>
+<style>
+:root{color-scheme:light dark}body{font:17px/1.65 system-ui,sans-serif;margin:3rem auto;padding:0 1.5rem;max-width:1050px;background:light-dark(#f6f8fa,#0b1220);color:light-dark(#172333,#e7edf5)}
+h1{font-size:2rem;line-height:1.3}p{max-width:75ch;color:light-dark(#48566b,#b7c7dc)}
+ol{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));list-style:none;padding:0;gap:1rem;margin:2rem 0}li a{display:block;height:100%;box-sizing:border-box;border:1px solid light-dark(#d6dfe9,#33445e);border-radius:12px;padding:1rem;background:light-dark(#fff,#142034);text-decoration:none}
+a{color:inherit}a:hover,a:focus-visible{outline:3px solid #12a894;outline-offset:3px}span{font-variant-numeric:tabular-nums;color:light-dark(#08786d,#46d5bf);margin-right:.7rem}footer{border-top:1px solid #738198;padding-top:1rem;font-size:.9rem}
+</style>
+<main><p>2026-09-15 · 시퀀스 다이어그램 15개</p><h1>요고비의 현재 구현 흐름</h1>
+<p>공개 추천부터 회원 관리, 내부 파기 작업까지. 그림을 선택하고 화살표를 눌러 API 경로와 조건을 확인하세요.</p>
+<ol><li><a href="01-recommend.html"><span>01</span>추천과 직접 계산</a></li><li><a href="02-chat.html"><span>02</span>챗봇 추천</a></li><li><a href="03-email.html"><span>03</span>이메일 확인 · 가입 또는 재설정</a></li><li><a href="04-google.html"><span>04</span>Google 로그인</a></li><li><a href="05-link.html"><span>05</span>로그인 방법 명시적 연결</a></li><li><a href="06-sessions.html"><span>06</span>자체 로그인과 세션 관리</a></li><li><a href="07-privacy.html"><span>07</span>동의 관리와 회원 탈퇴</a></li><li><a href="08-retention.html"><span>08</span>명시적 보존과 정기 파기</a></li><li><a href="09-catalog.html"><span>09</span>시드 적재와 공개 카탈로그</a></li><li><a href="10-member-data.html"><span>10</span>내 구독·통신 요금제 관리</a></li><li><a href="11-detection.html"><span>11</span>중복 결제 탐지</a></li><li><a href="12-switch.html"><span>12</span>요금제 변경 시점 비교</a></li><li><a href="13-ocr.html"><span>13</span>OCR 내부 API</a></li><li><a href="14-payment-import.html"><span>14</span>외부 결제내역 업로드</a></li><li><a href="15-catalog-refresh.html"><span>15</span>공식 API 정기 수집</a></li></ol>
+<p>OCR은 AI 내부 API만 연결돼 있습니다. 법정 보존은 명시적 내부 호출이 필요합니다. Google·메일의 실제 운영 연동 성공을 나타내는 그림은 아닙니다.</p>
+<footer><a href="README.md">코드 근거·현재 제한</a> · <a href="verification.json">전체 검증 기록</a> · <a href="sources.json">소스 스냅샷</a>
+<p>그림 설명은 한국어이며 Archify 고정 메뉴는 영어입니다. 각 그림에서 테마 변경·확대·내보내기를 사용할 수 있습니다.</p></footer></main></html>

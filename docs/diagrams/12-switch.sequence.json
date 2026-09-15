@@ -1,0 +1,114 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "요고비 · 요금제 변경 시점 비교",
+    "quality_profile": "showcase",
+    "column_fit": "spread",
+    "viewBox": [
+      1080,
+      560
+    ]
+  },
+  "participants": [
+    {
+      "id": "screen",
+      "type": "frontend",
+      "label": "로그인한 회원",
+      "sublabel": "현재 요금제 사전 저장"
+    },
+    {
+      "id": "service",
+      "type": "backend",
+      "label": "SwitchTimingService",
+      "sublabel": "Controller 경유"
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "CatalogReader 포함"
+    },
+    {
+      "id": "pricing",
+      "type": "backend",
+      "label": "CostCalculator",
+      "sublabel": "동일 조건 비용 계산"
+    },
+    {
+      "id": "timing",
+      "type": "backend",
+      "label": "SwitchTiming",
+      "sublabel": "회수 개월·상태"
+    }
+  ],
+  "messages": [
+    {
+      "id": "y12-switch-m1",
+      "from": "screen",
+      "to": "service",
+      "y": 170.0,
+      "label": "GET /me/switch-timing",
+      "variant": "security",
+      "note": "전체 경로 /api/v1/me/switch-timing. targetPlanId, switchingCost, remainingContractMonths. 음수 switchingCost·remainingContractMonths 및 회수 개월 정수 범위 초과는 400"
+    },
+    {
+      "id": "y12-switch-m2",
+      "from": "service",
+      "to": "db",
+      "y": 210.0,
+      "label": "본인 현재 요금제·활성 티어 조회"
+    },
+    {
+      "id": "y12-switch-m3",
+      "from": "db",
+      "to": "service",
+      "y": 250.0,
+      "label": "현재·대상 요금제 자료",
+      "variant": "return",
+      "note": "현재 요금제 미설정은 입력 오류, 대상 요금제 없음은 404"
+    },
+    {
+      "id": "y12-switch-m4",
+      "from": "service",
+      "to": "pricing",
+      "y": 290.0,
+      "label": "같은 활성 티어로 두 번 계산",
+      "variant": "emphasis",
+      "note": "현재 구현은 사용자 monthly_price 대신 카탈로그 티어 가격 사용. 약정·가족결합 입력은 null"
+    },
+    {
+      "id": "y12-switch-m5",
+      "from": "pricing",
+      "to": "service",
+      "y": 330.0,
+      "label": "현재 비용 · 대상 비용",
+      "variant": "return"
+    },
+    {
+      "id": "y12-switch-m6",
+      "from": "service",
+      "to": "timing",
+      "y": 370.0,
+      "label": "전환비용·월 차액·약정 잔여"
+    },
+    {
+      "id": "y12-switch-m7",
+      "from": "timing",
+      "to": "service",
+      "y": 410.0,
+      "label": "회수 개월 · 변경 시점 상태",
+      "variant": "return",
+      "note": "월 차액 <=0은 NO_BENEFIT. 회수 개월 < 약정 잔여면 SWITCH_NOW, 아니면 WAIT_UNTIL_EXPIRY"
+    },
+    {
+      "id": "y12-switch-m8",
+      "from": "service",
+      "to": "screen",
+      "y": 450.0,
+      "label": "Controller 경유 비교 결과",
+      "variant": "return",
+      "note": "현재 응답에는 항목별 출처가 없다. 계산 추정과 실제 청구액을 구분해야 함"
+    }
+  ]
+}

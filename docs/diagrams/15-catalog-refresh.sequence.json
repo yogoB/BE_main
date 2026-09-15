@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "요고비 · 공식 API 정기 수집",
+    "quality_profile": "showcase",
+    "column_fit": "spread",
+    "viewBox": [
+      1080,
+      560
+    ]
+  },
+  "participants": [
+    {
+      "id": "timer",
+      "type": "backend",
+      "label": "정기 실행",
+      "sublabel": "한국시간 기준"
+    },
+    {
+      "id": "mvno",
+      "type": "backend",
+      "label": "MvnoCatalogLoader",
+      "sublabel": "우체국 카탈로그"
+    },
+    {
+      "id": "smart",
+      "type": "backend",
+      "label": "SmartChoiceSweepService",
+      "sublabel": "시세 수집"
+    },
+    {
+      "id": "external",
+      "type": "external",
+      "label": "공식 Open API",
+      "sublabel": "각 Client 경유"
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "카탈로그·시세 분리"
+    }
+  ],
+  "messages": [
+    {
+      "id": "collection-1",
+      "from": "timer",
+      "to": "mvno",
+      "y": 170,
+      "label": "매일 05:30 · load",
+      "note": "키가 없거나 HTTP 호출에 실패하면 기존 카탈로그를 유지한다",
+      "variant": "emphasis"
+    },
+    {
+      "id": "collection-2",
+      "from": "mvno",
+      "to": "external",
+      "y": 210,
+      "label": "우체국 요금제 조회",
+      "note": "PostOfficeMvnoClient.fetchAll. POST_OFFICE_MVNO_API_KEY 필요. 연결 5초·응답 15초"
+    },
+    {
+      "id": "collection-3",
+      "from": "external",
+      "to": "mvno",
+      "y": 250,
+      "label": "XML 해석 → 요금제 목록",
+      "note": "XML 외부 엔티티 차단. 실제 제공량 단위·무제한 표현의 파서 가정은 실응답 확인 필요",
+      "variant": "return"
+    },
+    {
+      "id": "collection-4",
+      "from": "mvno",
+      "to": "db",
+      "y": 290,
+      "label": "carrier · mobile_plan 업서트",
+      "note": "통신사+이름 자연키. 이름·통신사 공백, 망 미매핑, 기본료 0 이하는 제외. 행별 반영이라 부분 성공 가능",
+      "variant": "emphasis"
+    },
+    {
+      "id": "collection-5",
+      "from": "timer",
+      "to": "smart",
+      "y": 330,
+      "label": "06·14·22시 · 독립된 sweep",
+      "note": "우체국 작업과 별도 스케줄. SMARTCHOICE_API_KEY가 없으면 호출 없이 종료",
+      "variant": "emphasis"
+    },
+    {
+      "id": "collection-6",
+      "from": "smart",
+      "to": "external",
+      "y": 370,
+      "label": "사용조건 격자별 추천 API",
+      "note": "6개 데이터량 × 3개 망 × 3개 약정 = 54회/실행. 연속 도달 실패 3회면 중단. 전체 실행당 상한 2000회"
+    },
+    {
+      "id": "collection-7",
+      "from": "external",
+      "to": "smart",
+      "y": 410,
+      "label": "호출별 추천 목록 · 실패는 건너뜀",
+      "note": "개별 HTTP 호출과 DB 적재를 전체 트랜잭션으로 묶지 않는다",
+      "variant": "return"
+    },
+    {
+      "id": "collection-8",
+      "from": "smart",
+      "to": "db",
+      "y": 450,
+      "label": "시세 스냅샷 행별 업서트",
+      "note": "smartchoice_plan_snapshot에 통신사·요금제·망·약정별 저장. mobile_plan은 대체하지 않는다. 01번 추천에서 저장 시세 교차검증에 사용",
+      "variant": "emphasis"
+    }
+  ]
+}

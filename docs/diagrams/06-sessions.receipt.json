@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "deliver",
+  "type": "sequence",
+  "input": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/06-sessions.sequence.json",
+  "output": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/06-sessions.html",
+  "specification": {
+    "sha256": "517e781fb5042b19a8473b3eb6a0023affb6f774d7b6994b8119d9bc7580c6a2",
+    "bytes": 3380
+  },
+  "artifact": {
+    "sha256": "cd37ae3a3a7e07400bc024886dc333bf4b93413e270609426fab2a23bf3fbd32",
+    "bytes": 805560
+  },
+  "validation": {
+    "checksPassed": 9,
+    "checkCount": 9,
+    "compositionProfile": "showcase",
+    "compositionStatus": "pass",
+    "errors": 0,
+    "warnings": 0
+  }
+}

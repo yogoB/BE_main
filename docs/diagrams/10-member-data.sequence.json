@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "요고비 · 내 구독·통신 요금제 관리",
+    "quality_profile": "showcase",
+    "column_fit": "spread",
+    "viewBox": [
+      1080,
+      560
+    ]
+  },
+  "participants": [
+    {
+      "id": "screen",
+      "type": "frontend",
+      "label": "로그인한 회원",
+      "sublabel": "쿠키 + CSRF"
+    },
+    {
+      "id": "security",
+      "type": "security",
+      "label": "SecurityConfig",
+      "sublabel": "회원 신원 확인"
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "MeSubscriptionController",
+      "sublabel": "Principal만 사용"
+    },
+    {
+      "id": "service",
+      "type": "backend",
+      "label": "UserSubscriptionService",
+      "sublabel": "본인 데이터 제한"
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "구독·현재 요금제"
+    }
+  ],
+  "messages": [
+    {
+      "id": "y10-member-data-m1",
+      "from": "screen",
+      "to": "security",
+      "y": 170.0,
+      "label": "내 구독 조회·등록·삭제 요청",
+      "variant": "security",
+      "note": "GET/POST /api/v1/me/subscriptions, DELETE /api/v1/me/subscriptions/{id}. 변경 요청은 CSRF 필수"
+    },
+    {
+      "id": "y10-member-data-m2",
+      "from": "security",
+      "to": "api",
+      "y": 205.0,
+      "label": "인증된 Principal 전달"
+    },
+    {
+      "id": "y10-member-data-m3",
+      "from": "api",
+      "to": "service",
+      "y": 240.0,
+      "label": "본인 userId와 입력 전달"
+    },
+    {
+      "id": "y10-member-data-m4",
+      "from": "service",
+      "to": "db",
+      "y": 275.0,
+      "label": "등급 검증 · 본인 구독 CRUD",
+      "variant": "emphasis",
+      "note": "monthlyPrice는 사용자 입력 0 이상 정수. 삭제는 id AND user_id, 타인·미존재 404"
+    },
+    {
+      "id": "y10-member-data-m5",
+      "from": "service",
+      "to": "screen",
+      "y": 310.0,
+      "label": "Controller 경유 처리 결과",
+      "variant": "return"
+    },
+    {
+      "id": "y10-member-data-m6",
+      "from": "screen",
+      "to": "api",
+      "y": 345.0,
+      "label": "POST /me/current-plan + CSRF",
+      "variant": "security",
+      "note": "전체 경로 /api/v1/me/current-plan. 앞과 같은 인증 필터를 다시 통과"
+    },
+    {
+      "id": "y10-member-data-m7",
+      "from": "api",
+      "to": "service",
+      "y": 380.0,
+      "label": "setCurrentPlan(userId, planId)"
+    },
+    {
+      "id": "y10-member-data-m8",
+      "from": "service",
+      "to": "db",
+      "y": 415.0,
+      "label": "요금제 존재 확인 · 회원 값 변경"
+    },
+    {
+      "id": "y10-member-data-m9",
+      "from": "api",
+      "to": "screen",
+      "y": 450.0,
+      "label": "updated: true",
+      "variant": "return"
+    }
+  ]
+}

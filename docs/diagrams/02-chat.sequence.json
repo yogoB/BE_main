@@ -1,0 +1,131 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "요고비 · 챗봇 추천",
+    "quality_profile": "showcase",
+    "column_fit": "spread",
+    "viewBox": [
+      1080,
+      560
+    ]
+  },
+  "participants": [
+    {
+      "id": "screen",
+      "type": "frontend",
+      "label": "사용자 화면",
+      "sublabel": "비회원도 이용"
+    },
+    {
+      "id": "chat",
+      "type": "backend",
+      "label": "ChatController",
+      "sublabel": "AiGateway 경유"
+    },
+    {
+      "id": "recommend",
+      "type": "backend",
+      "label": "RecommendationService",
+      "sublabel": "01번과 같은 계산"
+    },
+    {
+      "id": "ai",
+      "type": "backend",
+      "label": "AI 서버",
+      "sublabel": "FastAPI · 무상태"
+    },
+    {
+      "id": "llm",
+      "type": "external",
+      "label": "LLM",
+      "sublabel": "조건 추출만"
+    }
+  ],
+  "messages": [
+    {
+      "id": "y02-chat-m1",
+      "from": "screen",
+      "to": "chat",
+      "y": 170.0,
+      "label": "POST /chat/messages",
+      "variant": "emphasis",
+      "note": "전체 경로 /api/v1/chat/messages. 단일 발화 {text}만 처리"
+    },
+    {
+      "id": "y02-chat-m2",
+      "from": "chat",
+      "to": "ai",
+      "y": 201.1,
+      "label": "POST /parse · 내부 토큰",
+      "variant": "security",
+      "note": "BE가 AI_INTERNAL_TOKEN으로 Bearer 생성. 사용자 쿠키·Authorization 전달 안 함"
+    },
+    {
+      "id": "y02-chat-m3",
+      "from": "ai",
+      "to": "llm",
+      "y": 232.2,
+      "label": "문장 → 조건 추출"
+    },
+    {
+      "id": "y02-chat-m4",
+      "from": "llm",
+      "to": "ai",
+      "y": 263.3,
+      "label": "구조화 조건·confidence",
+      "variant": "return"
+    },
+    {
+      "id": "y02-chat-m5",
+      "from": "ai",
+      "to": "chat",
+      "y": 294.4,
+      "label": "조건 응답 → BE 재검증",
+      "variant": "return",
+      "note": "confidence<0.7이면 NEEDS_INPUT. 통신·형식 오류는 FILTER_FALLBACK"
+    },
+    {
+      "id": "y02-chat-m6",
+      "from": "chat",
+      "to": "recommend",
+      "y": 325.6,
+      "label": "recommend(검증한 조건)",
+      "variant": "emphasis"
+    },
+    {
+      "id": "y02-chat-m7",
+      "from": "recommend",
+      "to": "chat",
+      "y": 356.7,
+      "label": "같은 엔진의 추천 결과",
+      "variant": "return"
+    },
+    {
+      "id": "y02-chat-m8",
+      "from": "chat",
+      "to": "ai",
+      "y": 387.8,
+      "label": "POST /narrate · 계산 결과",
+      "variant": "security",
+      "note": "1위 결과와 missingInputs 전달. narrate는 LLM 없이 고정 문구로 금액을 그대로 설명. priceCrossCheck는 AI 요청에서 제외"
+    },
+    {
+      "id": "y02-chat-m9",
+      "from": "ai",
+      "to": "chat",
+      "y": 418.9,
+      "label": "금액을 바꾸지 않은 설명",
+      "variant": "return",
+      "note": "설명 실패 시에도 추천 결과 유지"
+    },
+    {
+      "id": "y02-chat-m10",
+      "from": "chat",
+      "to": "screen",
+      "y": 450.0,
+      "label": "RECOMMENDED · 결과+설명",
+      "variant": "return"
+    }
+  ]
+}

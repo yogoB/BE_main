@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "deliver",
+  "type": "sequence",
+  "input": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/02-chat.sequence.json",
+  "output": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/02-chat.html",
+  "specification": {
+    "sha256": "0608f0e7a2bb99e4770630cd627dd234dc9e4938bc0cc857d19087c410135fa7",
+    "bytes": 3140
+  },
+  "artifact": {
+    "sha256": "fe03455a56cd1778a7a9044fd34bb7bfaa496869e066e420fb2efaec2a852c66",
+    "bytes": 805405
+  },
+  "validation": {
+    "checksPassed": 9,
+    "checkCount": 9,
+    "compositionProfile": "showcase",
+    "compositionStatus": "pass",
+    "errors": 0,
+    "warnings": 0
+  }
+}

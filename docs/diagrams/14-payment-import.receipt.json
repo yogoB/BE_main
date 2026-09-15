@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "deliver",
+  "type": "sequence",
+  "input": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/14-payment-import.sequence.json",
+  "output": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/14-payment-import.html",
+  "specification": {
+    "sha256": "cc52c868ebfc1b2273a5eedd06a14a67fb58087fd4a26b6379b68ee90bd79378",
+    "bytes": 2802
+  },
+  "artifact": {
+    "sha256": "be92b0024f1f29a1e385296aeb8acd5611b13e958d25c6cbe56a4219df2564e6",
+    "bytes": 806199
+  },
+  "validation": {
+    "checksPassed": 9,
+    "checkCount": 9,
+    "compositionProfile": "showcase",
+    "compositionStatus": "pass",
+    "errors": 0,
+    "warnings": 0
+  }
+}

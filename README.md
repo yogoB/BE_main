@@ -23,6 +23,8 @@ Compose는 PostgreSQL만 실행하며, 앱은 `.env`를 직접 읽고 기본 808
 번들 구성 15건을 CSV에서 적재한다. CSV와 마이그레이션은 JAR에도 포함된다.
 추천·계산기·카탈로그 HTTP API와 챗봇 게이트웨이가 구현되어 있다.
 
+[현재 구현 시퀀스 다이어그램](docs/diagrams/index.html) · [코드 근거와 구현 범위](docs/diagrams/README.md)
+
 ## 챗봇 게이트웨이
 
 회원 기능은 [회원 인증 명세](docs/auth.md)를 참고한다. 자체 가입·로그인과 Google OIDC를 제공하며,

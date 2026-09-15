@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "deliver",
+  "type": "sequence",
+  "input": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/11-detection.sequence.json",
+  "output": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/11-detection.html",
+  "specification": {
+    "sha256": "d796e320ab18b37ee84bfa6382be28ef9ec85dae8f9f6be06c0be57fc87cefc2",
+    "bytes": 2722
+  },
+  "artifact": {
+    "sha256": "2c103a1e3fb9960b62edc92e7f0e321ca71b56d2a9b32b43fd554ee497eaa94d",
+    "bytes": 803888
+  },
+  "validation": {
+    "checksPassed": 9,
+    "checkCount": 9,
+    "compositionProfile": "showcase",
+    "compositionStatus": "pass",
+    "errors": 0,
+    "warnings": 0
+  }
+}

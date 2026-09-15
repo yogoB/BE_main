@@ -4,3 +4,7 @@ build/
 .gradle/
 graphify-out/
 **/__pycache__/
+# Archify 산출물의 의미와 코드 근거는 docs/diagrams/README.md에서 추적한다.
+docs/diagrams/*.html
+docs/diagrams/*.png
+docs/diagrams/*.json
