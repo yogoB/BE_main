@@ -64,6 +64,7 @@ public class CatalogAdminController {
     @ResponseStatus(HttpStatus.ACCEPTED)
     public ApiResponse<Map<String, Object>> proposeCreate(@PathVariable String dataset,
                                                           @RequestBody Map<String, String> row, Principal principal) {
+        store.requireWritable();   // 적용할 수 없는 제안을 받아 두지 않는다
         String reason = reason(row);
         require(row);
         return ApiResponse.ok(requests.propose(actor(principal), CatalogAuditLog.Action.CREATE,
@@ -75,6 +76,7 @@ public class CatalogAdminController {
     @ResponseStatus(HttpStatus.ACCEPTED)
     public ApiResponse<Map<String, Object>> proposeUpdate(@PathVariable String dataset, @PathVariable String key,
                                                           @RequestBody Map<String, String> row, Principal principal) {
+        store.requireWritable();   // 적용할 수 없는 제안을 받아 두지 않는다
         String reason = reason(row);
         require(row);
         return ApiResponse.ok(requests.propose(actor(principal), CatalogAuditLog.Action.UPDATE,
@@ -85,6 +87,7 @@ public class CatalogAdminController {
     @ResponseStatus(HttpStatus.ACCEPTED)
     public ApiResponse<Map<String, Object>> proposeDelete(@PathVariable String dataset, @PathVariable String key,
                                                           Principal principal) {
+        store.requireWritable();   // 적용할 수 없는 제안을 받아 두지 않는다
         return ApiResponse.ok(requests.propose(actor(principal), CatalogAuditLog.Action.DELETE,
                 dataset, key, null, null));
     }
@@ -99,6 +102,8 @@ public class CatalogAdminController {
     /** 승인 → 이때 실제로 파일·DB에 반영되고 감사 기록에 제안자·승인자가 함께 남는다. */
     @PostMapping("/requests/{id}/approve")
     public ApiResponse<Map<String, Object>> approve(@PathVariable long id, Principal principal) {
+        // claim() 이 제안을 FAILED 로 닫기 **전에** 막는다 — 설정 문제로 남의 제안을 버리면 안 된다.
+        store.requireWritable();
         return ApiResponse.ok(requests.approve(actor(principal), id));
     }
 

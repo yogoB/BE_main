@@ -365,3 +365,17 @@ SELECT * FROM plan_benefit b LEFT JOIN mobile_plan p ON b.mobile_plan_id=p.id WH
 
 d 를 적는 이유: 지워진 경로가 조용히 되살아나면 아무도 모른다. **없어졌다는 것 자체가 검증 대상이다.**
 
+## G-22. 카탈로그 원본 경로가 없을 때 (2026-09-17)
+
+운영에는 `yogobi.catalog.combined-csv` 가 설정돼 있지 않다. 그 설정 그대로 도는 테스트가
+`CatalogAdminDisabledTest` 다 — **기존 카탈로그 테스트 셋은 전부 경로를 넣고 돌아서** 이 조건을 놓쳤다.
+
+| | 입력 | 정답 |
+|---|---|---|
+| a | `GET /api/v1/admin/catalog`, `GET /{dataset}` | **200.** 읽기는 클래스패스 합본 CSV 로 폴백한다 |
+| b | `POST`·`PATCH`·`DELETE /api/v1/admin/catalog/…` | **503** `YGB-CAT-503` (500 아님) |
+| c | b 이후 `catalog_change_request` 행 수 | **0.** 적용할 수 없는 제안을 쌓아 두지 않는다 |
+| d | PENDING 제안에 `POST /requests/{id}/approve` | **503**, 그리고 제안은 **PENDING 그대로**·`decided_by` 는 NULL |
+
+d 가 핵심이다. 가드가 `claim()` 뒤에 있으면 설정 문제로 **남의 제안이 FAILED 로 닫히고**,
+경로를 채워도 그 제안은 되살릴 수 없다. 서버 설정 때문에 사용자 입력을 버리면 안 된다.

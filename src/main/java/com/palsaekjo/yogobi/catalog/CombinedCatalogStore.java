@@ -54,6 +54,18 @@ public class CombinedCatalogStore {
         return file != null;
     }
 
+    /**
+     * 편집이 가능한 설정인가. **읽기는 경로가 없어도 클래스패스 폴백으로 계속 된다** — 막는 것은 쓰기뿐이다.
+     *
+     * <p>운영에는 `yogobi.catalog.combined-csv` 가 설정돼 있지 않아 이 조건이 실제로 발생한다(2026-09-17 확인).
+     * 가드가 없던 동안에는 승인 시점에 `IllegalStateException` 이 터져 **500** 이 나갔다. 설정 문제를
+     * 서버 오류로 보여주면 운영자는 자기 입력을 의심하게 된다 — 503 으로 "지금은 편집할 수 없다"고 말한다.
+     */
+    public void requireWritable() {
+        if (!enabled()) throw new ApiException("YGB-CAT-503", 503,
+                "카탈로그 원본 파일 경로가 설정되지 않아 지금은 편집할 수 없어요. 조회는 그대로 됩니다.", null);
+    }
+
     public synchronized Map<String, Section> read() {
         try {
             byte[] bytes = enabled() && Files.exists(file)
@@ -185,8 +197,7 @@ public class CombinedCatalogStore {
     }
 
     private void write(String text) {
-        if (!enabled()) throw new IllegalStateException(
-                "합본 CSV 경로(yogobi.catalog.combined-csv)가 설정되지 않아 쓸 수 없습니다");
+        requireWritable();   // 컨트롤러 가드를 지나온 경로라도 여기서 한 번 더 막는다(호출자가 늘어날 수 있다)
         try {
             Path parent = file.toAbsolutePath().getParent();
             Files.createDirectories(parent);
