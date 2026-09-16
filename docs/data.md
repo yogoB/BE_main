@@ -1,12 +1,13 @@
 # 데이터
 
-**현재 정책은 D-18 및 [CSV 카탈로그 운영](catalog-data.md)을 따른다.**
+**CSV 원본은 D-18 및 [CSV 카탈로그 운영](catalog-data.md)을 따른다. 스마트초이스는 후속 '검증 오버레이 복구' 결정으로 일부 대체됐다.**
 
 ## 1. 데이터 원본과 조회
 
 카탈로그는 팀의 검수 CSV가 원본이며 PostgreSQL에 반영해 조회한다.
 AI 모델의 출력은 이용 조건을 확인한 자료에서 추출한 후보로 받아 검수 후 CSV에 반영한다.
-우체국·스마트초이스 클라이언트/수집 스케줄/시세 교차검증은 제거한다. 과거 출처 표기는 실제 자료의 출처로 보존한다.
+우체국 연동은 제거했다. 스마트초이스 클라이언트는 검증용으로 복구됐지만 배치 수집·시세 교차검증 호출은 미연결이다.
+과거 출처 표기는 실제 자료의 출처로 보존한다.
 
 | 데이터 | 관리 파일 | 현재 확보 |
 |---|---|---|
@@ -15,6 +16,27 @@ AI 모델의 출력은 이용 조건을 확인한 자료에서 추출한 후보�
 | 번들 | bundle_product.csv | 7건 |
 | 통신 요금제 | mobile_plan.csv | **1,706건** (2026-09-16 팀 수집 매트릭스 1,853행 → `catalog_matrix_to_csv.py` 변환·검수 대기) |
 | 제휴 혜택 | plan_benefit.csv | **46건** (FREE 7 · FIXED_DISCOUNT 7 · BUNDLE_INCLUDED 32 — 아래 §1-C) |
+
+### 원천 데이터셋 = 합본 CSV (D-21, 2026-09-16)
+
+위 5개는 **`db/seed/catalog_combined.csv` 한 파일로 합쳐 원천 데이터셋**이 됐다. 개별 파일은 변환 이력으로 남아 있다.
+
+```
+#@ mobile_plan            ← 통신요금 1,706행
+#@ subscription_service   ← 구독서비스 6행
+#@ subscription_tier      ← 구독티어 17행
+#@ plan_benefit           ← 제휴혜택 46행
+#@ bundle_product         ← 번들 7행
+```
+
+- `#@ <dataset>` 줄이 섹션 경계, 각 섹션 첫 비주석 줄이 CSV 헤더다. 그 밖의 `#` 줄은 주석. 줄바꿈은 **LF**.
+- **원본은 이 파일, DB는 투영이다.** 쓰기는 파일(원자적 교체) → DB 전체 재적재 순서이며 DB 실패 시 파일을 되돌린다.
+- 활성화: `yogobi.catalog.combined-csv=<경로>`. 설정되면 시작 시 이 파일이 적재되고 개별 시드 적재는 건너뛴다.
+  `CATALOG_CSV_DIR`(승인·해시 잠금 모드)가 켜져 있으면 그쪽이 우선이며 합본은 관여하지 않는다.
+- CRUD: `GET/POST/PATCH/DELETE /api/v1/admin/catalog/...` (회원 인증 필수). 키는 데이터셋별 자연키를 `|`로 이은 값
+  (요금제 `SKT|베스트 Max(T 우주)`, 서비스·티어·번들은 `id`, 혜택은 `통신사|요금제명|service_id|tier_id`).
+- 삭제는 파일에서 행을 지우고 DB에서는 `active=false`로 내린다(회원 참조 보존).
+- 코드: `CombinedCatalogCsv`(파서) · `CombinedCatalogStore`(CRUD·되쓰기) · `CombinedCatalogLoader`(시작 적재) · `CatalogAdminController`.
 
 ## 1-C. 제휴 혜택을 어디서 얻는가 (2026-09-16)
 
@@ -67,13 +89,16 @@ AI 후보의 confidence나 두 모델의 같은 답만으로 정확성을 확정
 검증 전 후보는 계산/추천에서 제외한다. `OFFICIAL`은 파일 형식이 아니라 확인한 원자료의 성격에 따라 정한다.
 상세 실행법·제보 처리·알려진 제한: [catalog-data.md](catalog-data.md).
 
-## 2. 제거한 실시간 요금 API
+## 2. 외부 API의 현재 상태
 
 과거 우체국 키 미설정과 스마트초이스 성공 데이터 미확보를 확인했고 사용자 지시에 따라 연동을 제거했다.
 9/16 재조사에서 스마트초이스는 **로컬 키 한 문자 누락**이 인증 거부 원인이었고, 발급 키로 100·8건을 두 번 받았다.
 잘못된 기본 경로·실제 XML 태그와 파서의 불일치·진단 성공 오판도 확인했다. [원인 검증과 20개 대조 요청](smartchoice-integration-findings.md).
-D-18 제거 정책은 유지한다. 이번 실요청 성공은 운영 재연동·가격 최신성 검증·DB 적재 완료를 뜻하지 않는다.
-`SmartChoice*`, `PostOfficeMvnoClient`, `MvnoCatalogLoader`, `PriceCrossCheck` 및 환경 변수 예시/진단 스크립트는 사용하지 않는다.
+후속 결정으로 `SmartChoiceClient`·`SmartChoiceRecommendation`·테스트가 복구됐고 로컬 키도 교정됐다.
+9/16 15시 검증에서 조건별 API 5회 모두 100·8~9건, Java 어댑터 실호출 8건·단위 테스트 6개 통과.
+LTE/5G 30GB의 주요 반환 필드는 동일해 망 구분 정책은 추가 확인 대상이다. 최신 가격/약관 정합까지 검증한 것은 아니다.
+`SmartChoiceSweepService`·`SmartChoiceSnapshotReader`·`PriceCrossCheck`는 없고 추천/배치 호출자도 없어 자동 교차검증은 미연결이다.
+`PostOfficeMvnoClient`·`MvnoCatalogLoader`·과거 셸 진단은 제거 상태를 유지한다.
 V7은 이미 적용된 Flyway 이력으로 유지하고 V9에서 사용하지 않는 시세 테이블을 제거한다.
 이전 검증 기록은 worklog와 D-12~D-17에 남기며, 현재 카탈로그 운영 절차로 해석하지 않는다.
 
