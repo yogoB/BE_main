@@ -71,6 +71,7 @@ class CatalogAdminApiTest {
 
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;
+    @Autowired com.palsaekjo.yogobi.user.AuthTokens tokens;
 
     /** 운영자는 `CATALOG_ADMIN_USER_IDS=1` 이므로 **가장 먼저 가입한 계정**이어야 한다. 테스트 순서와 무관하게 고정한다. */
     @org.junit.jupiter.api.BeforeEach
@@ -242,28 +243,18 @@ class CatalogAdminApiTest {
         return cookies.length == 0 ? request : request.cookie(cookies);
     }
 
-    /** 직접 가입(D-20: 메일 비활성)으로 세션 쿠키를 얻는다. */
-    private Cookie[] signup(String email) throws Exception {
-        var body = Map.of("name", "운영자", "email", email, "password", PASSWORD,
-                "nickname", email.split("@")[0]);
-        var request = post("/api/v1/auth/signup").contentType(MediaType.APPLICATION_JSON)
-                .content(JSON.writeValueAsBytes(body));
-        var response = send(request, new Cookie[0]).andReturn().getResponse();
-        if (response.getStatus() != 200)
-            throw new IllegalStateException("signup " + response.getStatus() + ": " + response.getContentAsString());
-        return response.getCookies();
+    /** D-34: 가입은 Google 하나뿐이다. 여기서 필요한 것은 로그인한 회원뿐이라 직접 만든다. */
+    private Cookie[] signup(String email) {
+        return com.palsaekjo.yogobi.user.TestMembers.login(jdbc, tokens, email);
     }
 
     private boolean exists(String email) {
         return jdbc.queryForObject("SELECT count(*) FROM app_user WHERE email = ?", Integer.class, email) > 0;
     }
 
-    private Cookie[] login(String email) throws Exception {
-        var body = Map.of("email", email, "password", PASSWORD);
-        var request = post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON)
-                .content(JSON.writeValueAsBytes(body));
-        var response = send(request, new Cookie[0]).andExpect(status().isOk()).andReturn().getResponse();
-        return response.getCookies();
+    /** 이미 있는 회원의 새 세션. */
+    private Cookie[] login(String email) {
+        return com.palsaekjo.yogobi.user.TestMembers.session(tokens, userId(email));
     }
 
     private long userId(String email) {

@@ -54,7 +54,6 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Import(AuthSecurityTest.ProviderConfig.class)
 class AuthSecurityTest {
     static final String SECRET = "VHlwZS1vbmx5LXRlc3Qta2V5LTMyaGFyYWN0ZXJzLW9yLW1vcmUh";
-    static final String PASSWORD = "a long local password 1";
     @Container static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17");
     static final ObjectMapper JSON = new ObjectMapper();
     static final RSAKey RSA;
@@ -136,14 +135,12 @@ class AuthSecurityTest {
     static MockHttpServletRequestBuilder withCookies(MockHttpServletRequestBuilder request, Cookie[] cookies) {
         return cookies.length == 0 ? request : request.cookie(cookies);
     }
+    /**
+     * D-34: 가입·로그인은 Google 하나뿐이다. 이메일당 고정 sub 를 써서 같은 사람을 반복 로그인시킨다
+     * — 두 번 부르면 같은 회원의 세션이 하나 더 생긴다.
+     */
     Browser signup(String email) throws Exception {
-        Browser b = new Browser();
-        b.accept(b.post("/api/v1/auth/signup", direct(email)).andExpect(status().isOk()).andReturn());
-        return b;
-    }
-    /** 메일 없는 직접 가입이 유일한 가입 형태다(D-21). 닉네임은 비워 서버가 만들게 둔다. */
-    static Map<String,Object> direct(String email) {
-        return Map.of("name", email.trim().split("@")[0], "email", email, "password", PASSWORD);
+        return google("google-" + AuthService.email(email), email);
     }
     static Map<String,String> params(String query) {
         Map<String,String> result = new HashMap<>();
@@ -182,18 +179,17 @@ class AuthSecurityTest {
         b.accept(r); return b;
     }
 
-    @Test void localSignupLoginAndCurrentMemberAreIsolated() throws Exception {
+    @Test void membersAreIsolatedAndRequestParametersCannotImpersonate() throws Exception {
         Browser a = signup("Alice@Example.com"), b = signup("bob@example.com");
         a.me().andExpect(jsonPath("$.data.email").value("alice@example.com"));
         b.me().andExpect(jsonPath("$.data.email").value("bob@example.com"));
         mvc.perform(get("/api/v1/me").cookie(a.cookies).param("userId", "999"))
                 .andExpect(jsonPath("$.data.email").value("alice@example.com"));
         mvc.perform(get("/api/v1/me/999").cookie(a.cookies)).andExpect(status().isNotFound());
-        assertNotEquals(PASSWORD, jdbc.queryForObject("SELECT password_hash FROM app_user WHERE email='alice@example.com'", String.class));
-        Browser login = new Browser();
-        login.accept(login.post("/api/v1/auth/login", Map.of("email", "ALICE@example.com", "password", PASSWORD))
-                .andExpect(status().isOk()).andReturn());
-        login.me().andExpect(jsonPath("$.data.localLogin").value(true));
+        // D-34: 회원 비밀번호는 아예 보관하지 않는다.
+        assertNull(jdbc.queryForObject("SELECT password_hash FROM app_user WHERE email='alice@example.com'", String.class));
+        a.me().andExpect(jsonPath("$.data.localLogin").value(false))
+                .andExpect(jsonPath("$.data.googleLogin").value(true));
     }
 
     @Test void guestEndpointsRemainPublicAndMemberEndpointsRequireAuthentication() throws Exception {
@@ -206,12 +202,14 @@ class AuthSecurityTest {
     }
 
     @Test void cookiesAreHttpOnlyHostOnlySecureAndTokensNeverAppearInJson() throws Exception {
-        Browser b = new Browser();
-        var r = b.post("/api/v1/auth/signup", direct("alice@example.com"))
-                .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "no-store")).andReturn();
+        Flow flow = start(new Browser());
+        var r = callback(flow, grant(flow, "google-1", "alice@example.com", claims -> {}, RSA))
+                .andExpect(header().string("Cache-Control", "no-store")).andReturn();
         for (Cookie c : r.getResponse().getCookies()) {
             assertTrue(c.isHttpOnly()); assertTrue(c.getSecure()); assertNull(c.getDomain()); assertEquals("/", c.getPath());
-            assertTrue(c.getName().startsWith("__Host-")); assertFalse(r.getResponse().getContentAsString().contains(c.getValue()));
+            assertTrue(c.getName().startsWith("__Host-"));
+            // 토큰이 리다이렉트 URL 로 새면 브라우저 히스토리·리퍼러에 남는다.
+            assertFalse(r.getResponse().getRedirectedUrl().contains(c.getValue()));
         }
         assertTrue(r.getResponse().getHeaders("Set-Cookie").stream().allMatch(h -> h.contains("SameSite=Lax")));
     }
@@ -225,8 +223,7 @@ class AuthSecurityTest {
     }
 
     @Test void logoutAndLogoutAllRevokeEvenFullyCopiedCookies() throws Exception {
-        Browser a = signup("alice@example.com"), other = new Browser();
-        other.accept(other.post("/api/v1/auth/login", Map.of("email", "alice@example.com", "password", PASSWORD)).andReturn());
+        Browser a = signup("alice@example.com"), other = signup("alice@example.com");
         Cookie[] stolen = a.cookies;
         // Full browser credential theft is usable until expiry/revocation; do not claim otherwise.
         mvc.perform(get("/api/v1/me").cookie(stolen)).andExpect(status().isOk());
@@ -253,27 +250,16 @@ class AuthSecurityTest {
         assertThrows(IllegalArgumentException.class, () -> new com.palsaekjo.yogobi.common.WebConfig(List.of("https://*.example.com")));
     }
 
-    @Test void passwordGuessingLimitPersistsAcrossFailuresAndForwardedIpSpoofing() throws Exception {
-        signup("alice@example.com"); Browser b = new Browser();
-        for (int i=0; i<10; i++) b.post("/api/v1/auth/login", Map.of("email", "ALICE@example.com", "password", "wrong"))
-                .andExpect(status().isUnauthorized());
-        b.post("/api/v1/auth/login", Map.of("email", "alice@example.com", "password", PASSWORD)).andExpect(status().isTooManyRequests());
-        jdbc.execute("TRUNCATE auth_rate_limit");
-        for (int i=0; i<40; i++) mvc.perform(post("/api/v1/auth/login").header("X-Forwarded-For", "192.0.2." + i))
-                .andExpect(status().isForbidden());
-        mvc.perform(post("/api/v1/auth/login").header("X-Forwarded-For", "198.51.100.1")).andExpect(status().isTooManyRequests());
-    }
-
-    @Test void invalidInputAndCaseInsensitiveDuplicateCannotCreateMembers() throws Exception {
-        signup("alice@example.com"); Browser b = new Browser();
-        b.post("/api/v1/auth/signup", direct(" ALICE@example.com ")).andExpect(status().isConflict());
-        for (String password : List.of("short", "가".repeat(25)))
-            b.post("/api/v1/auth/signup", Map.of("name", "Bob", "email", "bob@example.com", "password", password))
-                    .andExpect(status().isBadRequest());
-        b.post("/api/v1/auth/signup", Map.of("name", "Bob", "email", "bob@example.com", "password", PASSWORD, "userId", 1))
-                .andExpect(status().isBadRequest());
-        b.post("/api/v1/auth/login", Map.of("email", "' OR 1=1 --", "password", PASSWORD)).andExpect(status().isBadRequest());
-        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM app_user", Integer.class));
+    /**
+     * 비밀번호 추측 제한은 D-34 로 사라졌다 — 추측할 비밀번호가 없다. IP 제한은 남고, 이제 그 제한이 걸리는
+     * 곳은 **로그인 입구 자체**다. X-Forwarded-For 를 바꿔도 같은 발신지로 센다.
+     */
+    @Test void ipRateLimitCountsTheRealPeerAndIgnoresForwardedForSpoofing() throws Exception {
+        for (int i = 0; i < 40; i++)
+            mvc.perform(get("/oauth2/authorization/google").header("X-Forwarded-For", "192.0.2." + i))
+                    .andExpect(status().is3xxRedirection());
+        mvc.perform(get("/oauth2/authorization/google").header("X-Forwarded-For", "198.51.100.1"))
+                .andExpect(status().isTooManyRequests());
     }
 
     @Test void googleSignupAndLoginUseSubjectAndDoNotAutoMergeEmail() throws Exception {
@@ -317,41 +303,6 @@ class AuthSecurityTest {
         mvc.perform(get("/login/oauth2/code/google").param("state", a.query().get("state")).param("code", code))
                 .andExpect(redirectedUrl("https://frontend.example/#auth=failed"));
         assertFalse(result.getResponse().getRedirectedUrl().contains("token"));
-    }
-
-    @Test void linkingRequiresPasswordAndGoogleProofAndRevokesOldSessions() throws Exception {
-        Browser local = signup("alice@example.com"); Cookie[] old = local.cookies;
-        local.post("/api/v1/auth/google/link", Map.of("password", "wrong")).andExpect(status().isUnauthorized());
-        local.post("/api/v1/auth/google/link", Map.of("password", PASSWORD)).andExpect(status().isOk());
-        Flow flow = start(local);
-        var result = callback(flow, grant(flow, "google-1", "alice@example.com", c -> {}, RSA))
-                .andExpect(redirectedUrl("https://frontend.example/#auth=success")).andReturn();
-        local.accept(result);
-        local.me().andExpect(jsonPath("$.data.localLogin").value(true)).andExpect(jsonPath("$.data.googleLogin").value(true));
-        mvc.perform(get("/api/v1/me").cookie(old)).andExpect(status().isUnauthorized());
-        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM app_user", Integer.class));
-        google("google-1", "alice@example.com").me().andExpect(jsonPath("$.data.localLogin").value(true));
-    }
-
-    @Test void linkingCannotBeFinishedWithAnotherUsersOrRevokedSession() throws Exception {
-        Browser local = signup("alice@example.com"), other = signup("bob@example.com");
-        local.post("/api/v1/auth/google/link", Map.of("password", PASSWORD)).andExpect(status().isOk());
-        Flow flow = start(local); local.cookies = other.cookies;
-        callback(flow, grant(flow, "google-1", "alice@example.com", c -> {}, RSA))
-                .andExpect(redirectedUrl("https://frontend.example/#auth=failed"));
-        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM app_user WHERE google_sub IS NOT NULL", Integer.class));
-    }
-
-    @Test void googleOnlyMemberCanAddLocalPasswordOnlyAfterMatchingGoogleProof() throws Exception {
-        Browser b = google("google-1", "alice@example.com");
-        b.post("/api/v1/auth/password", Map.of("password", PASSWORD)).andExpect(status().isOk());
-        Flow flow = start(b);
-        b.accept(callback(flow, grant(flow, "google-1", "alice@example.com", c -> {}, RSA))
-                .andExpect(redirectedUrl("https://frontend.example/#auth=success")).andReturn());
-        Browser login = new Browser();
-        login.accept(login.post("/api/v1/auth/login", Map.of("email", "alice@example.com", "password", PASSWORD))
-                .andExpect(status().isOk()).andReturn());
-        login.me().andExpect(jsonPath("$.data.googleLogin").value(true));
     }
 
     @Test void leakedSigningKeyCannotFabricateSessionsAndDbContainsOnlyFingerprints() throws Exception {
@@ -424,25 +375,8 @@ class AuthSecurityTest {
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM app_user", Integer.class));
     }
 
-    @Test void linkingAfterLogoutAndGooglePasswordWithWrongSubjectAreRejected() throws Exception {
-        Browser local = signup("local@example.com");
-        local.post("/api/v1/auth/google/link", Map.of("password", PASSWORD)).andExpect(status().isOk());
-        Flow localFlow = start(local);
-        long id = jdbc.queryForObject("SELECT id FROM app_user WHERE email='local@example.com'", Long.class);
-        tokens.revokeAll(id);
-        callback(localFlow, grant(localFlow, "google-local", "local@example.com", c -> {}, RSA))
-                .andExpect(redirectedUrl("https://frontend.example/#auth=failed"));
-        Browser google = google("google-1", "alice@example.com");
-        google.post("/api/v1/auth/password", Map.of("password", PASSWORD)).andExpect(status().isOk());
-        Flow flow = start(google);
-        callback(flow, grant(flow, "different-sub", "alice@example.com", c -> {}, RSA))
-                .andExpect(redirectedUrl("https://frontend.example/#auth=account-conflict"));
-        assertNull(jdbc.queryForObject("SELECT password_hash FROM app_user WHERE google_sub='google-1'", String.class));
-    }
-
     @Test void memberSessionsAreListedWithCurrentFlagAndRevocable() throws Exception {
-        Browser a = signup("alice@example.com"); Browser b = new Browser();
-        b.accept(b.post("/api/v1/auth/login", Map.of("email", "alice@example.com", "password", PASSWORD)).andExpect(status().isOk()).andReturn());
+        Browser a = signup("alice@example.com"), b = signup("alice@example.com");
         var data = JSON.readTree(mvc.perform(get("/api/v1/me/sessions").cookie(a.cookies)).andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString()).path("data");
         String currentId = null, otherId = null;
@@ -482,8 +416,8 @@ class AuthSecurityTest {
                 .andExpect(status().isNotFound());
         mvc.perform(delete("/api/v1/me/sessions/" + id).cookie(victim.cookies)).andExpect(status().isForbidden());
         victim.me().andExpect(status().isOk());
-        for (String path : List.of("signup", "login", "password/recover"))
-            mvc.perform(postJson("/api/v1/auth/"+path, Map.of())).andExpect(status().isForbidden());
+        for (String path : List.of("/api/v1/catalog/reports", "/api/v1/admin/login"))
+            mvc.perform(postJson(path, Map.of())).andExpect(status().isForbidden());
     }
 
     @Test void googleCallbackConfigurationRejectsUnreachablePathAndInjectedQuery() {

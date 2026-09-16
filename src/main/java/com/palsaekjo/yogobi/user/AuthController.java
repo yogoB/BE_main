@@ -11,41 +11,25 @@ import java.util.Set;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * 가입·로그인은 Google OAuth 하나뿐이다(D-34) — 그 경로는 Spring Security 가 처리하고
+ * ({@code /oauth2/authorization/google} → {@link GoogleLogin#success}) 여기에는 남지 않는다.
+ * 이 컨트롤러가 가진 것은 로그인 이후의 회원 조회·세션 관리·탈퇴다.
+ */
 @RestController
 @RequestMapping("/api/v1")
 public class AuthController {
     private final AuthService members;
     private final AuthTokens tokens;
-    private final GoogleLogin google;
 
-    public AuthController(AuthService members, AuthTokens tokens, GoogleLogin google) {
-        this.members = members; this.tokens = tokens; this.google = google;
+    public AuthController(AuthService members, AuthTokens tokens) {
+        this.members = members; this.tokens = tokens;
     }
 
     @GetMapping("/auth/csrf")
     public ApiResponse<Map<String, String>> csrf(CsrfToken token, HttpServletResponse response) {
         response.setHeader("Cache-Control", "no-store");
         return ApiResponse.ok(Map.of("headerName", token.getHeaderName(), "token", token.getToken()));
-    }
-
-    @PostMapping({"/auth/signup", "/auth/login"})
-    public ApiResponse<AuthService.Member> local(@RequestBody JsonNode body, HttpServletRequest request,
-                                               HttpServletResponse response) {
-        boolean signup = request.getRequestURI().endsWith("/signup");
-        // 가입은 {name,email,password,nickname} 하나뿐이다(D-19). 메일 토큰 흐름은 D-21 로 제거했다.
-        // 닉네임은 선택이다 — 비우면 서버가 만들어 준다(D-22).
-        if (signup && body.path("nickname").isTextual()) fields(body, "name", "email", "password", "nickname");
-        else if (signup) fields(body, "name", "email", "password");
-        else fields(body, "email", "password");
-        tokens.requireConfigured();
-        String password = body.get("password").textValue();
-        var member = signup
-                ? members.signupDirect(body.get("name").textValue(), body.get("email").textValue(),
-                        password, body.path("nickname").textValue())
-                : members.login(body.get("email").textValue(), password);
-        tokens.issue(member.id(), member.credentialVersion(), request, response);
-        GoogleLogin.invalidate(request);
-        return ApiResponse.ok(member);
     }
 
     @GetMapping("/me/sessions")
@@ -83,28 +67,6 @@ public class AuthController {
         tokens.clear(response);
         GoogleLogin.invalidate(request);
         return ApiResponse.ok(Map.of("loggedOut", true));
-    }
-
-    @PostMapping({"/auth/google/link", "/auth/password"})
-    public ApiResponse<Map<String, String>> link(@RequestBody JsonNode body, Principal principal,
-                                               HttpServletRequest request) {
-        fields(body, "password");
-        String url = google.begin(Long.parseLong(principal.getName()), body.get("password").textValue(),
-                request.getRequestURI().endsWith("/password"), request);
-        return ApiResponse.ok(Map.of("authorizationUrl", url));
-    }
-
-    /** 복구 코드로 비밀번호 재설정(D-22). 비회원 경로 — 메일이 없으므로 이것이 유일한 자기복구 수단이다. */
-    @PostMapping("/auth/password/recover")
-    public ApiResponse<AuthService.Member> recover(@RequestBody JsonNode body, HttpServletRequest request,
-                                                  HttpServletResponse response) {
-        fields(body, "email", "recoveryCode", "newPassword");
-        tokens.requireConfigured();
-        var member = members.recoverPassword(body.get("email").textValue(),
-                body.get("recoveryCode").textValue(), body.get("newPassword").textValue());
-        tokens.issue(member.id(), member.credentialVersion(), request, response);
-        GoogleLogin.invalidate(request);
-        return ApiResponse.ok(member);
     }
 
     /** 닉네임 변경(D-22). 회원 본인만. */

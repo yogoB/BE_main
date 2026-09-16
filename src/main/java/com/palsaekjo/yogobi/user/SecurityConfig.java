@@ -80,13 +80,11 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/v1/recommendations", "/api/v1/calculator", "/api/v1/chat/messages",
                                 "/api/v1/catalog/reports",
                                 // 백오피스 로그인만 공개다(D-32). 나머지 /admin/** 은 아래에서 ADMIN 전용.
-                                "/api/v1/admin/login",
-                                "/api/v1/auth/signup", "/api/v1/auth/login",
-                                // 메일 경로는 제거됐다 — 자기복구는 복구 코드뿐이다(D-21·D-22).
-                                "/api/v1/auth/password/recover").permitAll()
+                                // 가입·로그인은 Google 하나뿐이다(D-34) — 아래 /oauth2 경로가 그 입구다.
+                                "/api/v1/admin/login").permitAll()
                         .requestMatchers("/oauth2/authorization/google", "/login/oauth2/code/google").permitAll()
-                        .requestMatchers("/api/v1/me", "/api/v1/me/**", "/api/v1/auth/logout", "/api/v1/auth/logout-all",
-                                "/api/v1/auth/google/link", "/api/v1/auth/password").hasRole("MEMBER")
+                        .requestMatchers("/api/v1/me", "/api/v1/me/**",
+                                "/api/v1/auth/logout", "/api/v1/auth/logout-all").hasRole("MEMBER")
                         // 카탈로그 원본(합본 CSV) CRUD — 공개 읽기 경로와 분리하고 **운영자만** 허용한다(D-24).
                         // CSRF 보호는 기본값 그대로 적용된다. 운영자 지정은 CATALOG_ADMIN_USER_IDS(비면 아무도 못 쓴다).
                         .requestMatchers("/api/v1/admin", "/api/v1/admin/**").hasRole("ADMIN")

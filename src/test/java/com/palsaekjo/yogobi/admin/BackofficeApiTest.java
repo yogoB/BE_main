@@ -65,6 +65,7 @@ class BackofficeApiTest {
 
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;
+    @Autowired com.palsaekjo.yogobi.user.AuthTokens tokens;
     @Autowired CatalogDailyHarvest harvest;
 
     /* ---- 인증 ---- */
@@ -185,11 +186,8 @@ class BackofficeApiTest {
     }
 
     private Cookie[] signupMember(String email) throws Exception {
-        var body = Map.of("name", "회원", "email", email, "password", "Passw0rd!seed-backoffice-member",
-                "nickname", email.split("@")[0]);
-        var request = post("/api/v1/auth/signup").contentType(MediaType.APPLICATION_JSON)
-                .content(JSON.writeValueAsBytes(body));
-        return send(request, new Cookie[0]).andExpect(status().isOk()).andReturn().getResponse().getCookies();
+        // D-34: 가입은 Google 하나뿐이다. 여기서 필요한 것은 로그인한 회원뿐이라 직접 만든다.
+        return com.palsaekjo.yogobi.user.TestMembers.login(jdbc, tokens, email);
     }
 
     private long requestId(ResultActions result) throws Exception {

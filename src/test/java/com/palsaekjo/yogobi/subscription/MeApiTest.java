@@ -39,6 +39,7 @@ class MeApiTest {
 
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;
+    @Autowired com.palsaekjo.yogobi.user.AuthTokens tokens;
 
     @BeforeEach void clear() {
         jdbc.execute("TRUNCATE app_user CASCADE");
@@ -68,16 +69,14 @@ class MeApiTest {
         }
     }
 
-    /** 실제 가입 흐름(메일 없는 직접 가입, D-21). */
-    long signup(String email, Browser b) throws Exception {
-        b.csrf();
-        var res = mvc.perform(post("/api/v1/auth/signup").session(b.session).header("X-CSRF-TOKEN", b.csrf)
-                .contentType("application/json").content(JSON.writeValueAsBytes(
-                        Map.of("name", email.split("@")[0], "email", email, "password", PASSWORD))))
-                .andExpect(status().isOk()).andReturn();
-        b.cookies = res.getResponse().getCookies();
-        if (b.session != null && b.session.isInvalid()) b.session = null;
-        return jdbc.queryForObject("SELECT id FROM app_user WHERE email=?", Long.class, email);
+    /**
+     * D-34: 가입 경로는 Google 하나뿐이다. 이 테스트가 필요한 것은 "로그인한 회원"일 뿐이므로
+     * 회원과 세션을 직접 만든다 — 로그인 경로 자체는 AuthSecurityTest 가 검증한다.
+     */
+    long signup(String email, Browser b) {
+        long id = com.palsaekjo.yogobi.user.TestMembers.create(jdbc, email);
+        b.cookies = com.palsaekjo.yogobi.user.TestMembers.session(tokens, id);
+        return id;
     }
 
     @Test void addListDeleteSubscription() throws Exception {

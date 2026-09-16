@@ -1,4 +1,4 @@
-# 회원 인증 · 2026-09-10 (세션 관리 2026-09-11 · 메일 흐름 제거 2026-09-16)
+# 회원 인증 · 2026-09-10 (세션 관리 2026-09-11 · 메일 제거 2026-09-16 · **Google 전용 2026-09-17**)
 
 사용자 승인: 자체 가입·로그인, Google 로그인, 공통 회원 인증, 본인 확인 후 계정 연결의 네 항목.
 비회원은 추천·계산기·카탈로그·단일 발화 챗봇을 사용할 수 있다. 회원은 개인 정보를 저장·관리한다.
@@ -13,52 +13,45 @@ JWT·비밀번호·Google 토큰은 응답 JSON이나 URL에 넣지 않는다.
 | 요청 | 입력 | 성공 |
 |---|---|---|
 | `GET /api/v1/auth/csrf` | 없음 | `{headerName:"X-CSRF-TOKEN",token:"..."}` |
-| `POST /api/v1/auth/signup` | `{name,email,password,nickname?}`, CSRF | 현재 회원 + 인증 쿠키 + **복구 코드(한 번만)** |
-| `POST /api/v1/auth/login` | `{email,password}`, CSRF | 현재 회원 + 인증 쿠키 |
-| `GET /oauth2/authorization/google` | 브라우저 이동 | Google 인증 화면으로 이동 |
+| `GET /oauth2/authorization/google` | 브라우저 이동 | **유일한 가입·로그인 입구.** Google 인증 화면으로 이동 |
 | `GET /login/oauth2/code/google` | Google이 발급한 code/state | 고정 `AUTH_RETURN_URL#auth=success` 또는 `failed` / `account-conflict` |
 | `GET /api/v1/me` | 인증 쿠키 | 현재 회원 |
 | `GET /api/v1/me/sessions` | 인증 쿠키 | 로그인 세션 목록(`current` 표시, 15분 만료·5분 유휴 제외) |
 | `DELETE /api/v1/me/sessions/{id}` | 인증 쿠키·CSRF | `{revoked:true}`, 해당 세션 폐기. 현재 세션이면 쿠키 삭제 |
-| `POST /api/v1/auth/password/recover` | `{email,recoveryCode,newPassword}`, CSRF | 현재 회원 + 인증 쿠키 + **새 복구 코드**. 기존 세션 전부 폐기 |
 | `POST /api/v1/me/nickname` | `{nickname}`, 인증 쿠키, CSRF | 변경된 회원 |
 | `POST /api/v1/auth/logout` | 인증 쿠키·CSRF | `{loggedOut:true}`, 현재 토큰 무효화·쿠키 삭제 |
 | `POST /api/v1/auth/logout-all` | 인증 쿠키·CSRF | `{loggedOut:true}`, 이 회원의 모든 토큰 무효화 |
-| `POST /api/v1/auth/google/link` | `{password}`, 인증 쿠키·CSRF | `{authorizationUrl:"/oauth2/authorization/google"}` |
-| `POST /api/v1/auth/password` | `{password}`, 인증 쿠키·CSRF | 위와 동일. Google 전용 회원의 자체 비밀번호 등록 시작 |
 
-현재 회원: `{id,email,localLogin,googleLogin,currentPlanId,emailVerified}`. 요청에서 userId나 역할을 받지 않는다.
-`signup/login`도 CSRF가 필요하다. 입력은 표에 적힌 문자열 필드만 허용한다.
+현재 회원: `{id,email,name,nickname,localLogin,googleLogin,currentPlanId,emailVerified}`.
+요청에서 userId나 역할을 받지 않는다. 입력은 표에 적힌 문자열 필드만 허용한다.
+`localLogin` 은 **항상 false**, `googleLogin` 은 **항상 true** 다 — D-34 이후 다른 값이 될 수 없다.
+운영자 백오피스 로그인(`/api/v1/admin/login`)은 별개이며 비밀번호를 쓴다(D-32).
 
-> **2026-09-16 (D-21): 메일 발송은 쓰지 않는다.** 배포에서 SMTP·메일 secret 8개를 제거했고,
-> 같은 날 **메일 토큰 흐름을 코드에서도 제거**했다(`AuthEmail`, `/auth/email/verification`,
+> **제거 이력.** 2026-09-16(D-21) 메일 토큰 흐름(`AuthEmail`, `/auth/email/verification`,
 > `/auth/password/reset-request`, `/auth/password/reset`, `spring-boot-starter-mail`).
-> 되살리려면 다시 구현해야 한다 — 플래그로 켤 수 없다. `auth_email_token` 테이블만 남아 있다.
+> 2026-09-17(D-34) 자체 가입·로그인·복구 코드·계정 연결(`/auth/signup`, `/auth/login`,
+> `/auth/password/recover`, `/auth/google/link`, `/auth/password`).
+> 둘 다 **플래그로 되살릴 수 없다** — 다시 구현해야 한다. `app_user` 의 `password_hash`·
+> `recovery_code_hash`·`auth_email_token` 테이블은 남아 있으나 아무도 쓰지 않는다.
 
-### 닉네임과 복구 코드 (D-22)
+### 닉네임 (D-22)
 
 **닉네임은 선택이다.** 비우면 서버가 `이름(없으면 이메일 앞부분) + 숫자 5자`로 만든다. Google 로그인도 같다.
 겹치면 숫자를 다시 뽑고, 그래도 안 되면 자릿수를 늘려 반드시 성공시킨다 — 가입이 닉네임 때문에 막히면 안 된다.
 `POST /me/nickname` 으로 바꾼다. 남이 쓰는 값이면 409 `YGB-AUTH-DUP-NICK`, 자기 값 유지는 충돌이 아니다.
 
-**복구 코드는 유일한 자기복구 수단이다.** 가입·복구 응답의 `recoveryCode` 에 **한 번만**
-실리고 서버는 SHA-256 해시만 보관한다. `GET /me` 는 **절대 돌려주지 않는다.**
-`POST /auth/password/recover` 가 성공하면 코드는 소진되고 **새 코드를 발급**한다(안 그러면 다음 복구 수단이 없다).
-복구가 성공하면 **그 전에 열려 있던 로그인 세션을 모두 끊는다**(2026-09-16 추가). 이 기능의 용도가
-"남이 내 계정에 들어가 있을 때 되찾기"이므로 세션이 살아남으면 되찾기의 의미가 없다.
-존재하지 않는 이메일·틀린 코드는 같은 401이고, 같은 이메일로 10회를 넘기면 429다.
+**비밀번호를 잊을 수 없다.** 우리가 보관하지 않기 때문이다. 계정을 잃는 유일한 경로는 Google 계정을
+잃는 것이고, 그 복구는 Google 이 한다. 자기복구 수단을 우리가 따로 둘 이유가 없어졌다(D-34).
 
-### 가입은 한 형태다 (D-20 · D-21)
+### 가입은 한 형태다 (D-34)
 
-**직접 가입뿐이다.** 이메일 소유를 확인하지 않으므로 `email_verified` 는 FALSE 로 남고,
-로그인은 그 값을 보지 않는다. 확인할 방법이 없는 값으로 로그인을 막으면 아무도 못 들어온다.
-
-직접 가입은 `name`(1~50자)·`nickname`(1~30자)을 함께 받는다. 비밀번호 규칙은 같다(문자+숫자 8자 이상, 72바이트 이하).
-중복은 **어느 쪽이 겹쳤는지 구분**해 돌려준다 — 사용자가 할 일이 다르기 때문이다.
+**Google 로그인뿐이다.** 이메일은 Google 이 확인해 준 값이라 `email_verified` 는 TRUE 로 저장한다.
+`sub` 가 신원이며 **이메일만으로 계정을 자동 병합하지 않는다** — 같은 이메일에 다른 `sub` 가 오면
+`#auth=account-conflict` 로 돌려보낸다. 이메일은 trim/lowercase 후 저장한다.
 
 | 코드 | HTTP | 의미 |
 |---|---|---|
-| `YGB-AUTH-DUP-EMAIL` | 409 | 이미 가입된 이메일. `field: "email"` |
+| `YGB-AUTH-409` | 409 | 같은 이메일의 계정이 다른 Google `sub` 로 이미 있다 |
 | `YGB-AUTH-DUP-NICK` | 409 | 이미 사용 중인 닉네임(대소문자·앞뒤 공백 무시). `field: "nickname"` |
 
 **이메일 소유를 확인하지 않는다는 뜻이다.** 타인의 주소로 가입할 수 있다. 이를 막으려면 메일이든
@@ -75,9 +68,10 @@ JWT·비밀번호·Google 토큰은 응답 JSON이나 URL에 넣지 않는다.
 
 Google Cloud 설정부터 시작하는 팀원은 [Google OAuth 연동 가이드](google-oauth-guide.md)를 따른다.
 
-프론트(`front/`)의 `signup.html`·`login.html`·`account.html` 이 가입·로그인·복구·계정 연결·세션 회수를 담당한다.
-Google 로그인 후에는 `AUTH_RETURN_URL#auth=success|failed|account-conflict` 로 돌아오며, 페이지는 fragment 를
-읽은 즉시 주소에서 제거한다. 상태를 바꾸는 요청은 CSRF 가 있는 POST 로만 하고 응답 문자열은 `textContent` 로 출력한다.
+프론트(`front/`)의 `login.html`·`account.html` 이 로그인·세션 회수를 담당한다. 가입 화면은 따로 없다 —
+가입과 로그인이 같은 버튼이다(D-34). Google 로그인 후에는 `AUTH_RETURN_URL#auth=success|failed|account-conflict`
+로 돌아오며, 페이지는 fragment 를 읽은 즉시 주소에서 제거한다. 상태를 바꾸는 요청은 CSRF 가 있는 POST 로만 하고
+응답 문자열은 `textContent` 로 출력한다.
 
 1. 비회원 추천은 기존대로 호출한다. 로그인할 때 `GET /api/v1/auth/csrf`를 `credentials:'include'`로 호출한다.
 2. 응답의 토큰을 `X-CSRF-TOKEN` 헤더에 넣고 signup/login POST를 호출한다. 모든 회원 요청은 `credentials:'include'`.
@@ -87,8 +81,7 @@ Google 로그인 후에는 `AUTH_RETURN_URL#auth=success|failed|account-conflict
 6. 자체 → Google 연결: 로그인 → 비밀번호 재확인 POST → 응답의 BE authorizationUrl로 이동 → 같은 이메일의 Google 계정 확인.
 7. Google → 자체 연결: Google 로그인 → 새 password POST → 같은 Google 계정 재확인. 해시만 임시 세션에 저장하며 평문은 보관하지 않는다.
 
-연결 의도는 5분간 유효하며 시작한 회원·발급 JWT·브라우저에 묶인다. 계정 연결 완료 시 기존 모든 토큰을 폐기하고 새 토큰을 발급한다.
-단순 이메일 일치에 의한 자동 연결·기존 데이터 병합은 하지 않는다. 다른 이메일 계정 연결은 지원하지 않는다.
+단순 이메일 일치에 의한 자동 연결·기존 데이터 병합은 하지 않는다.
 
 ## 운영 설정
 

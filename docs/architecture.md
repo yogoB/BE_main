@@ -132,21 +132,12 @@ AI의 `/parse`·`/narrate`·`/ocr`는 토큰 누락·불일치 시 401, 서버 �
 
 ### Phase 1
 
-> **D-34(확정 2026-09-17): 가입·로그인은 Google OAuth 하나만 남긴다.** 아래 표는 **현재 코드 상태**이며
-> 아직 반영되지 않았다. 반영 시 **삭제 대상**은 `⛔` 표시한 5행이고, `/oauth2/authorization/google` 이
-> 유일한 가입·로그인 경로가 된다. 근거와 캘린더 전제 정정은 `calendar-integration-findings.md`.
-
 | Method | Path | 설명 |
 |---|---|---|
-| ⛔ POST | `/api/v1/auth/signup` | 자체 가입 — `{name,email,password,nickname?}` 하나뿐이다(D-20·D-21). **D-34로 삭제 예정** |
-| ⛔/유지 POST | `/api/v1/auth/login` `/logout` | 로그인 `{email,password}` **D-34로 삭제 예정** · 로그아웃은 유지 |
-| ⛔ POST | `/api/v1/auth/password/recover` | 복구 코드로 재설정 — `{email,recoveryCode,newPassword}`(D-22). **D-34로 삭제 예정** |
+| POST | `/api/v1/auth/logout` `/logout-all` | 로그아웃 · 이 회원의 모든 로그인 무효화 |
 | GET | `/api/v1/auth/csrf` | 회원 변경·비회원 제보 요청용 CSRF 토큰 |
-| GET | `/oauth2/authorization/google` → `/login/oauth2/code/google` | Google OIDC 로그인·콜백 |
-| ⛔ POST | `/api/v1/auth/google/link` | 자체 계정 비밀번호 재확인 후 Google 연결 시작. **D-34로 삭제 예정** — 연결할 자체 계정이 없어진다 |
-| ⛔ POST | `/api/v1/auth/password` | Google 전용 회원의 자체 비밀번호 등록 시작. **D-34로 삭제 예정** |
+| GET | `/oauth2/authorization/google` → `/login/oauth2/code/google` | **유일한 가입·로그인 경로**(D-34). 콜백 후 `AUTH_RETURN_URL#auth=...` |
 | POST | `/api/v1/me/nickname` | 닉네임 변경 — `{nickname}` (D-22) |
-| POST | `/api/v1/auth/logout-all` | 현재 회원의 모든 로그인 무효화 |
 | GET | `/api/v1/me` | 인증된 현재 회원 조회 |
 | GET/DELETE | `/api/v1/me/sessions` `/{id}` | 로그인 세션 목록 · 개별 세션 폐기 |
 | GET/POST/DELETE | `/api/v1/me/subscriptions` `/{id}` | 내 구독 (구현) |
@@ -179,8 +170,7 @@ AI의 `/parse`·`/narrate`·`/ocr`는 토큰 누락·불일치 시 401, 서버 �
 별도 브라우저 확인 쿠키와 DB 발급 지문을 함께 검사한다. 회원 요청은 `credentials: include`, 변경 요청은 CSRF 헤더가 필요하다.
 자체 가입은 `{name,email,password,nickname?}` 한 번으로 끝난다(D-21). **메일은 쓰지 않는다** — 본인 확인 메일·메일 토큰 가입·메일 재설정
 엔드포인트와 `AuthEmail`·`spring-boot-starter-mail`을 2026-09-16 에 제거했다. 이메일 소유는 확인하지 않으며 `email_verified`는 자체 가입에서 FALSE 로 남는다.
-비밀번호를 잊었을 때의 **유일한 자기복구 수단은 가입 시 한 번 보여주는 복구 코드**다(`/auth/password/recover`, D-22). 재설정은 CSRF 필수다.
-**D-34(2026-09-17)로 이 문단 전체가 폐기된다** — Google 전용 로그인에는 우리가 보관하는 비밀번호가 없고 복구도 Google 이 한다. 코드 반영 전까지는 위 설명이 현재 동작이다.
+**우리는 회원 비밀번호를 보관하지 않는다**(D-34). 그래서 재설정도 복구 코드도 없다 — 계정 복구는 Google 이 한다.
 이메일만 같다고 계정을 합치지 않는다. 자체 계정에서 비밀번호 재확인 후 같은 이메일의 Google 계정을 명시적으로 연결한다.
 Google 전용 계정은 동일 Google `sub` 재인증으로 자체 비밀번호를 추가한다. 연결 완료 시 기존 세션을 모두 무효화한다.
 

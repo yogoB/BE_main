@@ -377,40 +377,38 @@ CSV에 없는 것을 물어도 **200으로 답한다.** 아는 것으로 계산�
 
 ## 회원 인증
 
-> **D-34(확정 2026-09-17): 가입·로그인은 Google OAuth 하나만 남긴다. 아직 코드에 반영되지 않았다.**
-> 아래는 **현재 동작**이다. 반영되면 `/auth/signup` `/auth/login` `/auth/password/recover`
-> `/auth/google/link` `/auth/password` 다섯 개가 사라지고 `/oauth2/authorization/google` 만 남는다.
-> 캘린더 연동이 Google 로그인을 요구하지 않는다는 확인은 `calendar-integration-findings.md`.
+**가입·로그인은 Google OAuth 하나뿐이다(D-34).** 자체 이메일·비밀번호 가입, 복구 코드, 계정 연결은
+2026-09-17 에 제거했다. 사용자가 보는 것은 **버튼 하나**이고, Google `sub` 가 이미 있으면 로그인,
+없으면 가입이다 — 서버가 알아서 나눈다.
 
-**가입 방법은 하나다 — `{name,email,password,nickname?}` 직접 가입**(D-20·D-21). 메일은 쓰지 않는다:
-본인 확인 메일·메일 토큰 가입·메일 재설정 엔드포인트는 **2026-09-16 에 제거**했다. 이메일 소유는 확인하지
-않으며 `email_verified` 는 자체 가입에서 FALSE 로 남는다. **비밀번호를 잊었을 때의 유일한 자기복구 수단은
-가입 시 한 번 보여주는 복구 코드**(`POST /api/v1/auth/password/recover`, D-22)다.
+우리는 **회원 비밀번호를 보관하지 않는다.** 따라서 비밀번호 재설정·복구 코드도 없다(잊을 것이 없다).
+`localLogin` 은 항상 `false`, `googleLogin` 은 항상 `true` 다. 운영자 백오피스 로그인(`/api/v1/admin/login`)은
+별개이며 비밀번호를 쓴다(D-32).
 
-비밀번호는 **문자와 숫자를 섞어 8자 이상**, UTF-8 72바이트 이하. JWT 절대 수명 15분·유휴 제한 5분(refresh 없음).
-상태를 바꾸는 요청은 모두 CSRF 토큰이 필요하다. 상세 실행법·설정은 [auth.md](auth.md), 공격 검증은
-[auth-security.md](auth-security.md).
+JWT 절대 수명 15분·유휴 제한 5분(refresh 없음). 상태를 바꾸는 요청은 모두 CSRF 토큰이 필요하다.
+상세 실행법·설정은 [auth.md](auth.md), 공격 검증은 [auth-security.md](auth-security.md).
 
 | Method | Path | 요청 | 응답 |
 |---|---|---|---|
 | GET | `/api/v1/auth/csrf` | — | `{headerName,token}` — 공개. 헤더 이름은 `X-CSRF-TOKEN` |
-| POST | `/api/v1/auth/signup` | `{name,email,password,nickname?}`, CSRF | 현재 회원 + 인증 쿠키. `recoveryCode` 는 **이때 한 번만** 나온다 |
-| POST | `/api/v1/auth/login` | `{email,password}`, CSRF | 현재 회원 + 인증 쿠키 |
-| POST | `/api/v1/auth/logout` | CSRF | `{loggedOut:true}` — 현재 로그인만 폐기 |
-| POST | `/api/v1/auth/logout-all` | CSRF | `{loggedOut:true}` — 이 회원의 모든 로그인 폐기 |
-| POST | `/api/v1/auth/password/recover` | `{email,recoveryCode,newPassword}`, CSRF | 현재 회원 + **새 복구 코드**. **기존 세션은 모두 끊긴다** |
-| POST | `/api/v1/auth/google/link` | `{password}`, 인증+CSRF | `{authorizationUrl}` — 자체 계정에 Google 연결 시작 |
-| POST | `/api/v1/auth/password` | `{password}`, 인증+CSRF | `{authorizationUrl}` — Google 전용 회원의 자체 비밀번호 등록 시작 |
-| GET | `/api/v1/me` | 인증 | 현재 회원. `recoveryCode` 는 **항상 null** |
+| GET | `/oauth2/authorization/google` → `/login/oauth2/code/google` | — | **유일한 가입·로그인 경로.** 완료 후 `AUTH_RETURN_URL#auth=success\|failed\|account-conflict` 로 리다이렉트 |
+| POST | `/api/v1/auth/logout` | 인증+CSRF | `{loggedOut:true}` — 현재 로그인만 폐기 |
+| POST | `/api/v1/auth/logout-all` | 인증+CSRF | `{loggedOut:true}` — 이 회원의 모든 로그인 폐기 |
+| GET | `/api/v1/me` | 인증 | 현재 회원 |
 | DELETE | `/api/v1/me` | 인증+CSRF | `{deleted:true}` — 탈퇴. 법정 보존 사본만 남는다 |
 | POST | `/api/v1/me/nickname` | `{nickname}`, 인증+CSRF | 현재 회원 (D-22) |
 | GET | `/api/v1/me/sessions` | 인증 | 로그인 세션 목록(`current` 플래그 포함) |
 | DELETE | `/api/v1/me/sessions/{sessionId}` | 인증+CSRF | `{revoked:true}`. 남의 세션은 404 |
-| GET | `/oauth2/authorization/google` → `/login/oauth2/code/google` | — | Google OIDC 로그인·콜백. 완료 후 `AUTH_RETURN_URL#auth=success` 로 리다이렉트 |
 
-**인증 에러 코드**: `YGB-AUTH-001` 401(로그인 정보·본인 확인 불일치) · `YGB-AUTH-DUP-EMAIL` 409 ·
-`YGB-AUTH-DUP-NICKNAME` 409 · `YGB-AUTH-403` 403(CSRF·권한) · `YGB-AUTH-429` 429(같은 이메일 10회 초과) ·
-`YGB-AUTH-503` 503(`JWT_SECRET` 미설정).
+같은 이메일에 **다른 Google `sub`** 로 들어오면 자동 병합하지 않고 `#auth=account-conflict` 로 돌려보낸다.
+
+**인증 에러 코드**: `YGB-AUTH-001` 401 · `YGB-AUTH-409` 409(계정 충돌) · `YGB-AUTH-DUP-NICK` 409 ·
+`YGB-AUTH-403` 403(CSRF·권한) · `YGB-AUTH-404` 404(세션 없음) · `YGB-AUTH-429` 429(IP 15분 40회 초과) ·
+`YGB-AUTH-503` 503(`JWT_SECRET`·Google 미설정).
+
+> **배포 전 확인:** Google 로그인이 유일한 입구이므로 OAuth 앱의 **게시 상태가 곧 회원 상한**이다.
+> `openid`·`email` 은 민감 스코프가 아니라 검증 없이 Production 게시가 되지만, Testing 모드로 남아 있으면
+> 동의화면에 등록한 **테스트 사용자 100명**이 전체 한도가 된다.
 
 ## 5. 회원 데이터 (`/api/v1/me/**`)
 

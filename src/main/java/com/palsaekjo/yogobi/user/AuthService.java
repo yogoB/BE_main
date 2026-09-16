@@ -1,11 +1,9 @@
 package com.palsaekjo.yogobi.user;
 
 import com.palsaekjo.yogobi.common.ApiException;
-import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,54 +11,16 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class AuthService {
     private final JdbcTemplate jdbc;
-    private final PasswordEncoder passwords;
-    private final AuthRateLimit limits;
-    private final String dummyHash;
     private final java.security.SecureRandom random = new java.security.SecureRandom();
 
-    public AuthService(JdbcTemplate jdbc, PasswordEncoder passwords, AuthRateLimit limits) {
-        this.jdbc = jdbc; this.passwords = passwords; this.limits = limits;
-        dummyHash = passwords.encode(java.util.UUID.randomUUID().toString());
+    public AuthService(JdbcTemplate jdbc) {
+        this.jdbc = jdbc;
     }
 
-    /** recoveryCode 는 **발급 순간에만** 채운다(가입·재설정 응답). 조회 경로에서는 항상 null 이다. */
+    /** {@code localLogin} 은 D-34 이후 항상 false 다 — 우리가 보관하는 비밀번호가 없다. */
     public record Member(long id, String email, String name, String nickname,
                          boolean localLogin, boolean googleLogin, Long currentPlanId,
-                         @com.fasterxml.jackson.annotation.JsonIgnore long credentialVersion, boolean emailVerified,
-                         String recoveryCode) {
-        Member withRecoveryCode(String code) {
-            return new Member(id, email, name, nickname, localLogin, googleLogin, currentPlanId,
-                    credentialVersion, emailVerified, code);
-        }
-    }
-    private record Credentials(long id, String passwordHash, long version) { }
-
-    /**
-     * 메일 없이 바로 가입한다(D-20·D-21). **이메일 소유는 확인하지 않는다** — email_verified 는 FALSE 로 남는다.
-     * 이메일·닉네임 중복은 서로 다른 코드로 구분해 돌려준다 — 사용자가 할 일이 다르다.
-     */
-    @Transactional
-    public Member signupDirect(String name, String rawEmail, String password, String nickname) {
-        String normalized = email(rawEmail);
-        String trimmedName = text(name, "name", 50);
-        String hash = encodePassword(password);
-        // 닉네임은 비워도 된다 — 서버가 '이름 + 숫자 5자'로 만들어 준다(D-22).
-        boolean chosen = nickname != null && !nickname.isBlank();
-        String trimmedNickname = chosen ? text(nickname, "nickname", 30) : freshNickname(trimmedName, normalized);
-        if (exists("lower(btrim(email)) = ?", normalized)) throw duplicateEmail();
-        if (chosen && nicknameTaken(trimmedNickname, 0)) throw duplicateNickname();
-        try {
-            long id = jdbc.queryForObject(
-                    "INSERT INTO app_user(email, password_hash, email_verified, name, nickname)"
-                            + " VALUES (?, ?, FALSE, ?, ?) RETURNING id",
-                    Long.class, normalized, hash, trimmedName, trimmedNickname);
-            recordEssentialConsent(id);
-            // 메일이 없으므로 복구 코드가 유일한 자기복구 수단이다. 평문은 지금 한 번만 보여준다.
-            return member(id).withRecoveryCode(issueRecoveryCode(id));
-        } catch (DuplicateKeyException e) {
-            // 동시에 같은 값이 들어온 경우. 어느 쪽이 겹쳤는지 다시 확인해 알려준다.
-            throw exists("lower(btrim(email)) = ?", normalized) ? duplicateEmail() : duplicateNickname();
-        }
+                         @com.fasterxml.jackson.annotation.JsonIgnore long credentialVersion, boolean emailVerified) {
     }
 
     /* ── 닉네임 자동 발급·변경 (D-22) ───────────────────────────────────────── */
@@ -103,66 +63,12 @@ public class AuthService {
         return member(id);
     }
 
-    /* ── 복구 코드 (D-22) ────────────────────────────────────────────────────── */
-
-    /** 사람이 옮겨 적을 수 있게 혼동되는 글자(0/O, 1/I)를 뺀 대문자·숫자 조합. */
-    private static final String CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-
-    private String newRecoveryCode() {
-        var code = new StringBuilder(19);
-        for (int i = 0; i < 16; i++) {
-            if (i > 0 && i % 4 == 0) code.append('-');
-            code.append(CODE_ALPHABET.charAt(random.nextInt(CODE_ALPHABET.length())));
-        }
-        return code.toString();
-    }
-
-    /** 새 복구 코드를 저장하고 평문을 돌려준다. 평문은 이때만 존재한다. */
-    private String issueRecoveryCode(long id) {
-        String code = newRecoveryCode();
-        jdbc.update("UPDATE app_user SET recovery_code_hash = ? WHERE id = ?", AuthTokens.hash(code), id);
-        return code;
-    }
-
-    /**
-     * 복구 코드로 비밀번호를 바꾼다. 코드는 **1회용**이라 성공하면 즉시 새 코드를 발급한다
-     * — 안 그러면 다음 복구 수단이 없어진다. 기존 세션은 credential_version 을 올려 전부 폐기한다.
-     * 존재하지 않는 이메일·틀린 코드는 **같은 401** 이다(계정 존재를 알려주지 않는다).
-     */
-    @Transactional
-    public Member recoverPassword(String rawEmail, String recoveryCode, String newPassword) {
-        String normalized = email(rawEmail);
-        limits.check("recover:" + normalized, 10);
-        String hash = encodePassword(newPassword);
-        var found = jdbc.query("""
-                SELECT id FROM app_user
-                WHERE lower(btrim(email)) = ? AND recovery_code_hash IS NOT NULL AND recovery_code_hash = ?
-                FOR UPDATE""",
-                (rs, i) -> rs.getLong(1), normalized, AuthTokens.hash(recoveryCode == null ? "" : recoveryCode.trim()));
-        if (found.isEmpty()) throw unauthorized();
-        long id = found.getFirst();
-        jdbc.update("UPDATE app_user SET password_hash = ?, credential_version = credential_version + 1 WHERE id = ?",
-                hash, id);
-        // 되찾기의 용도가 "남이 들어가 있을 때 되찾기"다. credential_version 은 발급 시점에만 보므로
-        // (AuthTokens.authenticate 는 auth_session 만 본다) 여기서 세션을 직접 끊어야 한다.
-        jdbc.update("DELETE FROM auth_session WHERE user_id = ?", id);
-        return member(id).withRecoveryCode(issueRecoveryCode(id));
-    }
-
-    private boolean exists(String where, Object value) {
-        return jdbc.queryForObject("SELECT count(*) FROM app_user WHERE " + where, Integer.class, value) > 0;
-    }
-
     /** 공백만 있거나 길이를 넘으면 400. 앞뒤 공백은 잘라 저장한다. */
     private static String text(String value, String field, int max) {
         String trimmed = value == null ? "" : value.trim();
         if (trimmed.isEmpty() || trimmed.codePointCount(0, trimmed.length()) > max)
             throw ApiException.requiredMissing(field, "1자 이상 " + max + "자 이하로 입력해 주세요.");
         return trimmed;
-    }
-
-    static ApiException duplicateEmail() {
-        return new ApiException("YGB-AUTH-DUP-EMAIL", 409, "이미 가입된 이메일이에요. 로그인하거나 다른 이메일을 써 주세요.", "email");
     }
 
     static ApiException duplicateNickname() {
@@ -181,37 +87,10 @@ public class AuthService {
                 id, com.palsaekjo.yogobi.privacy.PrivacyPolicy.VERSION);
     }
 
-    public Member login(String email, String password) {
-        String normalized = email(email);
-        limits.check("email:" + normalized, 10);
-        var credentials = jdbc.query("SELECT id,password_hash,credential_version FROM app_user WHERE lower(btrim(email))=?",
-                (rs, i) -> new Credentials(rs.getLong(1), rs.getString(2), rs.getLong(3)), normalized);
-        Credentials found = credentials.isEmpty() ? new Credentials(0, null, -1) : credentials.getFirst();
-        if (!matches(password, found.passwordHash())) throw unauthorized();
-        var member = member(found.id());
-        if (member.credentialVersion() != found.version()) throw unauthorized();
-        return member;
-    }
-
-    public long verifyPassword(long id, String password) {
-        limits.check("reauth:" + id, 10);
-        var found = jdbc.queryForObject("SELECT password_hash,credential_version FROM app_user WHERE id=?",
-                (rs, i) -> new Credentials(id, rs.getString(1), rs.getLong(2)), id);
-        if (!matches(password, found.passwordHash())) throw unauthorized();
-        return found.version();
-    }
-
-    private boolean matches(String password, String hash) {
-        boolean valid = password != null && password.getBytes(StandardCharsets.UTF_8).length <= 72;
-        boolean matched = passwords.matches(valid ? password : "", hash == null ? dummyHash : hash);
-        return valid && hash != null && matched;
-    }
-
     public Member member(long id) {
         return jdbc.query("SELECT id,email,name,nickname,password_hash IS NOT NULL,google_sub IS NOT NULL,current_plan_id,credential_version,email_verified FROM app_user WHERE id=?",
                 (rs, i) -> new Member(rs.getLong(1), rs.getString(2), rs.getString(3), rs.getString(4),
-                        rs.getBoolean(5), rs.getBoolean(6), rs.getObject(7, Long.class), rs.getLong(8), rs.getBoolean(9),
-                        null),       // 복구 코드는 조회로 돌려주지 않는다 — 발급 순간에만 보인다
+                        rs.getBoolean(5), rs.getBoolean(6), rs.getObject(7, Long.class), rs.getLong(8), rs.getBoolean(9)),
                 id).stream().findFirst().orElseThrow(AuthService::unauthorized);
     }
 
@@ -229,44 +108,10 @@ public class AuthService {
         } catch (DuplicateKeyException e) { throw conflict(); } // Never auto-link by email.
     }
 
-    @Transactional
-    public Member linkGoogle(long id, OidcUser google, long version) {
-        String email = googleEmail(google);
-        if (!member(id).email().equalsIgnoreCase(email)) throw conflict();
-        try {
-            if (jdbc.update("UPDATE app_user SET google_sub=?,credential_version=credential_version+1 WHERE id=? AND password_hash IS NOT NULL AND google_sub IS NULL AND credential_version=?",
-                    google.getSubject(), id, version) != 1) throw conflict();
-        } catch (DuplicateKeyException e) { throw conflict(); }
-        return member(id);
-    }
-
-    @Transactional
-    public Member addPassword(long id, String hash, OidcUser google, long version) {
-        googleEmail(google);
-        if (jdbc.update("UPDATE app_user SET password_hash=?,credential_version=credential_version+1 WHERE id=? AND google_sub=? AND password_hash IS NULL AND credential_version=?",
-                hash, id, google.getSubject(), version) != 1) throw conflict();
-        return member(id);
-    }
-
     private static String googleEmail(OidcUser google) {
         if (!Boolean.TRUE.equals(google.getEmailVerified()) || google.getSubject() == null
                 || google.getSubject().isBlank() || google.getSubject().length() > 255) throw unauthorized();
         return email(google.getEmail());
-    }
-
-    /**
-     * 비밀번호 규칙(사용자 결정 2026-09-16): **문자와 숫자를 섞어 8자 이상**.
-     * 72바이트 상한은 취향이 아니라 bcrypt 의 입력 한계라 그대로 둔다(넘으면 조용히 잘린다).
-     */
-    public String encodePassword(String password) {
-        boolean hasLetter = password != null && password.codePoints().anyMatch(Character::isLetter);
-        boolean hasDigit = password != null && password.codePoints().anyMatch(Character::isDigit);
-        if (password == null || password.codePointCount(0, password.length()) < 8
-                || password.getBytes(StandardCharsets.UTF_8).length > 72
-                || !hasLetter || !hasDigit)
-            throw ApiException.requiredMissing("password",
-                    "비밀번호는 문자와 숫자를 섞어 8자 이상, UTF-8 기준 72바이트 이하로 입력해 주세요.");
-        return passwords.encode(password);
     }
 
     static String email(String email) {

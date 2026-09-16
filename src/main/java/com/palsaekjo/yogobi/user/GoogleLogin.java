@@ -4,21 +4,19 @@ import com.palsaekjo.yogobi.common.ApiException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.time.Instant;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Component;
 
+/** 가입·로그인의 유일한 경로다(D-34). 자체 계정이 없으므로 연결(link)할 것도 없다. */
 @Component
 public class GoogleLogin {
-    private static final String INTENT = GoogleLogin.class.getName();
     private final AuthService members;
     private final AuthTokens tokens;
     private final boolean enabled;
     private final String returnUrl;
-    private record Intent(long userId, String sessionHash, Instant expires, String passwordHash, long version) { }
 
     public GoogleLogin(AuthService members, AuthTokens tokens,
                        @Value("${yogobi.auth.google-enabled:false}") boolean enabled,
@@ -32,21 +30,6 @@ public class GoogleLogin {
         this.returnUrl = returnUrl;
     }
 
-    public String begin(long id, String password, boolean addPassword, HttpServletRequest request) {
-        requireEnabled();
-        String hash = null;
-        long version;
-        if (addPassword) {
-            var member = members.member(id);
-            if (member.localLogin() || !member.googleLogin()) throw AuthService.conflict();
-            hash = members.encodePassword(password);
-            version = member.credentialVersion();
-        } else version = members.verifyPassword(id, password);
-        request.getSession().setAttribute(INTENT, new Intent(id, tokens.sessionHash(request), Instant.now().plusSeconds(300), hash, version));
-        request.changeSessionId();
-        return "/oauth2/authorization/google";
-    }
-
     public void requireEnabled() {
         tokens.requireConfigured();
         if (!enabled) throw new ApiException("YGB-AUTH-503", 503, "Google 로그인 설정을 확인해 주세요.", null);
@@ -55,19 +38,8 @@ public class GoogleLogin {
     public void success(HttpServletRequest request, HttpServletResponse response, Authentication authentication) throws IOException {
         try {
             OidcUser google = (OidcUser) authentication.getPrincipal();
-            var session = request.getSession(false);
-            Intent intent = session == null ? null : (Intent) session.getAttribute(INTENT);
-            if (session != null) session.removeAttribute(INTENT);
-            AuthService.Member member;
-            if (intent == null) member = members.googleLogin(google);
-            else {
-                Long id = tokens.authenticate(request);
-                if (id == null || id != intent.userId() || !Instant.now().isBefore(intent.expires())
-                        || !tokens.sessionHash(request).equals(intent.sessionHash())) throw AuthService.unauthorized();
-                member = intent.passwordHash() == null ? members.linkGoogle(id, google, intent.version())
-                        : members.addPassword(id, intent.passwordHash(), google, intent.version());
-                tokens.revokeAll(id); // Credential linking retires previously issued sessions.
-            }
+            // Google sub 가 있으면 로그인, 없으면 가입이다 — 사용자에게는 같은 버튼 하나다(D-34).
+            var member = members.googleLogin(google);
             tokens.issue(member.id(), member.credentialVersion(), request, response);
             invalidate(request);
             response.sendRedirect(returnUrl + "#auth=success");

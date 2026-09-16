@@ -99,7 +99,7 @@ public class AdminAccount implements ApplicationRunner {
         return jdbc.queryForObject("""
                 SELECT id, email, name, nickname, credential_version FROM app_user WHERE id = ?""",
                 (rs, i) -> new AuthService.Member(rs.getLong(1), rs.getString(2), rs.getString(3), rs.getString(4),
-                        true, false, null, rs.getLong(5), true, null), adminId);
+                        true, false, null, rs.getLong(5), true), adminId);
     }
 
     /** 관리자 전용 기능에서 "설정이 없어 잠김"을 구분해 알린다. */
