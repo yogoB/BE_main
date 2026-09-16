@@ -51,7 +51,7 @@ D-18 변경: 우체국·스마트초이스 연동과 `CostResult.priceCrossCheck
 | 배포 Base URL | `https://yogob.fly.dev` |
 | 로컬 Base URL | `http://localhost:8080` |
 | 공통 프리픽스 | `/api/v1` |
-| 인증 | 추천·계산기·카탈로그·챗봇은 비회원 공개. `/me`와 계정 관리는 HttpOnly JWT 쿠키 + CSRF. 상세 `docs/auth.md` |
+| 인증 | 추천·계산기·카탈로그·챗봇 **엔드포인트는 비회원 공개**. `/me`와 계정 관리는 HttpOnly JWT 쿠키 + CSRF. 단 **결과 리포트 화면은 로그인 후에만 그린다**(D-36 — 화면 게이트이며 API 는 그대로 공개다). 상세 `docs/auth.md` |
 | 콘텐츠 타입 | `application/json` (UTF-8) |
 | CORS | 정확한 프론트 오리진만 허용(`YOGOBI_CORS_ALLOWED_ORIGINS`). 회원 요청은 `credentials: include`; wildcard 금지 |
 
@@ -391,8 +391,8 @@ JWT 절대 수명 15분·유휴 제한 5분(refresh 없음). 상태를 바꾸는
 
 | Method | Path | 요청 | 응답 |
 |---|---|---|---|
-| GET | `/api/v1/auth/csrf` | — | `{headerName,token}` — 공개. 헤더 이름은 `X-CSRF-TOKEN` |
 | GET | `/oauth2/authorization/google` → `/login/oauth2/code/google` | — | **유일한 가입·로그인 경로.** 완료 후 `AUTH_RETURN_URL#auth=success\|failed\|account-conflict` 로 리다이렉트 |
+| GET | `/api/v1/auth/csrf` | — | `{headerName,token}` — 공개. 헤더 이름은 `X-CSRF-TOKEN` |
 | POST | `/api/v1/auth/logout` | 인증+CSRF | `{loggedOut:true}` — 현재 로그인만 폐기 |
 | POST | `/api/v1/auth/logout-all` | 인증+CSRF | `{loggedOut:true}` — 이 회원의 모든 로그인 폐기 |
 | GET | `/api/v1/me` | 인증 | 현재 회원 |
