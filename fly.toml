@@ -29,3 +29,10 @@ primary_region = "nrt"
 [[vm]]
   size = "shared-cpu-1x"
   memory = "512mb"
+
+# 운영 지표(D-25). Fly 프로메테우스가 사설망(6PN)으로 9091 을 긁어 fly-metrics.net 그라파나에 그린다.
+# 공개되는 서비스는 위 http_service(8080) 하나뿐이라 이 포트는 인터넷에서 닿지 않는다.
+# 앱 쪽 포트는 application.properties 의 management.server.port(기본 9091)와 맞춰야 한다.
+[metrics]
+  port = 9091
+  path = "/actuator/prometheus"

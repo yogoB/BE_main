@@ -56,13 +56,14 @@ URL-safe 문자열을 넣으면 `JWT_SECRET must be Base64`로 기동에 실패�
 |---|---|
 | `Dockerfile` | 멀티스테이지(JDK 빌드 → JRE 실행). `bootJar`만 만들고 테스트는 스킵 |
 | `.dockerignore` | 빌드 컨텍스트 축소·비밀값 차단. `db/seed/dev/`는 데모 시드용으로 일부러 남김 |
-| `fly.toml` | 포트 8080, HTTPS 강제, 헬스체크(`/api/v1/catalog/services`), 머신 512MB |
+| `fly.toml` | 포트 8080, HTTPS 강제, 헬스체크(`/api/v1/catalog/services`), 머신 512MB, 지표 스크레이프(9091) |
 
 손볼 수 있는 것:
 - `fly.toml`의 `app` 이름이 전역에서 이미 쓰이면 다른 이름으로 바꾼다.
 - 메모리 512MB가 빠듯하면(OOM) `[[vm]] memory = "1024mb"`로 올린다.
-- (선택) 제대로 된 헬스 엔드포인트를 원하면 `spring-boot-starter-actuator`를 추가하고 헬스체크 path를
-  `/actuator/health`로 바꾼다. 지금은 의존성 없이 카탈로그 GET으로 대체한다.
+- 헬스체크 path 는 `/api/v1/catalog/services` 그대로다. 액추에이터는 들어왔지만(D-25) **관리 포트 9091**
+  에만 떠서 공개 포트(8080)를 지나는 `http_service` 체크로는 닿지 않는다. 바꾸려면 포트를 지정할 수 있는
+  최상위 `[checks]` 로 옮겨야 하는데, 지금 체크가 DB 연결까지 검증하며 잘 돌고 있어 그대로 둔다.
 
 ---
 
@@ -164,3 +165,30 @@ fly certs show api.yourdomain.com --app yogobi-be   # 넣어야 할 DNS 레코�
   첫 요청은 콜드 스타트로 몇 초 걸릴 수 있다.
 - **마이그레이션**: 적용된 Flyway 파일은 수정 금지, 항상 새 `V{n}` 추가(`AGENTS.md`).
 - **롤백**: `fly releases --app yogobi-be` → `fly deploy --image <이전 이미지>` 또는 `fly apps restart`.
+
+---
+
+## 9. 지표 보기 (D-25)
+
+배포하면 별도 설정 없이 쌓인다. 대시보드는 Fly 관리형 그라파나를 그대로 쓴다 — 우리가 만든 화면은 없다.
+
+```bash
+fly logs -a yogob-api                 # 로그
+open https://fly-metrics.net          # 그라파나(조직 계정으로 로그인)
+```
+
+`fly.toml`의 `[metrics]`가 **9091/`/actuator/prometheus`**를 사설망에서 긁어간다.
+공개 포트(8080)에는 액추에이터가 없다 — 열면 회원 수·내부 경로가 인증 없이 나간다.
+
+| 보고 싶은 것 | 쿼리 |
+|---|---|
+| 엔드포인트별 p95 지연 | `histogram_quantile(0.95, sum by (le,uri) (rate(http_server_requests_seconds_bucket[5m])))` |
+| 5xx 발생률 | `sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m]))` |
+| 총 회원 / 24시간 가입 | `yogobi_members` / `yogobi_members_signed_up_24h` |
+| 가입→구독 등록 전환율 | `yogobi_members_with_subscription / yogobi_members` |
+| 활성 세션 | `yogobi_sessions_active` |
+
+**화면 단위 이탈율·퍼널은 여기 없다.** 브라우저 이벤트가 서버에 오지 않아 DB에 기록 자체가 없다(D-25).
+
+지표를 추가하려면 `common/Metrics.java`에 게이지 한 줄. 매 스크레이프(15초)마다 쿼리가 나가므로
+집계 비용이 큰 값은 넣지 않는다.

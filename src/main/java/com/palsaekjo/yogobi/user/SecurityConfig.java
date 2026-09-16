@@ -25,6 +25,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.client.registration.*;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserService;
 import org.springframework.security.config.oauth2.client.CommonOAuth2Provider;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.context.RequestAttributeSecurityContextRepository;
 import org.springframework.security.web.csrf.CsrfFilter;
@@ -47,6 +48,21 @@ public class SecurityConfig {
             throw new IllegalStateException("Google callback must be HTTPS (HTTP only for loopback development)");
         return new InMemoryClientRegistrationRepository(CommonOAuth2Provider.GOOGLE.getBuilder("google")
                 .clientId(clientId).clientSecret(secret).redirectUri(redirectUri).scope("openid", "email").build());
+    }
+
+    /**
+     * 액추에이터(D-25)는 아래 회원 체인의 denyAll 에 걸리므로 별도 체인으로 연다.
+     * 열리는 곳은 관리 포트(`management.server.port`)뿐이다 — 공개 포트에는 이 경로가 매핑되지 않으므로
+     * permitAll 이어도 404 가 나고, 그 404 의 /error 디스패치를 아래 체인이 다시 막아 **401** 로 끝난다
+     * (배포본에서 확인). 그 경계를 MetricsEndpointTest 가 지킨다.
+     */
+    @Bean
+    @Order(0)
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication(type = org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication.Type.SERVLET)
+    SecurityFilterChain actuator(HttpSecurity http) throws Exception {
+        return http.securityMatcher("/actuator", "/actuator/**")
+                .authorizeHttpRequests(a -> a.anyRequest().permitAll())
+                .csrf(c -> c.disable()).cors(c -> c.disable()).build();
     }
 
     @Bean
