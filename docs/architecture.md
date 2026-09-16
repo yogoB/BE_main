@@ -108,7 +108,7 @@ AI의 `/parse`·`/narrate`·`/ocr`는 토큰 누락·불일치 시 401, 서버 �
 | POST | `/api/v1/recommendations` | 무상태 추천 — 필터·챗봇 공용 |
 | POST | `/api/v1/calculator` | 특정 조합 총비용 |
 | GET | `/api/v1/catalog/plans` | 요금제 카탈로그 |
-| GET | `/api/v1/catalog/services` | 구독 서비스·티어 |
+| GET | `/api/v1/catalog/services` | 구독 서비스·티어. 등급에 `currency`(KRW\|USD)·`krwEstimate`·`krwRateDate` — 해외 결제는 환산 **표시만** (아래) |
 | GET | `/api/v1/catalog/plans/{id}/benefits` | 요금제별 혜택 |
 | POST | `/api/v1/catalog/reports` | 정보 오류 제보(비회원 허용·CSRF 필수), 접수만 수행 — D-18 사용자 요청 |
 | GET | `/api/v1/admin/catalog` | 카탈로그 원본(합본 CSV) 데이터셋 목록·행 수 — **운영자 전용**, D-24 |
@@ -228,6 +228,21 @@ AI는 요청의 `breakdown`·`missingInputs`에 **실제로 있는 금액만** �
 `breakdown`에 없는 항목은 근거로 쓰지 않으므로 **미사용 혜택은 사유 문장에도 등장하지 않는다**(절대 원칙 1).
 카탈로그 원본은 검수·승인된 CSV이며 PostgreSQL에 반영된 값으로 계산한다. 발행·복구 절차는 `docs/catalog-data.md`,
 제보 요청·응답 상세는 `docs/BE_API.md`를 따른다. 제보는 카탈로그를 직접 수정하지 않는다.
+
+```jsonc
+// GET /api/v1/catalog/services 200 — 등급(tier) 스키마 (사용자 결정 2026-09-16)
+{ "id": 2,  "name": "스탠다드", "price": 13500, "currency": "KRW",
+  "krwEstimate": null,  "krwRateDate": null },
+{ "id": 94, "name": "Pro",      "price": 20,    "currency": "USD",
+  "krwEstimate": 27183, "krwRateDate": "2026-09-15" }   // 환율 환산 — ESTIMATED
+```
+
+`price`는 **`currency` 단위의 공식 표기 금액**이다. 해외 결제 등급은 원화 확정 금액이 없으므로
+`krwEstimate`(환산)와 기준일 `krwRateDate`를 함께 주고, 원화 등급은 두 필드가 `null`이다.
+환율은 **하루 1회 배치**로만 갱신하며(요청 경로에서 외부 호출 없음 — D-05) 값이 없으면 환산도 `null`이다. 0원으로 적지 않는다.
+**환산값은 표시 전용이다**(D-17): `/recommendations`·`/calculator`는 원화 확정 등급만 계산에 넣고,
+빠진 서비스·등급은 400이 아니라 `missingInputs`로 알린다. 계산에 들어가는 유일한 원화 금액은
+사용자가 확인해 넣은 `user_subscription.monthly_price`(`USER_PROVIDED`)다. 골든 케이스는 `docs/testing.md` G-17.
 
 ---
 
