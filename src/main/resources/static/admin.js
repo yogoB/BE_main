@@ -104,7 +104,7 @@ async function loadDashboard() {
     }));
   }
 
-  drawTrend(data.signupTrend || []);
+  drawActivity(data.weeklyActivity || []);
   $('endpoints').replaceChildren(...(data.endpoints || []).map(row =>
     tr([row.uri, row.method, row.status, show(row.count), row.avgMs])));
 }
@@ -114,42 +114,85 @@ function show(value) {
   return typeof value === 'number' && value >= 0 ? value.toLocaleString('ko-KR') : '—';
 }
 
-const SVG = 'http://www.w3.org/2000/svg';
-const svgEl = (name, attrs) => {
-  const node = document.createElementNS(SVG, name);
-  for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
-  return node;
-};
+/* 최근 7일 활동. 가입만 그리면 대부분 0 이라 빈 화면이 된다 — 실제로 움직이는 항목을 같이 낸다.
+   숫자를 항상 적고, 막대는 셀 바닥의 가는 선으로만 둔다(숫자를 가리지 않게). 합계 열이 왼쪽 요약을 대신한다. */
+const ACTIVITY_ROWS = [
+  ['signups', '가입'],
+  ['reports', '정보 오류 제보'],
+  ['proposals', '수집 제안'],
+  ['applied', '카탈로그 반영'],
+];
 
-/* 7일 가입 막대그래프. 외부 차트 라이브러리를 쓸 수 없다(CSP default-src 'none') —
-   인라인 SVG 로 직접 그린다. 값이 전부 0 이어도 축과 날짜는 보여준다. */
-function drawTrend(rows) {
-  const box = $('trend-chart');
-  if (!rows.length) { box.replaceChildren(document.createTextNode('아직 가입 기록이 없어요.')); return; }
-  const W = 320, H = 110, PAD = 14, gap = 8;
-  const max = Math.max(1, ...rows.map(r => Number(r.count) || 0));
-  const bar = (W - PAD * 2 - gap * (rows.length - 1)) / rows.length;
-  const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img',
-    'aria-label': `최근 ${rows.length}일 가입 추이, 최대 ${max}명` });
+function drawActivity(days) {
+  const box = $('activity');
+  if (!days.length) {
+    box.replaceChildren(document.createTextNode('활동 기록을 읽지 못했어요.'));
+    return;
+  }
+  const today = days[days.length - 1].date;
+  const table = document.createElement('table');
 
-  rows.forEach((row, i) => {
-    const n = Number(row.count) || 0;
-    const h = Math.round((H - PAD - 20) * (n / max));
-    const x = PAD + i * (bar + gap);
-    svg.append(svgEl('rect', { x, y: H - 18 - h, width: bar, height: Math.max(h, 1),
-      rx: 2, fill: n ? '#22c55e' : '#e3e7ec' }));
-    const day = svgEl('text', { x: x + bar / 2, y: H - 4, 'text-anchor': 'middle',
-      'font-size': 9, fill: '#8a8b9e' });
-    day.textContent = row.date.slice(5).replace('-', '/');
-    svg.append(day);
-    if (n) {
-      const label = svgEl('text', { x: x + bar / 2, y: H - 22 - h, 'text-anchor': 'middle',
-        'font-size': 10, 'font-weight': 700, fill: '#16a34a' });
-      label.textContent = n;
-      svg.append(label);
-    }
-  });
-  box.replaceChildren(svg);
+  const head = document.createElement('tr');
+  head.append(th(''));
+  for (const day of days) {
+    const cell = th(`${day.date.slice(5).replace('-', '/')} ${weekday(day.date)}`);
+    if (day.date === today) cell.className = 'today';
+    head.append(cell);
+  }
+  const sumHead = th('합계');
+  sumHead.className = 'sum';
+  head.append(sumHead);
+  const thead = document.createElement('thead');
+  thead.append(head);
+
+  const body = document.createElement('tbody');
+  for (const [key, label] of ACTIVITY_ROWS) {
+    const counts = days.map(day => Number(day[key]) || 0);
+    const max = Math.max(...counts);
+    const row = document.createElement('tr');
+    row.append(td(label));
+    counts.forEach(n => {
+      const cell = td('');
+      const wrap = document.createElement('span');
+      wrap.className = 'cell';
+      wrap.textContent = n.toLocaleString('ko-KR');
+      if (n) {
+        const bar = document.createElement('i');
+        bar.style.transform = `scaleX(${(n / max).toFixed(3)})`;
+        wrap.append(bar);
+      } else {
+        cell.className = 'zero';
+      }
+      cell.append(wrap);
+      row.append(cell);
+    });
+    const total = td(counts.reduce((a, b) => a + b, 0).toLocaleString('ko-KR'));
+    total.className = 'sum';
+    row.append(total);
+    body.append(row);
+  }
+  table.append(thead, body);
+  box.replaceChildren(table);
+}
+
+const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
+/** 'YYYY-MM-DD' → 요일. 서버가 준 날짜 문자열만 쓰고 현지 시간대로 다시 해석하지 않는다. */
+function weekday(date) {
+  const [y, m, d] = date.split('-').map(Number);
+  return WEEKDAYS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
+}
+
+function th(text) {
+  const cell = document.createElement('th');
+  cell.scope = 'col';
+  cell.textContent = text;
+  return cell;
+}
+
+function td(text) {
+  const cell = document.createElement('td');
+  cell.textContent = text;
+  return cell;
 }
 
 function tr(cells) {

@@ -42,7 +42,7 @@ public class BackofficeMetrics {
                 "signedUp7d", count("SELECT count(*) FROM app_user WHERE created_at > now() - interval '7 days'"),
                 "withSubscription", count("SELECT count(DISTINCT user_id) FROM user_subscription WHERE ended_at IS NULL"),
                 "activeSessions", count("SELECT count(*) FROM auth_session WHERE expires_at > now()")));
-        out.put("signupTrend", trend());
+        out.put("weeklyActivity", activity());
         out.put("catalog", Map.of(
                 "mobilePlans", count("SELECT count(*) FROM mobile_plan WHERE active"),
                 "subscriptionServices", count("SELECT count(*) FROM subscription_service WHERE active"),
@@ -68,12 +68,24 @@ public class BackofficeMetrics {
     }
 
     /** 최근 7일 일별 가입 수. 가입이 없는 날도 0으로 채워 그래프가 끊기지 않게 한다. */
-    private List<Map<String, Object>> trend() {
+    /**
+     * 최근 7일 활동. 가입만으로는 대부분 0 이라 화면이 비어 보인다 —
+     * 실제로 움직이는 운영 활동(제보·수집 제안·카탈로그 반영)을 같이 낸다.
+     * 표가 없는 환경에서는 빈 목록이고, 화면은 "기록 없음"으로 적는다(0 으로 적지 않는다).
+     */
+    private List<Map<String, Object>> activity() {
         try {
             return jdbc.queryForList("""
                     SELECT to_char(day, 'YYYY-MM-DD') AS date,
                            (SELECT count(*) FROM app_user u
-                            WHERE u.created_at >= day AND u.created_at < day + interval '1 day') AS count
+                             WHERE u.created_at >= day AND u.created_at < day + interval '1 day') AS signups,
+                           (SELECT count(*) FROM catalog_report r
+                             WHERE r.created_at >= day AND r.created_at < day + interval '1 day') AS reports,
+                           (SELECT count(*) FROM catalog_change_request c
+                             WHERE c.created_at >= day AND c.created_at < day + interval '1 day') AS proposals,
+                           (SELECT count(*) FROM catalog_audit a
+                             WHERE a.created_at >= day AND a.created_at < day + interval '1 day'
+                               AND a.outcome = 'APPLIED') AS applied
                     FROM generate_series(
                         date_trunc('day', now()) - interval '6 days', date_trunc('day', now()), interval '1 day') AS day
                     ORDER BY day""");

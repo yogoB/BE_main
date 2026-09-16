@@ -100,7 +100,12 @@ class BackofficeApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.members.total").isNumber())
                 .andExpect(jsonPath("$.data.catalog.mobilePlans").isNumber())
-                .andExpect(jsonPath("$.data.signupTrend.length()").value(7))
+                .andExpect(jsonPath("$.data.weeklyActivity.length()").value(7))
+                // 가입만으로는 대부분 0 이라 운영 활동을 같이 낸다 — 네 계열이 모두 있어야 한다.
+                .andExpect(jsonPath("$.data.weeklyActivity[0].signups").isNumber())
+                .andExpect(jsonPath("$.data.weeklyActivity[0].reports").isNumber())
+                .andExpect(jsonPath("$.data.weeklyActivity[0].proposals").isNumber())
+                .andExpect(jsonPath("$.data.weeklyActivity[0].applied").isNumber())
                 .andExpect(jsonPath("$.data.endpoints").isArray());
         mvc.perform(get("/api/v1/admin/catalog/requests").cookie(admin)).andExpect(status().isOk());
     }

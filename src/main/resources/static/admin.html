@@ -59,9 +59,26 @@ button.danger:hover{background:var(--danger-tint)}
 
 /* 묶음별 패널. 지표가 15개 나열되면 무엇이 무엇인지 안 읽힌다. */
 .panel-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
-/* 추이는 막대 7개와 날짜 라벨이 들어가야 해서 숫자 목록보다 넓은 자리가 필요하다. */
-.panel-grid .panel:first-child{grid-column:span 2}
-@media (max-width:760px){.panel-grid .panel:first-child{grid-column:auto}}
+/* 활동 표는 요일 7칸 + 합계가 들어가야 해서 숫자 목록보다 넓은 자리가 필요하다. */
+.panel-grid .panel.wide{grid-column:1/-1}
+
+/* 요일별 활동. 값이 0 이어도 숫자가 그대로 보여야 한다 — 막대만 그리면 빈 화면이 된다
+   (레퍼런스: Deputy 주간 스케줄의 요일 컬럼 + 좌측 주간 합계). */
+.activity{overflow-x:auto}
+.activity table{margin-top:4px;font-size:13px;min-width:560px}
+.activity th,.activity td{padding:7px 8px;text-align:right}
+.activity th:first-child,.activity td:first-child{text-align:left;white-space:nowrap;color:var(--ink-soft)}
+.activity thead th{font-size:11px}
+.activity thead th.today{color:var(--brand-ink)}
+.activity th.sum,.activity td.sum{border-left:1px solid var(--line);font-weight:800;
+  background:var(--bg);font-variant-numeric:tabular-nums}
+.activity td{font-variant-numeric:tabular-nums;color:var(--ink)}
+.activity td.zero{color:#c9ccd3}
+/* 셀 바닥의 가는 막대 — 숫자를 가리지 않으면서 큰 날이 어디인지 보이게 한다. */
+.activity .cell{display:block;position:relative;padding-bottom:5px}
+/* 막대는 숫자와 같은 쪽(오른쪽)에서 자란다 — 왼쪽에서 자라면 앞 칸 숫자에 붙어 보인다. */
+.activity .cell i{position:absolute;left:0;right:0;bottom:0;height:3px;border-radius:2px;
+  background:var(--brand);transform-origin:right;display:block}
 .panel{border:1px solid var(--line);border-radius:var(--radius-sm);padding:16px}
 .panel h3{margin:0 0 10px;font-size:14px;font-weight:800}
 .stat-list{display:grid;grid-template-columns:1fr auto;gap:6px 12px;margin:0;font-size:14px}
@@ -136,9 +153,9 @@ summary{cursor:pointer;color:var(--brand-ink);font-size:13px;font-weight:600}
   <ul class="kpi" id="kpi"></ul>
 
   <div class="panel-grid">
-    <div class="panel">
-      <h3>최근 7일 가입</h3>
-      <div id="trend-chart" class="chart"></div>
+    <div class="panel wide">
+      <h3>최근 7일 활동</h3>
+      <div class="activity" id="activity"></div>
     </div>
     <div class="panel" id="panel-catalog"><h3>카탈로그</h3><dl class="stat-list"></dl></div>
     <div class="panel" id="panel-review"><h3>검수</h3><dl class="stat-list"></dl></div>
