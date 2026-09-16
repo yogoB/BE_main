@@ -377,6 +377,11 @@ CSV에 없는 것을 물어도 **200으로 답한다.** 아는 것으로 계산�
 
 ## 회원 인증
 
+> **D-34(확정 2026-09-17): 가입·로그인은 Google OAuth 하나만 남긴다. 아직 코드에 반영되지 않았다.**
+> 아래는 **현재 동작**이다. 반영되면 `/auth/signup` `/auth/login` `/auth/password/recover`
+> `/auth/google/link` `/auth/password` 다섯 개가 사라지고 `/oauth2/authorization/google` 만 남는다.
+> 캘린더 연동이 Google 로그인을 요구하지 않는다는 확인은 `calendar-integration-findings.md`.
+
 **가입 방법은 하나다 — `{name,email,password,nickname?}` 직접 가입**(D-20·D-21). 메일은 쓰지 않는다:
 본인 확인 메일·메일 토큰 가입·메일 재설정 엔드포인트는 **2026-09-16 에 제거**했다. 이메일 소유는 확인하지
 않으며 `email_verified` 는 자체 가입에서 FALSE 로 남는다. **비밀번호를 잊었을 때의 유일한 자기복구 수단은
