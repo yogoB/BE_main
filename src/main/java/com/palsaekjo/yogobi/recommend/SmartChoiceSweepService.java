@@ -1,5 +1,6 @@
 package com.palsaekjo.yogobi.recommend;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -39,12 +40,31 @@ public class SmartChoiceSweepService {
         this.maxConditions = maxConditions;
     }
 
-    /** 하루 3회(D-12). 한국 시간 기준으로 새벽·점심·저녁에 한 번씩. */
+    /** 하루 3회(D-12). 머신이 잠들어 있으면 발화하지 않으므로 화면의 수동 실행이 실질적인 경로다. */
     @Scheduled(cron = "${yogobi.smartchoice.cron:0 40 3,12,20 * * *}", zone = "Asia/Seoul")
-    public void sweep() {
+    public void scheduled() {
+        try {
+            log.info("스마트초이스 스윕 완료: {}", sweep());
+        } catch (RuntimeException e) {
+            log.warn("스마트초이스 스윕 실패 — 이전 스냅샷을 유지합니다 ({})", e.getClass().getSimpleName());
+        }
+    }
+
+    /**
+     * 스윕 1회. 운영자가 화면에서 결과를 읽고 다음 행동을 정할 수 있게 셋을 구분해 돌려준다 —
+     * 키가 없다 / 서버에 닿지 못했다 / 돌았고 몇 행을 남겼다.
+     * 닿지 못한 것은 등록 IP·한국망 제한일 수 있어 "실패"와 다르게 읽어야 한다.
+     */
+    public Map<String, Object> sweep() {
+        var out = new LinkedHashMap<String, Object>();
         if (!client.enabled()) {
             log.info("스마트초이스 키가 없어 스윕을 건너뜁니다 (시드 추천은 그대로 동작)");
-            return;
+            out.put("enabled", false);
+            out.put("conditions", 0);
+            out.put("stored", 0);
+            out.put("reachable", true);
+            out.put("snapshotRows", snapshotRows());
+            return out;
         }
         List<Map<String, Object>> conditions = jdbc.queryForList("""
                 SELECT DISTINCT network_type, data_mb
@@ -53,6 +73,7 @@ public class SmartChoiceSweepService {
                  LIMIT ?
                 """, maxConditions);
         int stored = 0;
+        boolean reachable = true;
         for (Map<String, Object> condition : conditions) {
             int dataMb = (int) Math.min(((Number) condition.get("data_mb")).longValue(), SmartChoiceClient.UNLIMITED);
             String networkType = String.valueOf(condition.get("network_type"));
@@ -64,42 +85,23 @@ public class SmartChoiceSweepService {
             } catch (SmartChoiceClient.Unreachable e) {
                 // 등록 IP·한국망 제한 등으로 서버에 닿지 못했다. 남은 격자도 같을 테니 여기서 멈춘다.
                 log.warn("스마트초이스에 도달하지 못해 스윕을 중단합니다 — 이전 스냅샷을 유지합니다");
-                return;
+                reachable = false;
+                break;
             }
         }
-        log.info("스마트초이스 스윕 완료: 조건 {}건, 스냅샷 {}행 갱신", conditions.size(), stored);
-        recordMissingPlans();
+        log.info("스마트초이스 스윕: 조건 {}건, 스냅샷 {}행 갱신, 도달 {}", conditions.size(), stored, reachable);
+        out.put("enabled", true);
+        out.put("conditions", conditions.size());
+        out.put("stored", stored);
+        out.put("reachable", reachable);
+        out.put("snapshotRows", snapshotRows());
+        return out;
     }
 
-    /**
-     * 스냅샷에 있는데 카탈로그에 없는 요금제를 결손으로 남긴다(G-19 · D-31).
-     *
-     * <p>스윕은 {@link #AGE} = 20 으로 돌기 때문에 청년 요금제(KT Y덤·SKT 라이트(청년)·LGU+ 유쓰)를
-     * 이미 받아오고 있었다. 그 결과가 스냅샷에만 쌓이고 아무도 보지 않아 Y덤 11종이 통째로 빠져 있었다.
-     * <p><b>카탈로그로 승격하지 않는다</b> — 스냅샷은 여전히 원본이 아니다(D-20). 여기 쌓인 행은
-     * 사람이 CSV 에 반영해야 카탈로그가 된다(D-18). 계산에는 어느 단계에서도 쓰이지 않는다.
-     * <p>fail-soft: 기록이 실패해도 이미 저장한 스냅샷은 유지한다.
-     */
-    private void recordMissingPlans() {
-        try {
-            // requested_cnt 는 건드리지 않는다 — 그 값은 "사용자가 몇 번 찾았나"이고 곧 수집 우선순위다.
-            // 하루 3회 배치가 올리면 아무도 찾지 않은 요금제가 우선순위 1위가 된다(G-19-d).
-            int recorded = jdbc.update("""
-                    INSERT INTO catalog_candidate (kind, query_text, status)
-                    SELECT 'MOBILE_PLAN', btrim(s.carrier) || ' ' || btrim(s.plan_name), 'REQUESTED'
-                      FROM smartchoice_plan_snapshot s
-                     WHERE length(btrim(s.carrier) || ' ' || btrim(s.plan_name)) <= 200
-                       AND NOT EXISTS (
-                           SELECT 1 FROM mobile_plan p JOIN carrier c ON c.id = p.carrier_id
-                            WHERE replace(lower(btrim(c.name)), ' ', '') = replace(lower(btrim(s.carrier)), ' ', '')
-                              AND replace(lower(btrim(p.name)), ' ', '') = replace(lower(btrim(s.plan_name)), ' ', ''))
-                       AND (SELECT count(*) FROM catalog_candidate) < ?
-                    ON CONFLICT (kind, query_text) DO UPDATE SET last_requested_at = now()
-                    """, MAX_CANDIDATES);
-            log.info("카탈로그 결손 후보 {}행 기록 (사람이 CSV 에 반영해야 카탈로그가 된다)", recorded);
-        } catch (RuntimeException e) {
-            log.warn("결손 후보 기록 실패 — 스냅샷은 유지합니다 (fail-soft): {}", e.toString());
-        }
+    /** 대조에 실제로 쓸 수 있는 행이 몇 개인지. 0 이면 결과 화면은 전부 "확인 못 했다"로 나온다. */
+    private long snapshotRows() {
+        Long rows = jdbc.queryForObject("SELECT count(*) FROM smartchoice_plan_snapshot", Long.class);
+        return rows == null ? 0 : rows;
     }
 
     /** 이름·통신사가 비면 대조 키가 없으므로 버린다. 같은 키는 최신 값으로 덮는다(V7 의 dedup 키). */

@@ -59,21 +59,24 @@ class SmartChoiceSweepServiceTest {
     }
 
     @Test
-    void 키가_없으면_외부를_부르지도_저장하지도_않는다() {
+    void 키가_없으면_외부를_부르지도_저장하지도_않고_enabled_false_로_알린다() {
         var client = new StubClient(false, null, List.of());
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
-        new SmartChoiceSweepService(client, jdbc, 60).sweep();
+        var result = new SmartChoiceSweepService(client, jdbc, 60).sweep();
         assertThat(client.calls).isZero();
         verify(jdbc, never()).update(anyString(), any(Object[].class));
+        // 화면이 "키가 없다"와 "못 닿았다"를 다르게 안내해야 하므로 둘을 구분해 돌려준다.
+        assertThat(result).containsEntry("enabled", false).containsEntry("reachable", true);
     }
 
     @Test
     void 도달하지_못하면_남은_격자를_건너뛴다() {
         var client = new StubClient(true, new SmartChoiceClient.Unreachable(), List.of());
         var jdbc = jdbcWith(5);
-        new SmartChoiceSweepService(client, jdbc, 60).sweep();
+        var result = new SmartChoiceSweepService(client, jdbc, 60).sweep();
         assertThat(client.calls).isEqualTo(1);                       // 첫 실패에서 멈춘다
         verify(jdbc, never()).update(anyString(), any(Object[].class));
+        assertThat(result).containsEntry("enabled", true).containsEntry("reachable", false);
     }
 
     @Test

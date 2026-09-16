@@ -246,6 +246,22 @@ $('refresh').addEventListener('click', () =>
 $('status-filter').addEventListener('change', () => loadRequests().catch(error => say(error.message)));
 $('audit-limit').addEventListener('change', () => loadAudit().catch(error => say(error.message)));
 
+/* 시세 스냅샷 수집. 결과를 셋으로 나눠 읽어준다 — 키 없음 / 못 닿음 / 정상.
+   "0행"만 보여주면 운영자가 키를 의심해야 할지 네트워크를 의심해야 할지 알 수 없다. */
+$('sweep').addEventListener('click', async () => {
+  say('스마트초이스 시세를 모으는 중이에요…');
+  try {
+    const r = await call('/api/v1/admin/smartchoice/sweep', { method: 'POST', body: {} });
+    if (!r.enabled) say('스마트초이스 키(SMARTCHOICE_API_KEY)가 설정돼 있지 않아요. 배포 secret 을 확인해 주세요.');
+    else if (!r.reachable) say(`스마트초이스 서버에 닿지 못했어요 (조건 ${r.conditions}건 시도). `
+      + `등록 IP·접속 국가 제한일 수 있어요. 스냅샷 ${r.snapshotRows}행은 그대로 유지했어요.`);
+    else say(`시세 수집 완료 — 조건 ${r.conditions}건에서 ${r.stored}행 갱신, 스냅샷 총 ${r.snapshotRows}행.`);
+    await loadDashboard();
+  } catch (error) {
+    say(error.message);
+  }
+});
+
 $('harvest').addEventListener('click', async () => {
   say('수집하는 중이에요…');
   try {

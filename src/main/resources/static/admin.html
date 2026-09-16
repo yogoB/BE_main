@@ -130,7 +130,11 @@ summary{cursor:pointer;color:var(--brand-ink);font-size:13px;font-weight:600}
   </select>
   <table><thead><tr><th>#</th><th>대상</th><th>변경</th><th>검토</th><th>사유</th><th></th></tr></thead>
     <tbody id="requests"></tbody></table>
-  <button id="harvest" type="button">지금 수집 실행</button>
+  <p>시세 스냅샷이 비어 있으면 요금제 제안이 만들어지지 않아요 —
+     <b>시세 수집을 먼저</b> 돌리세요. 배포 서버는 유휴 시 정지하므로 예약 시각에 잠들어 있으면
+     정기 실행이 건너뛰어집니다. 그때는 여기서 직접 돌립니다.</p>
+  <button id="sweep" class="ghost" type="button">① 시세 스냅샷 수집</button>
+  <button id="harvest" type="button">② 지금 수집 실행</button>
 </section>
 
 <section id="audit-section" hidden>

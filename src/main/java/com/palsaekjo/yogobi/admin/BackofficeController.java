@@ -3,6 +3,7 @@ package com.palsaekjo.yogobi.admin;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.palsaekjo.yogobi.common.ApiException;
 import com.palsaekjo.yogobi.common.ApiResponse;
+import com.palsaekjo.yogobi.recommend.SmartChoiceSweepService;
 import com.palsaekjo.yogobi.user.AdminAccount;
 import com.palsaekjo.yogobi.user.AuthService;
 import com.palsaekjo.yogobi.user.AuthTokens;
@@ -30,13 +31,15 @@ public class BackofficeController {
     private final AuthTokens tokens;
     private final BackofficeMetrics metrics;
     private final CatalogDailyHarvest harvest;
+    private final SmartChoiceSweepService sweep;
 
     public BackofficeController(AdminAccount admin, AuthTokens tokens, BackofficeMetrics metrics,
-                                CatalogDailyHarvest harvest) {
+                                CatalogDailyHarvest harvest, SmartChoiceSweepService sweep) {
         this.admin = admin;
         this.tokens = tokens;
         this.metrics = metrics;
         this.harvest = harvest;
+        this.sweep = sweep;
     }
 
     /**
@@ -71,5 +74,19 @@ public class BackofficeController {
     @PostMapping("/harvest/run")
     public ApiResponse<Map<String, Object>> runHarvest() {
         return ApiResponse.ok(harvest.harvest());
+    }
+
+    /**
+     * 시세 스냅샷을 지금 한 번 모은다(정기 실행은 03:40·12:40·20:40 KST).
+     *
+     * <p>수집(②)보다 **먼저** 돌려야 하는 작업이다 — 수집은 이 스냅샷과 카탈로그를 비교하므로
+     * 스냅샷이 비어 있으면 아무 제안도 만들지 못한다. 키를 새로 넣었을 때도 여기서 바로 확인한다.
+     *
+     * <p>배포 머신이 유휴 시 정지(`auto_stop_machines`)라 예약 시각에 잠들어 있으면 스케줄이
+     * 발화하지 않는다. 그래서 이 수동 경로가 실질적인 실행 수단이다.
+     */
+    @PostMapping("/smartchoice/sweep")
+    public ApiResponse<Map<String, Object>> runSweep() {
+        return ApiResponse.ok(sweep.sweep());
     }
 }
