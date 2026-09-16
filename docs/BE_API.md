@@ -377,13 +377,35 @@ CSV에 없는 것을 물어도 **200으로 답한다.** 아는 것으로 계산�
 
 ## 회원 인증
 
-자체 가입·로그인, Google 로그인, 현재 회원 조회, 로그아웃·모든 기기 로그아웃, 명시적 계정 연결,
-이메일 검증 가입, 비밀번호 재설정, 로그인 세션 조회/폐기가 구현됐다. `/account.html`에서 확인할 수 있다.
-가입은 메일의 토큰과 본인이 정한 비밀번호로 완료한다. 재설정은 CSRF 필수이며 자동 로그인하지 않는다.
-JWT 절대 수명 15분·유휴 제한 5분. 상세 실행법·설정 점검은 `docs/auth.md`, 공격 검증은 `docs/auth-security.md`.
-자체 가입은 이메일 검증 토큰이 필요하다(`AUTH_EMAIL_ENABLED=false`면 자체 가입·재설정은 503, Google만 동작).
-요청 예시·엔드포인트·CSRF·쿠키·Google·SMTP 설정·에러 코드는 [회원 인증 명세](auth.md)를 따른다.
-회원 JWT는 15분 만료(refresh 없음)이며 `GET /api/v1/me`는 현재 로그인한 회원만 반환한다.
+**가입 방법은 하나다 — `{name,email,password,nickname?}` 직접 가입**(D-20·D-21). 메일은 쓰지 않는다:
+본인 확인 메일·메일 토큰 가입·메일 재설정 엔드포인트는 **2026-09-16 에 제거**했다. 이메일 소유는 확인하지
+않으며 `email_verified` 는 자체 가입에서 FALSE 로 남는다. **비밀번호를 잊었을 때의 유일한 자기복구 수단은
+가입 시 한 번 보여주는 복구 코드**(`POST /api/v1/auth/password/recover`, D-22)다.
+
+비밀번호는 **문자와 숫자를 섞어 8자 이상**, UTF-8 72바이트 이하. JWT 절대 수명 15분·유휴 제한 5분(refresh 없음).
+상태를 바꾸는 요청은 모두 CSRF 토큰이 필요하다. 상세 실행법·설정은 [auth.md](auth.md), 공격 검증은
+[auth-security.md](auth-security.md).
+
+| Method | Path | 요청 | 응답 |
+|---|---|---|---|
+| GET | `/api/v1/auth/csrf` | — | `{headerName,token}` — 공개. 헤더 이름은 `X-CSRF-TOKEN` |
+| POST | `/api/v1/auth/signup` | `{name,email,password,nickname?}`, CSRF | 현재 회원 + 인증 쿠키. `recoveryCode` 는 **이때 한 번만** 나온다 |
+| POST | `/api/v1/auth/login` | `{email,password}`, CSRF | 현재 회원 + 인증 쿠키 |
+| POST | `/api/v1/auth/logout` | CSRF | `{loggedOut:true}` — 현재 로그인만 폐기 |
+| POST | `/api/v1/auth/logout-all` | CSRF | `{loggedOut:true}` — 이 회원의 모든 로그인 폐기 |
+| POST | `/api/v1/auth/password/recover` | `{email,recoveryCode,newPassword}`, CSRF | 현재 회원 + **새 복구 코드**. **기존 세션은 모두 끊긴다** |
+| POST | `/api/v1/auth/google/link` | `{password}`, 인증+CSRF | `{authorizationUrl}` — 자체 계정에 Google 연결 시작 |
+| POST | `/api/v1/auth/password` | `{password}`, 인증+CSRF | `{authorizationUrl}` — Google 전용 회원의 자체 비밀번호 등록 시작 |
+| GET | `/api/v1/me` | 인증 | 현재 회원. `recoveryCode` 는 **항상 null** |
+| DELETE | `/api/v1/me` | 인증+CSRF | `{deleted:true}` — 탈퇴. 법정 보존 사본만 남는다 |
+| POST | `/api/v1/me/nickname` | `{nickname}`, 인증+CSRF | 현재 회원 (D-22) |
+| GET | `/api/v1/me/sessions` | 인증 | 로그인 세션 목록(`current` 플래그 포함) |
+| DELETE | `/api/v1/me/sessions/{sessionId}` | 인증+CSRF | `{revoked:true}`. 남의 세션은 404 |
+| GET | `/oauth2/authorization/google` → `/login/oauth2/code/google` | — | Google OIDC 로그인·콜백. 완료 후 `AUTH_RETURN_URL#auth=success` 로 리다이렉트 |
+
+**인증 에러 코드**: `YGB-AUTH-001` 401(로그인 정보·본인 확인 불일치) · `YGB-AUTH-DUP-EMAIL` 409 ·
+`YGB-AUTH-DUP-NICKNAME` 409 · `YGB-AUTH-403` 403(CSRF·권한) · `YGB-AUTH-429` 429(같은 이메일 10회 초과) ·
+`YGB-AUTH-503` 503(`JWT_SECRET` 미설정).
 
 ## 5. 회원 데이터 (`/api/v1/me/**`)
 
@@ -511,5 +533,30 @@ JWT 절대 수명 15분·유휴 제한 5분. 상세 실행법·설정 점검은 
 요청 `{ "agree": true }` → 응답 200 `{ "data": { "agreed": true } }`. `agree`가 boolean이 아니면 400 `YGB-REQ-001`.
 
 > **회원 탈퇴·데이터 삭제**는 `DELETE /api/v1/me`(회원 인증, [auth.md](auth.md)). 법정 보존 사본만 별도 보존.
+
+## 7. 운영자 API (`/api/v1/admin/**`)
+
+백오피스 전용이다. `POST /api/v1/admin/login` 만 공개이며 나머지는 운영자 세션이 필요하다.
+프론트에서는 nginx 가 `/admin.(html|js)` 만 BE 로 프록시한다 — 일반 회원 화면에는 노출되지 않는다.
+
+| Method | Path | 설명 |
+|---|---|---|
+| POST | `/api/v1/admin/login` | 운영자 로그인 `{id,password}`. 실패는 401 하나로만 답한다 (D-32) |
+| GET | `/api/v1/admin/session` | 관리자 여부 확인 |
+| GET | `/api/v1/admin/dashboard` | 사용 지표 — 회원·카탈로그·검수·제보·엔드포인트 |
+| POST | `/api/v1/admin/harvest/run` | 일일 수집 즉시 실행 (정기: 매일 09:00 KST) |
+| POST | `/api/v1/admin/smartchoice/sweep` | 스마트초이스 스냅샷 스윕 즉시 실행 |
+| POST | `/api/v1/admin/fx/refresh` | 환율 즉시 갱신(정기: 09:15 KST). 실패해도 이전 값 유지 — 응답 `updated` 로 구분 |
+| GET | `/api/v1/admin/retention/pending` | 보유기간 만료 **건수만** 조회. 지우지 않는다 |
+| POST | `/api/v1/admin/retention/purge` | 만료 개인정보 파기(정기: 04:00 KST). `{confirm:"파기"}` 없으면 400 — 되돌릴 수 없다 |
+| GET | `/api/v1/admin/catalog` | 카탈로그 원본(합본 CSV) 데이터셋 목록·행 수 (D-24) |
+| GET | `/api/v1/admin/catalog/{dataset}` | 데이터셋 전체 행 |
+| POST | `/api/v1/admin/catalog/{dataset}` | 행 추가 **제안** — 202. 승인 전까지 반영 없음 (D-28) |
+| PATCH | `/api/v1/admin/catalog/{dataset}/{key}` | 행 부분 수정 **제안** — 202 |
+| DELETE | `/api/v1/admin/catalog/{dataset}/{key}` | 행 삭제 **제안** — 202 |
+| GET | `/api/v1/admin/catalog/requests` | 제안 목록. `?status=PENDING\|APPROVED\|REJECTED\|FAILED` |
+| POST | `/api/v1/admin/catalog/requests/{id}/approve` | 승인 — **이때 파일·DB 에 반영**. 재승인·검토 불일치는 409 (D-29) |
+| POST | `/api/v1/admin/catalog/requests/{id}/reject` | 거절 — `{reason}`, 영영 반영하지 않는다 |
+| GET | `/api/v1/admin/catalog/audit` | 원본 변경 이력(최신순, `?limit=1~500`) — 행위자·시각·전/후 행·결과 (D-27) |
 
 전체 호출 흐름은 [시퀀스 다이어그램](diagrams/index.html)에서 확인한다.

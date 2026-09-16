@@ -36,7 +36,6 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  */
 @SpringBootTest(properties = {
         "JWT_SECRET=VHlwZS1vbmx5LXRlc3Qta2V5LTMyaGFyYWN0ZXJzLW9yLW1vcmUh",
-        "yogobi.auth.email-enabled=false",
         "AUTH_SECURE_COOKIES=false", "AUTH_SESSION_COOKIE_NAME=YGB_SESSION",
         "ADMIN_ID=yogogo", "ADMIN_PASSWORD=test-backoffice-password",
         "CATALOG_ADMIN_USER_IDS=",                      // 허용목록 없이 관리자 계정만으로 운영자여야 한다

@@ -5,9 +5,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.palsaekjo.yogobi.user.AuthTokens;
 import jakarta.servlet.http.Cookie;
-import java.util.Base64;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -70,14 +68,12 @@ class MeApiTest {
         }
     }
 
+    /** 실제 가입 흐름(메일 없는 직접 가입, D-21). */
     long signup(String email, Browser b) throws Exception {
-        byte[] bytes = new byte[32]; new java.security.SecureRandom().nextBytes(bytes);
-        String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-        jdbc.update("INSERT INTO auth_email_token(token_hash,purpose,email,expires_at) VALUES (?,?,?,now()+interval '10 minutes')",
-                AuthTokens.hash(token), "SIGNUP", email);
         b.csrf();
         var res = mvc.perform(post("/api/v1/auth/signup").session(b.session).header("X-CSRF-TOKEN", b.csrf)
-                .contentType("application/json").content(JSON.writeValueAsBytes(Map.of("token", token, "password", PASSWORD))))
+                .contentType("application/json").content(JSON.writeValueAsBytes(
+                        Map.of("name", email.split("@")[0], "email", email, "password", PASSWORD))))
                 .andExpect(status().isOk()).andReturn();
         b.cookies = res.getResponse().getCookies();
         if (b.session != null && b.session.isInvalid()) b.session = null;

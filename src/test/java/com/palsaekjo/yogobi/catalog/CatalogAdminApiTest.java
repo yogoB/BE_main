@@ -38,7 +38,6 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  */
 @SpringBootTest(properties = {
         "JWT_SECRET=VHlwZS1vbmx5LXRlc3Qta2V5LTMyaGFyYWN0ZXJzLW9yLW1vcmUh",
-        "yogobi.auth.email-enabled=false",
         "AUTH_SECURE_COOKIES=false", "AUTH_SESSION_COOKIE_NAME=YGB_SESSION",
         "CATALOG_ADMIN_USER_IDS=1",      // 첫 가입자만 운영자
         // 로컬 .env 에 백오피스 관리자가 있으면 그 계정이 id 1 을 가져간다(D-32). 여기서는 끈다.

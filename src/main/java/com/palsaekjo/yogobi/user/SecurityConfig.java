@@ -81,8 +81,8 @@ public class SecurityConfig {
                                 "/api/v1/catalog/reports",
                                 // 백오피스 로그인만 공개다(D-32). 나머지 /admin/** 은 아래에서 ADMIN 전용.
                                 "/api/v1/admin/login",
-                                "/api/v1/auth/signup", "/api/v1/auth/login", "/api/v1/auth/email/verification",
-                                "/api/v1/auth/password/reset-request", "/api/v1/auth/password/reset",
+                                "/api/v1/auth/signup", "/api/v1/auth/login",
+                                // 메일 경로는 제거됐다 — 자기복구는 복구 코드뿐이다(D-21·D-22).
                                 "/api/v1/auth/password/recover").permitAll()
                         .requestMatchers("/oauth2/authorization/google", "/login/oauth2/code/google").permitAll()
                         .requestMatchers("/api/v1/me", "/api/v1/me/**", "/api/v1/auth/logout", "/api/v1/auth/logout-all",

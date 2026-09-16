@@ -28,8 +28,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * docs/testing.md G-13 — 메일 없이 가입(D-20). **메일 기능이 꺼진 환경**이다.
  * 메일이 켜진 경우(f·g)는 {@link AuthSecurityTest} 가 같은 규칙의 반대편을 검증한다.
  */
-@SpringBootTest(properties = {"JWT_SECRET=VHlwZS1vbmx5LXRlc3Qta2V5LTMyaGFyYWN0ZXJzLW9yLW1vcmUh",
-        "yogobi.auth.email-enabled=false", "AUTH_SECURE_COOKIES=true",
+@SpringBootTest(properties = {"JWT_SECRET=VHlwZS1vbmx5LXRlc3Qta2V5LTMyaGFyYWN0ZXJzLW9yLW1vcmUh", "AUTH_SECURE_COOKIES=true",
         "AUTH_SESSION_COOKIE_NAME=__Host-YGB_SESSION"})
 @AutoConfigureMockMvc
 @Testcontainers
@@ -209,6 +208,29 @@ class DirectSignupTest {
                 .andExpect(status().isOk());
         new Browser().post("/api/v1/auth/login", Map.of("email", "a@example.com", "password", PASSWORD))
                 .andExpect(status().isUnauthorized());
+    }
+
+    /**
+     * G-15h: 복구 코드로 비밀번호를 되찾으면 **그 전에 열려 있던 로그인 세션이 끊겨야 한다.**
+     * 이 기능의 주 용도가 "남이 내 계정에 들어가 있을 때 되찾기"이므로, 세션이 살아남으면 되찾기의 의미가 없다.
+     * 되찾은 본인의 새 세션 하나만 남는다(응답이 쿠키를 새로 발급한다).
+     */
+    @Test void g15h_recoveryRevokesSessionsOpenedWithTheOldPassword() throws Exception {
+        var intruder = new Browser();
+        var signupResult = intruder.post("/api/v1/auth/signup", signup("이승훈", "a@example.com", "훈이"))
+                .andExpect(status().isOk()).andReturn();
+        intruder.accept(signupResult);
+        intruder.me().andExpect(status().isOk());
+
+        String code = JSON.readTree(signupResult.getResponse().getContentAsString())
+                .path("data").path("recoveryCode").asText();
+        new Browser().post("/api/v1/auth/password/recover",
+                        Map.of("email", "a@example.com", "recoveryCode", code,
+                                "newPassword", "brand new password 2026!"))
+                .andExpect(status().isOk());
+
+        intruder.me().andExpect(status().isUnauthorized());
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM auth_session", Integer.class)).isEqualTo(1);
     }
 
     @Test void g15d_wrongCodeAndUnknownEmailLookTheSame() throws Exception {

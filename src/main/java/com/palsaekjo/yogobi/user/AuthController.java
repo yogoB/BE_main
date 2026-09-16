@@ -17,10 +17,9 @@ public class AuthController {
     private final AuthService members;
     private final AuthTokens tokens;
     private final GoogleLogin google;
-    private final AuthEmail emails;
 
-    public AuthController(AuthService members, AuthTokens tokens, GoogleLogin google, AuthEmail emails) {
-        this.members = members; this.tokens = tokens; this.google = google; this.emails = emails;
+    public AuthController(AuthService members, AuthTokens tokens, GoogleLogin google) {
+        this.members = members; this.tokens = tokens; this.google = google;
     }
 
     @GetMapping("/auth/csrf")
@@ -33,38 +32,20 @@ public class AuthController {
     public ApiResponse<AuthService.Member> local(@RequestBody JsonNode body, HttpServletRequest request,
                                                HttpServletResponse response) {
         boolean signup = request.getRequestURI().endsWith("/signup");
-        // 가입은 두 형태다: 메일 토큰 {token,password} 또는 직접 가입 {name,email,password,nickname}(D-19).
-        boolean direct = signup && !body.path("token").isTextual();
+        // 가입은 {name,email,password,nickname} 하나뿐이다(D-19). 메일 토큰 흐름은 D-21 로 제거했다.
         // 닉네임은 선택이다 — 비우면 서버가 만들어 준다(D-22).
-        if (direct && body.path("nickname").isTextual()) fields(body, "name", "email", "password", "nickname");
-        else if (direct) fields(body, "name", "email", "password");
-        else fields(body, signup ? "token" : "email", "password");
+        if (signup && body.path("nickname").isTextual()) fields(body, "name", "email", "password", "nickname");
+        else if (signup) fields(body, "name", "email", "password");
+        else fields(body, "email", "password");
         tokens.requireConfigured();
         String password = body.get("password").textValue();
-        var member = direct
+        var member = signup
                 ? members.signupDirect(body.get("name").textValue(), body.get("email").textValue(),
                         password, body.path("nickname").textValue())
-                : signup ? members.signup(body.get("token").textValue(), password)
-                        : members.login(body.get("email").textValue(), password);
+                : members.login(body.get("email").textValue(), password);
         tokens.issue(member.id(), member.credentialVersion(), request, response);
         GoogleLogin.invalidate(request);
         return ApiResponse.ok(member);
-    }
-
-    @PostMapping({"/auth/email/verification", "/auth/password/reset-request"})
-    public ApiResponse<Map<String,String>> email(@RequestBody JsonNode body, HttpServletRequest request) {
-        fields(body,"email"); tokens.requireConfigured();
-        emails.request(body.get("email").textValue(), request.getRequestURI().endsWith("/verification")
-                ? AuthEmail.Purpose.SIGNUP : AuthEmail.Purpose.RESET);
-        return ApiResponse.ok(Map.of("message","입력한 이메일에서 본인 확인 안내를 확인해 주세요."));
-    }
-
-    @PostMapping("/auth/password/reset")
-    public ApiResponse<Map<String,Boolean>> reset(@RequestBody JsonNode body, HttpServletRequest request, HttpServletResponse response) {
-        fields(body,"token","password");
-        members.resetPassword(body.get("token").textValue(),body.get("password").textValue());
-        tokens.clear(response); GoogleLogin.invalidate(request);
-        return ApiResponse.ok(Map.of("passwordReset",true));
     }
 
     @GetMapping("/me/sessions")

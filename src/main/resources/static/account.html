@@ -12,23 +12,20 @@ body{font-family:system-ui,sans-serif;max-width:680px;margin:48px auto;padding:0
 <a href="/">요고비 홈</a><h1>내 계정</h1>
 <p>추천과 비용 계산은 로그인 없이 이용할 수 있어요.</p>
 <p id="message" role="status" aria-live="polite"></p>
-<section id="confirmation" hidden>
-<h2 id="confirmation-title">비밀번호 설정</h2>
-<form id="confirm-form">
-<label for="new-password">새 비밀번호</label><input id="new-password" type="password" autocomplete="new-password" minlength="15" required aria-describedby="password-help">
-<p id="password-help">15자 이상으로 입력해 주세요. 한글 등을 포함하면 최대 길이가 달라질 수 있어요(72바이트 이내).</p>
-<label for="confirm-password">새 비밀번호 확인</label><input id="confirm-password" type="password" autocomplete="new-password" required>
-<button type="submit">확인하고 완료</button>
-</form></section>
 <section id="login-section"><h2>로그인</h2>
 <form id="login-form"><label for="email">이메일</label><input id="email" type="email" autocomplete="username" maxlength="254" required>
 <label for="password">비밀번호</label><input id="password" type="password" autocomplete="current-password" required>
 <button type="submit">로그인</button></form>
 <p><a href="/oauth2/authorization/google">Google로 계속하기</a></p></section>
-<section id="mail-section"><h2>가입 · 비밀번호 찾기</h2>
-<form id="mail-form"><label for="mail-action">원하는 작업</label><select id="mail-action"><option value="verification">새로 가입하기</option><option value="reset-request">비밀번호 재설정</option></select>
-<label for="mail-email">본인 이메일</label><input id="mail-email" type="email" autocomplete="email" maxlength="254" required>
-<button type="submit">본인 확인 메일 받기</button></form></section>
+<section id="signup-section"><h2>가입</h2>
+<p>메일 확인 없이 바로 가입해요(D-21). 비밀번호를 잊으면 가입할 때 받은 복구 코드로 재설정합니다(D-22).</p>
+<form id="signup-form">
+<label for="signup-name">이름</label><input id="signup-name" autocomplete="name" maxlength="60" required>
+<label for="signup-email">이메일</label><input id="signup-email" type="email" autocomplete="username" maxlength="254" required>
+<label for="signup-password">비밀번호</label><input id="signup-password" type="password" autocomplete="new-password" minlength="15" required aria-describedby="password-help">
+<p id="password-help">15자 이상으로 입력해 주세요. 한글 등을 포함하면 최대 길이가 달라질 수 있어요(72바이트 이내).</p>
+<label for="signup-nickname">닉네임(선택)</label><input id="signup-nickname" autocomplete="nickname" maxlength="20">
+<button type="submit">가입하기</button></form></section>
 <section id="member" hidden><h2>로그인한 계정</h2><p id="member-email"></p>
 <p>15분이 지나거나 5분 동안 이용하지 않으면 다시 로그인해 주세요.</p>
 <form id="link-form" hidden><label id="link-label" for="link-password">비밀번호 재확인</label><input id="link-password" type="password" required>

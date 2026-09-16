@@ -133,10 +133,9 @@ AI의 `/parse`·`/narrate`·`/ocr`는 토큰 누락·불일치 시 401, 서버 �
 ### Phase 1
 | Method | Path | 설명 |
 |---|---|---|
-| POST | `/api/v1/auth/signup` | 자체 가입 — `{token,password}`(메일 활성) 또는 `{name,email,password,nickname}`(메일 비활성, D-20) |
+| POST | `/api/v1/auth/signup` | 자체 가입 — `{name,email,password,nickname?}` 하나뿐이다(D-20·D-21) |
 | POST | `/api/v1/auth/login` `/logout` | 로그인 `{email,password}` · 로그아웃 |
-| POST | `/api/v1/auth/email/verification` | 가입용 본인 확인 메일 발송 — `{email}` |
-| POST | `/api/v1/auth/password/reset-request` `/reset` | 재설정 메일 발송 · 토큰으로 재설정 `{token,password}` |
+| POST | `/api/v1/auth/password/recover` | 복구 코드로 재설정 — `{email,recoveryCode,newPassword}`(D-22) |
 | GET | `/api/v1/auth/csrf` | 회원 변경·비회원 제보 요청용 CSRF 토큰 |
 | GET | `/oauth2/authorization/google` → `/login/oauth2/code/google` | Google OIDC 로그인·콜백 |
 | POST | `/api/v1/auth/google/link` | 자체 계정 비밀번호 재확인 후 Google 연결 시작 |
@@ -174,9 +173,9 @@ AI의 `/parse`·`/narrate`·`/ocr`는 토큰 누락·불일치 시 401, 서버 �
 추천·계산기·카탈로그·단일 발화 챗봇은 비회원에게 공개한다. 개인 데이터 저장·관리는 회원 전용이다.
 자체·Google 로그인 모두 동일한 내부 `userId`와 15분 JWT를 사용한다(refresh 없음, 만료 후 재로그인). JWT는 HttpOnly 쿠키로만 전달하며
 별도 브라우저 확인 쿠키와 DB 발급 지문을 함께 검사한다. 회원 요청은 `credentials: include`, 변경 요청은 CSRF 헤더가 필요하다.
-자체 가입은 `/auth/email/verification`으로 발송한 10분·단일 사용 토큰으로만 완료되며 검증된 이메일 계정으로 저장한다. 비밀번호 재설정도 같은 메일 소유 확인을 거친다.
-메일 요청만으로 계정/비밀번호를 만들지 않으며 재설정은 CSRF 필수·자동 로그인 없음이다.
-미존재·Google 전용 계정에도 동일한 메일 경로를 사용하되 연결된 회원/버전이 없어 재설정 토큰은 사용할 수 없다.
+자체 가입은 `{name,email,password,nickname?}` 한 번으로 끝난다(D-21). **메일은 쓰지 않는다** — 본인 확인 메일·메일 토큰 가입·메일 재설정
+엔드포인트와 `AuthEmail`·`spring-boot-starter-mail`을 2026-09-16 에 제거했다. 이메일 소유는 확인하지 않으며 `email_verified`는 자체 가입에서 FALSE 로 남는다.
+비밀번호를 잊었을 때의 **유일한 자기복구 수단은 가입 시 한 번 보여주는 복구 코드**다(`/auth/password/recover`, D-22). 재설정은 CSRF 필수다.
 이메일만 같다고 계정을 합치지 않는다. 자체 계정에서 비밀번호 재확인 후 같은 이메일의 Google 계정을 명시적으로 연결한다.
 Google 전용 계정은 동일 Google `sub` 재인증으로 자체 비밀번호를 추가한다. 연결 완료 시 기존 세션을 모두 무효화한다.
 

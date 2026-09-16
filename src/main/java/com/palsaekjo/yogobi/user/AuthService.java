@@ -15,16 +15,11 @@ public class AuthService {
     private final JdbcTemplate jdbc;
     private final PasswordEncoder passwords;
     private final AuthRateLimit limits;
-    private final AuthEmail emailProofs;
     private final String dummyHash;
-    /** 메일 기능이 켜져 있으면 이메일 소유 확인이 필수다. 꺼져 있으면 확인할 방법이 없어 직접 가입을 연다(D-20). */
-    private final boolean emailEnabled;
     private final java.security.SecureRandom random = new java.security.SecureRandom();
 
-    public AuthService(JdbcTemplate jdbc, PasswordEncoder passwords, AuthRateLimit limits, AuthEmail emailProofs,
-                       @org.springframework.beans.factory.annotation.Value("${yogobi.auth.email-enabled:false}") boolean emailEnabled) {
-        this.jdbc = jdbc; this.passwords = passwords; this.limits = limits; this.emailProofs = emailProofs;
-        this.emailEnabled = emailEnabled;
+    public AuthService(JdbcTemplate jdbc, PasswordEncoder passwords, AuthRateLimit limits) {
+        this.jdbc = jdbc; this.passwords = passwords; this.limits = limits;
         dummyHash = passwords.encode(java.util.UUID.randomUUID().toString());
     }
 
@@ -40,29 +35,12 @@ public class AuthService {
     }
     private record Credentials(long id, String passwordHash, long version) { }
 
-    @Transactional
-    public Member signup(String token, String password) {
-        String hash = encodePassword(password);
-        var proof = emailProofs.consume(token, AuthEmail.Purpose.SIGNUP);
-        try {
-            long id = jdbc.queryForObject("INSERT INTO app_user(email,password_hash,email_verified) VALUES (?,?,TRUE) RETURNING id",
-                    Long.class, proof.email(), hash);
-            jdbc.update("DELETE FROM auth_email_token WHERE email=?", proof.email());
-            recordEssentialConsent(id);
-            return member(id);
-        } catch (DuplicateKeyException e) { throw conflict(); }
-    }
-
     /**
-     * 메일 없이 바로 가입한다(D-20). **이메일 소유는 확인하지 않는다** — email_verified 는 FALSE 로 남고,
-     * 로그인 게이트는 메일 기능이 켜졌을 때만 적용된다(login). SMTP 를 켜면 토큰 흐름을 써야 한다.
+     * 메일 없이 바로 가입한다(D-20·D-21). **이메일 소유는 확인하지 않는다** — email_verified 는 FALSE 로 남는다.
      * 이메일·닉네임 중복은 서로 다른 코드로 구분해 돌려준다 — 사용자가 할 일이 다르다.
      */
     @Transactional
     public Member signupDirect(String name, String rawEmail, String password, String nickname) {
-        if (emailEnabled)
-            throw ApiException.requiredMissing("token",
-                    "본인 확인 메일로 가입해 주세요. 메일의 링크에서 이어서 진행할 수 있어요.");
         String normalized = email(rawEmail);
         String trimmedName = text(name, "name", 50);
         String hash = encodePassword(password);
@@ -165,6 +143,9 @@ public class AuthService {
         long id = found.getFirst();
         jdbc.update("UPDATE app_user SET password_hash = ?, credential_version = credential_version + 1 WHERE id = ?",
                 hash, id);
+        // 되찾기의 용도가 "남이 들어가 있을 때 되찾기"다. credential_version 은 발급 시점에만 보므로
+        // (AuthTokens.authenticate 는 auth_session 만 본다) 여기서 세션을 직접 끊어야 한다.
+        jdbc.update("DELETE FROM auth_session WHERE user_id = ?", id);
         return member(id).withRecoveryCode(issueRecoveryCode(id));
     }
 
@@ -208,9 +189,7 @@ public class AuthService {
         Credentials found = credentials.isEmpty() ? new Credentials(0, null, -1) : credentials.getFirst();
         if (!matches(password, found.passwordHash())) throw unauthorized();
         var member = member(found.id());
-        // 메일이 꺼져 있으면 소유를 확인할 방법 자체가 없다. 켜면 기존대로 확인을 요구한다(D-20).
-        if ((emailEnabled && !member.emailVerified()) || member.credentialVersion() != found.version())
-            throw unauthorized();
+        if (member.credentialVersion() != found.version()) throw unauthorized();
         return member;
     }
 
@@ -273,19 +252,6 @@ public class AuthService {
         if (!Boolean.TRUE.equals(google.getEmailVerified()) || google.getSubject() == null
                 || google.getSubject().isBlank() || google.getSubject().length() > 255) throw unauthorized();
         return email(google.getEmail());
-    }
-
-    @Transactional
-    public void resetPassword(String token, String password) {
-        String hash = encodePassword(password);
-        var proof = emailProofs.consume(token, AuthEmail.Purpose.RESET);
-        if (proof.userId() == null || jdbc.update("""
-                UPDATE app_user SET password_hash=?,email_verified=TRUE,credential_version=credential_version+1
-                WHERE id=? AND credential_version=? AND password_hash IS NOT NULL AND lower(btrim(email))=?
-                """, hash, proof.userId(), proof.credentialVersion(), proof.email()) != 1) throw AuthEmail.invalid();
-        jdbc.update("DELETE FROM auth_session WHERE user_id=?", proof.userId());
-        jdbc.update("DELETE FROM auth_email_token WHERE user_id=? OR email=?", proof.userId(), proof.email());
-        emailProofs.notifyResetAfterCommit(proof.email());
     }
 
     /**

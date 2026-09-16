@@ -2,9 +2,7 @@
   'use strict';
   const $ = id => document.getElementById(id);
   const fragment = new URLSearchParams(location.hash.slice(1));
-  const action = fragment.get('action');
-  let proof = fragment.get('token');
-  history.replaceState(null, '', location.pathname); // Email proof never stays in browser history or persistent storage.
+  history.replaceState(null, '', location.pathname);
   let member;
   const show = message => { $('message').textContent = message; };
   const validPassword = password => {
@@ -55,30 +53,20 @@
       item.append(button); $('sessions').append(item);
     }
   }
-  if (proof && (action === 'signup' || action === 'reset')) {
-    $('confirmation').hidden = false;
-    $('confirmation-title').textContent = action === 'signup' ? '이메일 확인 · 가입 완료' : '비밀번호 재설정';
-  } else {
-    proof = null;
-    if (fragment.get('auth') === 'success') show('로그인 또는 계정 연결이 완료되었습니다.');
-    else if (fragment.has('auth')) show('로그인 정보를 확인해 주세요. 기존 계정이 있으면 로그인 후 연결할 수 있습니다.');
-  }
-  handle('confirm-form', async () => {
-    const password = $('new-password').value; validPassword(password);
-    if (password !== $('confirm-password').value) throw new Error('두 비밀번호가 일치하지 않습니다.');
-    if (!proof) throw new Error('본인 확인 메일을 다시 요청해 주세요.');
-    await api(action === 'signup' ? '/api/v1/auth/signup' : '/api/v1/auth/password/reset', 'POST', { token: proof, password });
-    proof = null; $('confirm-form').reset(); $('confirmation').hidden = true;
-    show(action === 'signup' ? '가입이 완료되었습니다.' : '비밀번호를 변경했습니다. 새 비밀번호로 로그인해 주세요.');
-    await refresh();
+  if (fragment.get('auth') === 'success') show('로그인 또는 계정 연결이 완료되었습니다.');
+  else if (fragment.has('auth')) show('로그인 정보를 확인해 주세요. 기존 계정이 있으면 로그인 후 연결할 수 있습니다.');
+  // 가입은 메일 확인 없이 한 번에 끝난다(D-21). 닉네임은 선택 — 비우면 서버가 만들어 준다(D-22).
+  handle('signup-form', async () => {
+    const password = $('signup-password').value; validPassword(password);
+    const nickname = $('signup-nickname').value.trim();
+    const body = { name: $('signup-name').value.trim(), email: $('signup-email').value, password };
+    if (nickname) body.nickname = nickname;
+    await api('/api/v1/auth/signup', 'POST', body);
+    $('signup-form').reset(); show('가입하고 로그인했습니다.'); await refresh();
   });
   handle('login-form', async () => {
     await api('/api/v1/auth/login', 'POST', { email: $('email').value, password: $('password').value });
     $('password').value = ''; show('로그인했습니다.'); await refresh();
-  });
-  handle('mail-form', async () => {
-    const path = $('mail-action').value === 'verification' ? '/api/v1/auth/email/verification' : '/api/v1/auth/password/reset-request';
-    const result = await api(path, 'POST', { email: $('mail-email').value }); show(result.message);
   });
   handle('link-form', async () => {
     const password = $('link-password').value;

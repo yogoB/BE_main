@@ -5,9 +5,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.palsaekjo.yogobi.user.AuthTokens;
 import jakarta.servlet.http.Cookie;
-import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -63,15 +61,12 @@ class PrivacyApiTest {
         csrf = JSON.readTree(res.getResponse().getContentAsString()).path("data").path("token").asText();
     }
 
-    /** 검증 토큰을 직접 시드해 가입(메일 인프라 불필요). 발급된 인증 쿠키를 보관하고 userId 를 돌려준다. */
+    /** 실제 가입 흐름(메일 없는 직접 가입, D-21). 발급된 인증 쿠키를 보관하고 userId 를 돌려준다. */
     long signup(String email) throws Exception {
-        byte[] b = new byte[32]; new java.security.SecureRandom().nextBytes(b);
-        String token = Base64.getUrlEncoder().withoutPadding().encodeToString(b);
-        jdbc.update("INSERT INTO auth_email_token(token_hash,purpose,email,expires_at) VALUES (?,?,?,now()+interval '10 minutes')",
-                AuthTokens.hash(token), "SIGNUP", email);
         csrf();
         MvcResult res = mvc.perform(post("/api/v1/auth/signup").session(session).header("X-CSRF-TOKEN", csrf)
-                        .contentType("application/json").content(JSON.writeValueAsBytes(Map.of("token", token, "password", PASSWORD))))
+                        .contentType("application/json").content(JSON.writeValueAsBytes(
+                                Map.of("name", email.split("@")[0], "email", email, "password", PASSWORD))))
                 .andExpect(status().isOk()).andReturn();
         cookies = res.getResponse().getCookies();
         if (session != null && session.isInvalid()) session = null;
