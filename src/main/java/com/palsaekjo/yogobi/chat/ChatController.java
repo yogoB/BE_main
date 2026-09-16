@@ -50,8 +50,9 @@ public class ChatController {
         // 필터 엔드포인트와 동일한 서비스·계산 엔진을 재사용한다.
         RecommendationResponse result = recommendations.recommend(inputs);
         try {
-            String message = ai.narrate(result.results().getFirst(), result.missingInputs());
-            return ApiResponse.ok(new ChatResponse(Status.RECOMMENDED, message, result));
+            AiGateway.Narration narration = ai.narrate(result.results().getFirst(), result.missingInputs());
+            return ApiResponse.ok(new ChatResponse(Status.RECOMMENDED, narration.message(),
+                    result.withReasons(narration.reasons())));
         } catch (AiGateway.Unavailable e) {
             return warning(new ChatResponse(Status.RECOMMENDED,
                     "추천 결과는 준비됐어요. 설명을 불러오지 못해 요금제 목록과 항목별 금액을 확인해 주세요.", result));

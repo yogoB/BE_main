@@ -48,7 +48,8 @@
       "from": "boot",
       "to": "loader",
       "y": 170.0,
-      "label": "ApplicationRunner 실행"
+      "label": "ApplicationRunner 실행",
+      "note": "CATALOG_CSV_DIR가 비었을 때의 내장 시드 흐름이다. 설정 시 이 로더의 시작 적재를 건너뛰고 15번 CSV 동기화를 사용한다."
     },
     {
       "id": "y09-catalog-m2",
@@ -91,7 +92,8 @@
       "from": "api",
       "to": "db",
       "y": 370.0,
-      "label": "CatalogReader로 저장 자료 조회"
+      "label": "CatalogReader로 저장 자료 조회",
+      "note": "서비스·티어·요금제 목록은 active 상품만 공개한다. 기존 회원 참조는 유지한다."
     },
     {
       "id": "y09-catalog-m7",

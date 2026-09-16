@@ -8,3 +8,5 @@ graphify-out/
 docs/diagrams/*.html
 docs/diagrams/*.png
 docs/diagrams/*.json
+# API 관측 JSON의 의미·근거는 조사 문서에서 추적한다.
+docs/evidence/*.json

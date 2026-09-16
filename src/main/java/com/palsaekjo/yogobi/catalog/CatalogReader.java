@@ -39,8 +39,9 @@ public class CatalogReader {
     public record TierView(long id, String name, long price, Integer concurrentStreams, String quality, String note) {
     }
 
+    /** voiceMin·smsCnt 는 공식 표기에 수량이 없으면 null(미확인)이다 — 0(미제공)과 구분한다. */
     public record PlanView(long id, String carrier, String name, String networkType, long basePrice,
-                           long dataMb, long voiceMin, long smsCnt, Long contractDiscount12m, Long contractDiscount24m) {
+                           long dataMb, Long voiceMin, Long smsCnt, Long contractDiscount12m, Long contractDiscount24m) {
     }
 
     public record BenefitView(long serviceId, String serviceName, Long tierId, String benefitType,
@@ -52,7 +53,7 @@ public class CatalogReader {
         var tiersByService = new LinkedHashMap<Long, List<TierView>>();
         jdbc.query("""
                 SELECT service_id, id, name, price, concurrent_streams, quality, note
-                FROM subscription_tier ORDER BY service_id, price
+                FROM subscription_tier WHERE active AND service_id IN (SELECT id FROM subscription_service WHERE active) ORDER BY service_id, price
                 """, new MapSqlParameterSource(), rs -> {
                     tiersByService.computeIfAbsent(rs.getLong("service_id"), k -> new ArrayList<>())
                             .add(new TierView(rs.getLong("id"), rs.getString("name"), rs.getLong("price"),
@@ -60,7 +61,7 @@ public class CatalogReader {
                                     rs.getString("quality"), rs.getString("note")));
                 });
         return jdbc.query("""
-                SELECT id, name, category, official_url FROM subscription_service ORDER BY id
+                SELECT id, name, category, official_url FROM subscription_service WHERE active ORDER BY id
                 """, new MapSqlParameterSource(), (rs, i) -> new ServiceView(
                 rs.getLong("id"), rs.getString("name"), rs.getString("category"), rs.getString("official_url"),
                 tiersByService.getOrDefault(rs.getLong("id"), List.of())));
@@ -71,10 +72,11 @@ public class CatalogReader {
         return jdbc.query("""
                 SELECT p.id, c.name AS carrier, p.name, p.network_type, p.base_price,
                        p.data_mb, p.voice_min, p.sms_cnt, p.contract_discount_12m, p.contract_discount_24m
-                FROM mobile_plan p JOIN carrier c ON c.id = p.carrier_id ORDER BY p.id
+                FROM mobile_plan p JOIN carrier c ON c.id = p.carrier_id WHERE p.active ORDER BY p.id
                 """, new MapSqlParameterSource(), (rs, i) -> new PlanView(
                 rs.getLong("id"), rs.getString("carrier"), rs.getString("name"), rs.getString("network_type"),
-                rs.getLong("base_price"), rs.getLong("data_mb"), rs.getLong("voice_min"), rs.getLong("sms_cnt"),
+                rs.getLong("base_price"), rs.getLong("data_mb"),
+                rs.getObject("voice_min", Long.class), rs.getObject("sms_cnt", Long.class),
                 rs.getObject("contract_discount_12m", Long.class), rs.getObject("contract_discount_24m", Long.class)));
     }
 
@@ -104,7 +106,7 @@ public class CatalogReader {
         var plans = jdbc.query("""
                 SELECT p.id, p.name, p.base_price, p.contract_discount_12m, p.contract_discount_24m, c.name AS carrier
                 FROM mobile_plan p JOIN carrier c ON c.id = p.carrier_id
-                WHERE p.data_mb >= :dataMb
+                WHERE p.active AND p.data_mb >= :dataMb
                   AND (:networkType::text IS NULL OR p.network_type = :networkType)
                 """, params, (rs, i) -> new Object[]{
                     rs.getLong("id"), rs.getString("name"), rs.getLong("base_price"),
@@ -186,7 +188,8 @@ public class CatalogReader {
     public List<SubscriptionTier> findRepresentativeTiers(List<Long> serviceIds) {
         var tiers = jdbc.query("""
                 SELECT id, service_id, name, price FROM subscription_tier
-                WHERE service_id IN (:serviceIds)
+                WHERE active AND service_id IN (:serviceIds)
+                  AND service_id IN (SELECT id FROM subscription_service WHERE active)
                 """, new MapSqlParameterSource("serviceIds", serviceIds),
                 (rs, i) -> new SubscriptionTier(rs.getLong("id"), rs.getLong("service_id"),
                         rs.getString("name"), rs.getLong("price")));
@@ -211,7 +214,7 @@ public class CatalogReader {
         var tierIds = new LinkedHashMap<Long, java.util.Set<Long>>();
         jdbc.query("""
                 SELECT b.id, b.name, b.price, bi.tier_id
-                FROM bundle_product b JOIN bundle_item bi ON bi.bundle_id = b.id
+                FROM bundle_product b JOIN bundle_item bi ON bi.bundle_id = b.id WHERE b.active
                 """, new MapSqlParameterSource(), rs -> {
             long bundleId = rs.getLong("id");
             byBundle.putIfAbsent(bundleId, new Object[]{rs.getString("name"), rs.getLong("price")});

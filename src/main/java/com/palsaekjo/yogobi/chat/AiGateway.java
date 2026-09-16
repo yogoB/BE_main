@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.palsaekjo.yogobi.recommend.CostResult;
 import com.palsaekjo.yogobi.recommend.MissingInput;
+import com.palsaekjo.yogobi.recommend.Narrator;
 import com.palsaekjo.yogobi.recommend.RecommendationRequest;
 import java.io.IOException;
 import java.net.http.HttpClient;
@@ -23,7 +24,7 @@ import org.springframework.web.client.RestClientException;
 
 /** AI 서버 호출과 응답 검증. 금액은 CostResult를 그대로 전달한다. */
 @Component
-public class AiGateway {
+public class AiGateway implements Narrator {
     private final RestClient client;
     private final ObjectMapper json;
     private final String internalToken;
@@ -89,16 +90,44 @@ public class AiGateway {
         return new RecommendationRequest(new RecommendationRequest.Required(gb.intValue(), ids), options);
     }
 
-    public String narrate(CostResult cost, List<MissingInput> missingInputs) {
+    /** AI 설명 1건. message(고정 템플릿) + reasons(LLM 큐레이션, 0~3줄). D-19. */
+    public record Narration(String message, List<String> reasons) {
+    }
+
+    public Narration narrate(CostResult cost, List<MissingInput> missingInputs) {
         ObjectNode request = json.valueToTree(cost);
-        request.remove("priceCrossCheck"); // 교차검증 표시값은 AI로 보내지 않는다(/narrate extra=forbid). 금액·근거만 전달.
         request.set("missingInputs", json.valueToTree(missingInputs));
         JsonNode result = post("/narrate", request);
-        requireObject(result, "message");
+        requireObject(result, "message", "reasons");
         JsonNode message = result.path("message");
         if (!message.isTextual() || message.textValue().isBlank() || message.textValue().length() > 50000)
             throw new Unavailable();
-        return message.textValue();
+        return new Narration(message.textValue(), reasons(result.path("reasons")));
+    }
+
+    /** 추천 사유만 필요한 필터 경로용. AI 장애는 빈 목록으로 흡수한다 — 결과·계산은 영향 없다(보조 정보). */
+    @Override
+    public List<String> reasonsFor(CostResult result, List<MissingInput> missingInputs) {
+        try {
+            return narrate(result, missingInputs).reasons();
+        } catch (Unavailable e) {
+            return List.of();
+        }
+    }
+
+    /** reasons: 없으면 빈 목록. 있으면 배열·최대 3개·각 1~80자·개행 없음(AI 계약과 동일). 어긋나면 폐기. */
+    private static List<String> reasons(JsonNode node) {
+        if (node.isMissingNode() || node.isNull()) return List.of();
+        if (!node.isArray() || node.size() > 3) throw new Unavailable();
+        var out = new ArrayList<String>();
+        for (JsonNode item : node) {
+            if (!item.isTextual()) throw new Unavailable();
+            String text = item.textValue();
+            if (text.isBlank() || text.length() > 80 || text.indexOf('\n') >= 0 || text.indexOf('\r') >= 0)
+                throw new Unavailable();
+            out.add(text);
+        }
+        return List.copyOf(out);
     }
 
     private JsonNode post(String path, Object request) {

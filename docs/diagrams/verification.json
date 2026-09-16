@@ -1,6 +1,6 @@
 {
-  "checked_at": "2026-09-15T02:11:02.234696+00:00",
-  "diagram_count": 15,
+  "checked_at": "2026-09-15T14:58:38.166692+00:00",
+  "diagram_count": 16,
   "validation_scope": "Archify HTML artifact only; not backend integration or live OAuth validation",
   "browser_viewports": [
     [
@@ -24,8 +24,8 @@
     {
       "diagram_type": "sequence",
       "output": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/01-recommend.html",
-      "specification_sha256": "4f39e7577f3238d86b2ab783cd2b1918d21c5255c35dd8353dc55f32de19f005",
-      "artifact_sha256": "7e97b3b82123e4edd327bf468fbfe57985a60a92ed9785721fdd8f4c033845cf",
+      "specification_sha256": "e134e46b68d9a7dccf72279dba99204f9d6077b3d59f9535f4a17e43a6b5b3ba",
+      "artifact_sha256": "03dea3d4b3603ce9ee96ddfdad497d703f615eebfc01fe0b1ef1105c95a4e71a",
       "validation": {
         "checksPassed": 9,
         "checkCount": 9,
@@ -48,8 +48,8 @@
     {
       "diagram_type": "sequence",
       "output": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/02-chat.html",
-      "specification_sha256": "0608f0e7a2bb99e4770630cd627dd234dc9e4938bc0cc857d19087c410135fa7",
-      "artifact_sha256": "fe03455a56cd1778a7a9044fd34bb7bfaa496869e066e420fb2efaec2a852c66",
+      "specification_sha256": "406f11abd847caaa4cc307fd001c6427126294b055ba6c3d7296237f51842b8e",
+      "artifact_sha256": "30c063eb16a24894f7e662b5d5d4acc1fc2789d4059f2765f2f301253d6236ec",
       "validation": {
         "checksPassed": 9,
         "checkCount": 9,
@@ -192,8 +192,8 @@
     {
       "diagram_type": "sequence",
       "output": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/08-retention.html",
-      "specification_sha256": "b1e871300b1cd13664e2d68f343c9fcf9b7981f85413bce43055563ed9db43d9",
-      "artifact_sha256": "6fee93114ee00752b6269a573dab55de96e8e56b6cfef7545959ac91d8e9c13f",
+      "specification_sha256": "22685162bc38aa1ae7120984546b204ec1e9690367b8d0e671340898004b98ed",
+      "artifact_sha256": "4105bf1537842b9d91abe25358a17ec971c135a6383c6aa0ef38bfefd2a06f55",
       "validation": {
         "checksPassed": 9,
         "checkCount": 9,
@@ -216,8 +216,8 @@
     {
       "diagram_type": "sequence",
       "output": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/09-catalog.html",
-      "specification_sha256": "d6c0e167696bc64269908ed97e97300687f6bcc51e25e2a4aa05ba3fab4dcce0",
-      "artifact_sha256": "e69dc47f96095b2b378616f7644fd1b622fe9ca60741427a74eb5524560ad29e",
+      "specification_sha256": "cc75036790986570d37ecce28e686a802a4432e471dce52d7893324be792523d",
+      "artifact_sha256": "803bb7e9b3483976e12e1b7f88b47f7c894db39402690dbf19dccaf91990f7d6",
       "validation": {
         "checksPassed": 9,
         "checkCount": 9,
@@ -288,8 +288,8 @@
     {
       "diagram_type": "sequence",
       "output": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/12-switch.html",
-      "specification_sha256": "3452b4043af39852ad5ac4955efc93fa4988b6391882c6fb26762fc789bd345b",
-      "artifact_sha256": "087874379406fc5c07a49180058573da7f8b953686a4b696820b75040ed7d4f1",
+      "specification_sha256": "872b70c263178c01e34b4381bbbf1c76ba0c94a3e23426e72c66aa1d1d013995",
+      "artifact_sha256": "d8690b229d85c0c52b0a7ffd8c9fddc0e6201084a98366d76b39adb0c14eb174",
       "validation": {
         "checksPassed": 9,
         "checkCount": 9,
@@ -336,8 +336,8 @@
     {
       "diagram_type": "sequence",
       "output": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/14-payment-import.html",
-      "specification_sha256": "cc52c868ebfc1b2273a5eedd06a14a67fb58087fd4a26b6379b68ee90bd79378",
-      "artifact_sha256": "be92b0024f1f29a1e385296aeb8acd5611b13e958d25c6cbe56a4219df2564e6",
+      "specification_sha256": "eaeddb8cfd779e2c3ed85aff2b68c4b52235b3dfa34f2822697868b4b014d539",
+      "artifact_sha256": "2f736f5227c4b4d6480f3c47d2fdda32115ea6e4d19dab1aaa7c5bd1fc0f6263",
       "validation": {
         "checksPassed": 9,
         "checkCount": 9,
@@ -360,8 +360,8 @@
     {
       "diagram_type": "sequence",
       "output": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/15-catalog-refresh.html",
-      "specification_sha256": "11866698b76b77e6ad5992647cc085635e567f43b0c334b4535a2230bc4f0bea",
-      "artifact_sha256": "27eb30dd31ca6dc651bb314c87c63b3dd5dacd454aac2ad2c12fe492e5ef6cb1",
+      "specification_sha256": "41d1810055aaaa2cdbb2026d8951e0db7d426f403b5c7e588c7a05452b6b76e8",
+      "artifact_sha256": "81de22a90414dde0ac59f781bb818a006fe6ac6a642d0b1f3f569d33eb03dd58",
       "validation": {
         "checksPassed": 9,
         "checkCount": 9,
@@ -380,6 +380,30 @@
       "observations": "실제 이미지에서 두 테마의 라벨·화살표·노드·하단 범례·조작부 및 큰 화면 균형 확인. 화면 잘림과 의미를 가리는 겹침 없음.",
       "delivery_receipt": "15-catalog-refresh.receipt.json",
       "browser_receipt": "15-catalog-refresh.visual-check.json"
+    },
+    {
+      "diagram_type": "sequence",
+      "output": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/16-catalog-report.html",
+      "specification_sha256": "2b2414008666ed9cc767ea1decf3d92d67c86f53bbb1b04028874bcb0bb71dce",
+      "artifact_sha256": "69189082a779abade9d1a1f9faf241b3702edccc3578db8d9e1fd8ef67719bb3",
+      "validation": {
+        "checksPassed": 9,
+        "checkCount": 9,
+        "compositionProfile": "showcase",
+        "compositionStatus": "pass",
+        "errors": 0,
+        "warnings": 0
+      },
+      "browser_evidence": "passed",
+      "visual_review": "passed",
+      "correction_rounds": 0,
+      "reviewed_images": [
+        "16-catalog-report.visual-check.1440x900.dark.png",
+        "16-catalog-report.visual-check.2048x1320.light.png"
+      ],
+      "observations": "실제 이미지에서 두 테마의 라벨·화살표·노드·하단 범례·조작부 및 큰 화면 균형 확인. 화면 잘림과 의미를 가리는 겹침 없음.",
+      "delivery_receipt": "16-catalog-report.receipt.json",
+      "browser_receipt": "16-catalog-report.visual-check.json"
     }
   ]
 }

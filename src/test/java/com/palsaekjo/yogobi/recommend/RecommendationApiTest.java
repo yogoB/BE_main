@@ -1,5 +1,6 @@
 package com.palsaekjo.yogobi.recommend;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -41,10 +42,10 @@ class RecommendationApiTest {
 
     @BeforeEach
     void fixtures() {
+        jdbc.execute("TRUNCATE catalog_candidate");
         jdbc.execute("DELETE FROM plan_benefit");
         jdbc.execute("DELETE FROM mobile_plan");
         jdbc.execute("DELETE FROM carrier");
-        jdbc.execute("TRUNCATE smartchoice_plan_snapshot");
         jdbc.execute("INSERT INTO carrier(id,name,carrier_type) VALUES (1,'SKT','MNO'),(2,'KT','MNO')");
         // P1형: 넷플릭스 무료 55,000 / P2형: 웨이브 무료 45,000 (docs/testing.md G-01)
         jdbc.execute("""
@@ -110,30 +111,65 @@ class RecommendationApiTest {
                 .andExpect(jsonPath("$.error.field").value("wantedServiceIds"));
     }
 
+    // --- G-12 카탈로그 결손은 막지 않는다 (D-17) ---
+
     @Test
-    void livePriceCrossCheckAttachedOnlyWhenSnapshotMatches() throws Exception {
-        // 넷플플랜에 매칭되는 스마트초이스 스냅샷(정상가 54,000 ≠ 시드 55,000). 웨이브플랜은 스냅샷 없음.
-        jdbc.execute("""
-                INSERT INTO smartchoice_plan_snapshot(carrier,plan_name,network_type,contract_months,plan_price,discounted_price,display_data,source_url)
-                VALUES ('SKT','넷플플랜','5G',0,54000,40500,'무제한','http://api.smartchoice.or.kr/openAPI.xml')""");
+    void g12a_unknownServiceIsExcludedNotRejected() throws Exception {
         mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
-                {"required":{"monthlyDataGb":20,"wantedServiceIds":[1]},"optional":{"contractType":"NONE"}}"""))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.results[0].planName").value("넷플플랜"))
-                .andExpect(jsonPath("$.data.results[0].monthlyTotal").value(55000)) // 계산은 시드 그대로(교차검증은 표시만)
-                .andExpect(jsonPath("$.data.results[0].priceCrossCheck.livePrice").value(54000))
-                .andExpect(jsonPath("$.data.results[0].priceCrossCheck.seedPrice").value(55000))
-                .andExpect(jsonPath("$.data.results[0].priceCrossCheck.matches").value(false))
-                .andExpect(jsonPath("$.data.results[0].priceCrossCheck.source").value("스마트초이스(KTOA)"))
-                .andExpect(jsonPath("$.data.results[1].planName").value("웨이브플랜"))
-                .andExpect(jsonPath("$.data.results[1].priceCrossCheck.livePrice").doesNotExist());
+                {"required":{"monthlyDataGb":20,"wantedServiceIds":[1,99]},"optional":{"contractType":"NONE"}}"""))
+                .andExpect(status().isOk())                                   // 이전엔 400 YGB-REQ-001
+                .andExpect(jsonPath("$.data.accuracy").value("PARTIAL"))
+                .andExpect(jsonPath("$.data.results[0].planName").value("넷플플랜"))   // 아는 서비스(1)로 계산
+                .andExpect(jsonPath("$.data.missingInputs[*].field").value(
+                        org.hamcrest.Matchers.hasItem("wantedServiceIds")));
+        assertGap("SUBSCRIPTION_TIER", "serviceId:99", 1);
     }
 
     @Test
-    void noCandidatePlan_returns422() throws Exception {
+    void g12b_allServicesUnknownStillReturnsResults() throws Exception {
         mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
-                {"required":{"monthlyDataGb":200,"wantedServiceIds":[1]},"optional":{}}"""))
-                .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.error.code").value("YGB-CAL-001"));
+                {"required":{"monthlyDataGb":20,"wantedServiceIds":[99]},"optional":{"contractType":"NONE"}}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.results.length()").value(2))      // 혜택 0원, 기본료로 계산
+                .andExpect(jsonPath("$.data.results[0].planName").value("웨이브플랜"))  // 45,000 이 더 싸다
+                .andExpect(jsonPath("$.data.results[0].monthlyTotal").value(45000));
+        assertGap("SUBSCRIPTION_TIER", "serviceId:99", 1);
+    }
+
+    @Test
+    void g12cd_noCandidatePlanReturnsEmptyResultsAndCountsRepeats() throws Exception {
+        String body = """
+                {"required":{"monthlyDataGb":200,"wantedServiceIds":[1]},"optional":{}}""";
+        mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk())                                   // 이전엔 422 YGB-CAL-001
+                .andExpect(jsonPath("$.data.results").isEmpty())
+                .andExpect(jsonPath("$.data.accuracy").value("PARTIAL"))
+                .andExpect(jsonPath("$.data.missingInputs[*].field").value(
+                        org.hamcrest.Matchers.hasItem("monthlyDataGb")));
+        assertGap("MOBILE_PLAN", "dataMb>=204800,network=ANY", 1);
+
+        mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk());
+        assertGap("MOBILE_PLAN", "dataMb>=204800,network=ANY", 2);   // 행은 안 늘고 횟수만 오른다
+    }
+
+    @Test
+    void g12e_recordingStopsAtRowCapButRequestStillSucceeds() throws Exception {
+        jdbc.update("""
+                INSERT INTO catalog_candidate(kind, query_text, status)
+                SELECT 'MOBILE_PLAN', 'filler-' || g, 'REQUESTED' FROM generate_series(1, 10000) g""");
+
+        mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
+                {"required":{"monthlyDataGb":20,"wantedServiceIds":[1,99]},"optional":{"contractType":"NONE"}}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.results[0].planName").value("넷플플랜"));
+
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM catalog_candidate", Integer.class)).isEqualTo(10000);
+    }
+
+    private void assertGap(String kind, String queryText, int expectedCount) {
+        assertThat(jdbc.queryForObject(
+                "SELECT requested_cnt FROM catalog_candidate WHERE kind=? AND query_text=?",
+                Integer.class, kind, queryText)).isEqualTo(expectedCount);
     }
 }

@@ -41,7 +41,7 @@ public class UserSubscriptionService {
         if (monthlyPrice == null || monthlyPrice < 0) {
             throw ApiException.requiredMissing("monthlyPrice", "월 결제액은 0 이상 정수여야 합니다.");
         }
-        if (jdbc.queryForObject("SELECT count(*) FROM subscription_tier WHERE id = ?", Integer.class, tierId) == 0) {
+        if (jdbc.queryForObject("SELECT count(*) FROM subscription_tier WHERE id = ? AND active", Integer.class, tierId) == 0) {
             throw ApiException.requiredMissing("tierId", "존재하지 않는 구독 등급입니다.");
         }
         long id = jdbc.queryForObject("""
@@ -63,7 +63,7 @@ public class UserSubscriptionService {
         if (planId == null) {
             throw ApiException.requiredMissing("planId", "요금제 ID가 필요합니다.");
         }
-        if (jdbc.queryForObject("SELECT count(*) FROM mobile_plan WHERE id = ?", Integer.class, planId) == 0) {
+        if (jdbc.queryForObject("SELECT count(*) FROM mobile_plan WHERE id = ? AND active", Integer.class, planId) == 0) {
             throw ApiException.planNotFound("요금제를 찾을 수 없습니다: " + planId);
         }
         jdbc.update("UPDATE app_user SET current_plan_id = ? WHERE id = ?", planId, userId);

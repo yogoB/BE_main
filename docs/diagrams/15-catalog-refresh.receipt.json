@@ -6,12 +6,12 @@
   "input": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/15-catalog-refresh.sequence.json",
   "output": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/15-catalog-refresh.html",
   "specification": {
-    "sha256": "11866698b76b77e6ad5992647cc085635e567f43b0c334b4535a2230bc4f0bea",
-    "bytes": 3359
+    "sha256": "41d1810055aaaa2cdbb2026d8951e0db7d426f403b5c7e588c7a05452b6b76e8",
+    "bytes": 3659
   },
   "artifact": {
-    "sha256": "27eb30dd31ca6dc651bb314c87c63b3dd5dacd454aac2ad2c12fe492e5ef6cb1",
-    "bytes": 804351
+    "sha256": "81de22a90414dde0ac59f781bb818a006fe6ac6a642d0b1f3f569d33eb03dd58",
+    "bytes": 805329
   },
   "validation": {
     "checksPassed": 9,

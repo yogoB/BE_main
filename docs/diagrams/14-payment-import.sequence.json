@@ -1,23 +1,131 @@
 {
-  "schema_version":1,"diagram_type":"sequence",
-  "meta":{"title":"요고비 · 외부 결제내역 업로드","quality_profile":"showcase","column_fit":"spread","viewBox":[1080,560]},
-  "participants":[
-    {"id":"member","type":"frontend","label":"로그인한 회원","sublabel":"Mock JSON 업로드"},
-    {"id":"service","type":"backend","label":"PaymentImportService","sublabel":"MePaymentController 경유"},
-    {"id":"parser","type":"backend","label":"MockMydataProvider","sublabel":"파일 내용 파싱"},
-    {"id":"normalizer","type":"backend","label":"MerchantNormalizer","sublabel":"별칭 규칙 대조"},
-    {"id":"db","type":"database","label":"PostgreSQL","sublabel":"외부 결제 분석본"}
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "요고비 · 외부 결제내역 업로드",
+    "quality_profile": "showcase",
+    "column_fit": "spread",
+    "viewBox": [
+      1080,
+      560
+    ]
+  },
+  "participants": [
+    {
+      "id": "member",
+      "type": "frontend",
+      "label": "로그인한 회원",
+      "sublabel": "Mock JSON 업로드"
+    },
+    {
+      "id": "service",
+      "type": "backend",
+      "label": "PaymentImportService",
+      "sublabel": "MePaymentController 경유"
+    },
+    {
+      "id": "parser",
+      "type": "backend",
+      "label": "MockMydataProvider",
+      "sublabel": "파일 내용 파싱"
+    },
+    {
+      "id": "normalizer",
+      "type": "backend",
+      "label": "MerchantNormalizer",
+      "sublabel": "별칭 규칙 대조"
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "외부 결제 분석본"
+    }
   ],
-  "messages":[
-    {"id":"payment-request","from":"member","to":"service","y":170,"label":"POST /me/payments/import + CSRF","variant":"security","note":"전체 경로 /api/v1/me/payments/import. 회원 쿠키·CSRF 검증 후 Principal에서 userId를 결정"},
-    {"id":"payment-parse","from":"service","to":"parser","y":201,"label":"parse(업로드 JSON)","note":"외부 금융기관 API를 호출하지 않는 프로젝트 Mock 입력 형식"},
-    {"id":"payment-validated","from":"parser","to":"service","y":232,"label":"검증된 승인 내역 · 취소 제외","variant":"return","note":"KRW 정수 금액·실제 14자리 일시 검증. 소수·문자열 금액·범위 초과·외화·잘못된 날짜는 400. 모든 항목 파싱 후 저장 시작"},
-    {"id":"payment-alias-read","from":"service","to":"db","y":263,"label":"merchant_alias 조회"},
-    {"id":"payment-alias-result","from":"db","to":"service","y":294,"label":"서비스별 별칭 규칙","variant":"return"},
-    {"id":"payment-normalize","from":"service","to":"normalizer","y":325,"label":"항목마다 resolve(가맹점명, 별칭)","variant":"emphasis"},
-    {"id":"payment-match-result","from":"normalizer","to":"service","y":356,"label":"serviceId / 매칭 없음","variant":"return","note":"모르는 가맹점을 추측 매핑하지 않으며 service_id=null과 unrecognized 목록으로 유지"},
-    {"id":"payment-save","from":"service","to":"db","y":387,"label":"본인 payment_record에 저장","variant":"emphasis","note":"트랜잭션 안에서 저장. source=MOCK_MYDATA. user_subscription 생성이나 법정 사본 자동 보존은 하지 않음"},
-    {"id":"payment-saved","from":"db","to":"service","y":418,"label":"삽입 성공 · 트랜잭션 완료","variant":"return"},
-    {"id":"payment-response","from":"service","to":"member","y":449,"label":"등록·인식 건수 / 미인식 목록","variant":"return","note":"같은 파일 재업로드 중복 방지는 현재 미구현. API 응답 이후 UI에서 구독 목록을 별도로 정리해야 탐지 입력에 반영"}
+  "messages": [
+    {
+      "id": "payment-request",
+      "from": "member",
+      "to": "service",
+      "y": 170,
+      "label": "POST /me/payments/import + CSRF",
+      "variant": "security",
+      "note": "전체 경로 /api/v1/me/payments/import. 회원 쿠키·CSRF 검증 후 Principal에서 userId를 결정"
+    },
+    {
+      "id": "payment-parse",
+      "from": "service",
+      "to": "parser",
+      "y": 201,
+      "label": "parse(업로드 JSON)",
+      "note": "외부 금융기관 API를 호출하지 않는 프로젝트 Mock 입력 형식"
+    },
+    {
+      "id": "payment-validated",
+      "from": "parser",
+      "to": "service",
+      "y": 232,
+      "label": "검증된 승인 내역 · 취소 제외",
+      "variant": "return",
+      "note": "KRW 정수 금액·실제 14자리 일시 검증. 소수·문자열 금액·범위 초과·외화·잘못된 날짜는 400. 모든 항목 파싱 후 저장 시작"
+    },
+    {
+      "id": "payment-alias-read",
+      "from": "service",
+      "to": "db",
+      "y": 263,
+      "label": "merchant_alias 조회"
+    },
+    {
+      "id": "payment-alias-result",
+      "from": "db",
+      "to": "service",
+      "y": 294,
+      "label": "서비스별 별칭 규칙",
+      "variant": "return"
+    },
+    {
+      "id": "payment-normalize",
+      "from": "service",
+      "to": "normalizer",
+      "y": 325,
+      "label": "항목마다 resolve(가맹점명, 별칭)",
+      "variant": "emphasis"
+    },
+    {
+      "id": "payment-match-result",
+      "from": "normalizer",
+      "to": "service",
+      "y": 356,
+      "label": "serviceId / 매칭 없음",
+      "variant": "return",
+      "note": "모르는 가맹점을 추측 매핑하지 않으며 service_id=null과 unrecognized 목록으로 유지"
+    },
+    {
+      "id": "payment-save",
+      "from": "service",
+      "to": "db",
+      "y": 387,
+      "label": "본인 payment_record에 저장",
+      "variant": "emphasis",
+      "note": "V8 자연키(회원·가맹점·금액·결제일·출처) 중복은 ON CONFLICT DO NOTHING. 전체 트랜잭션. 구독 생성·법정 사본 자동 보존 없음."
+    },
+    {
+      "id": "payment-saved",
+      "from": "db",
+      "to": "service",
+      "y": 418,
+      "label": "삽입 성공 · 트랜잭션 완료",
+      "variant": "return"
+    },
+    {
+      "id": "payment-response",
+      "from": "service",
+      "to": "member",
+      "y": 449,
+      "label": "등록·인식 건수 / 미인식 목록",
+      "variant": "return",
+      "note": "응답 건수와 미인식 목록은 새로 저장된 행만 집계한다. UI에서 구독 목록을 별도로 정리해야 탐지 입력에 반영한다."
+    }
   ]
 }

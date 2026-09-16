@@ -2,7 +2,7 @@
   "schema_version": 1,
   "diagram_type": "sequence",
   "meta": {
-    "title": "요고비 · 공식 API 정기 수집",
+    "title": "요고비 · 검수 CSV 발행과 DB 반영",
     "quality_profile": "showcase",
     "column_fit": "spread",
     "viewBox": [
@@ -12,106 +12,108 @@
   },
   "participants": [
     {
-      "id": "timer",
-      "type": "backend",
-      "label": "정기 실행",
-      "sublabel": "한국시간 기준"
+      "id": "operator",
+      "type": "frontend",
+      "label": "운영자",
+      "sublabel": "허용 자료 · AI 추출 검수"
     },
     {
-      "id": "mvno",
+      "id": "tool",
       "type": "backend",
-      "label": "MvnoCatalogLoader",
-      "sublabel": "우체국 카탈로그"
+      "label": "catalog_csv.py",
+      "sublabel": "형식 검증 · 승인 해시"
     },
     {
-      "id": "smart",
-      "type": "backend",
-      "label": "SmartChoiceSweepService",
-      "sublabel": "시세 수집"
+      "id": "files",
+      "type": "database",
+      "label": "CSV 저장소",
+      "sublabel": "불변 버전 · current"
     },
     {
-      "id": "external",
-      "type": "external",
-      "label": "공식 Open API",
-      "sublabel": "각 Client 경유"
+      "id": "sync",
+      "type": "backend",
+      "label": "CatalogCsvSync",
+      "sublabel": "시작 시 · 60초 주기"
     },
     {
       "id": "db",
       "type": "database",
       "label": "PostgreSQL",
-      "sublabel": "카탈로그·시세 분리"
+      "sublabel": "조회용 카탈로그"
     }
   ],
   "messages": [
     {
-      "id": "collection-1",
-      "from": "timer",
-      "to": "mvno",
+      "id": "y15-catalog-refresh-m1",
+      "from": "operator",
+      "to": "tool",
       "y": 170,
-      "label": "매일 05:30 · load",
-      "note": "키가 없거나 HTTP 호출에 실패하면 기존 카탈로그를 유지한다",
+      "label": "init → CSV 편집 → prepare",
+      "note": "AI 자동 수집기는 아직 없다. 허용 자료를 팀원이 추출·검수하고 전체 CSV 5종을 준비한다.",
       "variant": "emphasis"
     },
     {
-      "id": "collection-2",
-      "from": "mvno",
-      "to": "external",
+      "id": "y15-catalog-refresh-m2",
+      "from": "tool",
+      "to": "operator",
       "y": 210,
-      "label": "우체국 요금제 조회",
-      "note": "PostOfficeMvnoClient.fetchAll. POST_OFFICE_MVNO_API_KEY 필요. 연결 5초·응답 15초"
+      "label": "검수 초안 · 파일 해시",
+      "note": "금액·참조·단위 검사 후 승인자·사유·출처·이용 근거를 사람이 기록한다. 내용 변경 시 다시 검수한다.",
+      "variant": "return"
     },
     {
-      "id": "collection-3",
-      "from": "external",
-      "to": "mvno",
+      "id": "y15-catalog-refresh-m3",
+      "from": "operator",
+      "to": "tool",
       "y": 250,
-      "label": "XML 해석 → 요금제 목록",
-      "note": "XML 외부 엔티티 차단. 실제 제공량 단위·무제한 표현의 파서 가정은 실응답 확인 필요",
-      "variant": "return"
+      "label": "publish(승인 파일)",
+      "note": "삭제와 혜택 교체는 --allow-deletions 명시. 단일 호스트 파일 잠금과 expected_revision으로 동시 덮어쓰기 방지.",
+      "variant": "security"
     },
     {
-      "id": "collection-4",
-      "from": "mvno",
-      "to": "db",
+      "id": "y15-catalog-refresh-m4",
+      "from": "tool",
+      "to": "files",
       "y": 290,
-      "label": "carrier · mobile_plan 업서트",
-      "note": "통신사+이름 자연키. 이름·통신사 공백, 망 미매핑, 기본료 0 이하는 제외. 행별 반영이라 부분 성공 가능",
+      "label": "버전 저장 → current 원자 교체",
+      "note": "입력·승인 실패는 current를 바꾸지 않는다. 기존 버전은 복구 근거로 보존한다.",
       "variant": "emphasis"
     },
     {
-      "id": "collection-5",
-      "from": "timer",
-      "to": "smart",
+      "id": "y15-catalog-refresh-m5",
+      "from": "sync",
+      "to": "files",
       "y": 330,
-      "label": "06·14·22시 · 독립된 sweep",
-      "note": "우체국 작업과 별도 스케줄. SMARTCHOICE_API_KEY가 없으면 호출 없이 종료",
-      "variant": "emphasis"
+      "label": "current · manifest · CSV 읽기",
+      "note": "CATALOG_CSV_DIR가 설정된 경우만 실행. 승인 기록과 SHA-256을 확인하고 같은 바이트를 DB로 보낸다.",
+      "variant": "default"
     },
     {
-      "id": "collection-6",
-      "from": "smart",
-      "to": "external",
+      "id": "y15-catalog-refresh-m6",
+      "from": "files",
+      "to": "sync",
       "y": 370,
-      "label": "사용조건 격자별 추천 API",
-      "note": "6개 데이터량 × 3개 망 × 3개 약정 = 54회/실행. 연속 도달 실패 3회면 중단. 전체 실행당 상한 2000회"
-    },
-    {
-      "id": "collection-7",
-      "from": "external",
-      "to": "smart",
-      "y": 410,
-      "label": "호출별 추천 목록 · 실패는 건너뜀",
-      "note": "개별 HTTP 호출과 DB 적재를 전체 트랜잭션으로 묶지 않는다",
+      "label": "검증된 전체 스냅샷",
+      "note": "현재 버전이 도중에 바뀌면 다음 주기로 미룬다. 재시작 전까지 적용한 동일 버전은 건너뛴다.",
       "variant": "return"
     },
     {
-      "id": "collection-8",
-      "from": "smart",
+      "id": "y15-catalog-refresh-m7",
+      "from": "sync",
       "to": "db",
-      "y": 450,
-      "label": "시세 스냅샷 행별 업서트",
-      "note": "smartchoice_plan_snapshot에 통신사·요금제·망·약정별 저장. mobile_plan은 대체하지 않는다. 01번 추천에서 저장 시세 교차검증에 사용",
+      "y": 410,
+      "label": "loadSnapshot · 단일 트랜잭션",
+      "note": "스테이징·전체 반영. 빠진 상품은 active=false, 기존 회원 참조 보존. DB 실패는 롤백하고 다음 주기에 재시도한다.",
       "variant": "emphasis"
+    },
+    {
+      "id": "y15-catalog-refresh-m8",
+      "from": "db",
+      "to": "sync",
+      "y": 450,
+      "label": "커밋 → 적용 해시 로그",
+      "note": "발행과 DB 반영은 별도 단계다. 사용자 요청은 DB만 조회하며 파일·외부 가격·AI를 요청 중 조회하지 않는다.",
+      "variant": "return"
     }
   ]
 }

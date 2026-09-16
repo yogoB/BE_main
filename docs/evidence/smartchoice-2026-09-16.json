@@ -1,0 +1,696 @@
+{
+  "investigation_status": "key_rejection_root_cause_verified",
+  "date_kst": "2026-09-16",
+  "timezone": "Asia/Seoul",
+  "matrix_requests": 20,
+  "database_written": false,
+  "real_key_sent_over_http": false,
+  "redirects_followed": false,
+  "tls_certificate_verification": true,
+  "proxy_present": false,
+  "key_checks": {
+    "present": true,
+    "source": ".env",
+    "dotenv_occurrences": 1,
+    "ascii_alphanumeric": true,
+    "whitespace_present": false,
+    "percent_escapes_present": false,
+    "encoding_round_trip": true
+  },
+  "custom_api_url_configured": false,
+  "requests": [
+    {
+      "case": "https_root_no_key",
+      "checked_at": "2026-09-16T00:55:53.697073+00:00",
+      "endpoint": "https://api.smartchoice.or.kr/openAPI.xml",
+      "method": "GET",
+      "parameter_names": [
+        "voice",
+        "data",
+        "sms",
+        "age",
+        "type",
+        "dis"
+      ],
+      "credential": "absent",
+      "http_status": 404,
+      "content_type": "text/html",
+      "server_date": "Wed, 16 Sep 2026 00:55:27 GMT",
+      "body_bytes": 2705,
+      "body_kind": "non_xml_or_rejected",
+      "elapsed_seconds": 0.086
+    },
+    {
+      "case": "https_api_no_key",
+      "checked_at": "2026-09-16T00:55:54.188683+00:00",
+      "endpoint": "https://api.smartchoice.or.kr/api/openAPI.xml",
+      "method": "GET",
+      "parameter_names": [
+        "voice",
+        "data",
+        "sms",
+        "age",
+        "type",
+        "dis"
+      ],
+      "credential": "absent",
+      "http_status": 200,
+      "content_type": "application/xml",
+      "server_date": "Wed, 16 Sep 2026 00:55:27 GMT",
+      "body_bytes": 174,
+      "body_kind": "xml",
+      "xml_tags": [
+        "root",
+        "result_code",
+        "result_date",
+        "result_count"
+      ],
+      "result_code": "001",
+      "reported_count": 0,
+      "plan_name_fields": 0,
+      "live_success": false,
+      "elapsed_seconds": 0.086
+    },
+    {
+      "case": "https_api_invalid_control",
+      "checked_at": "2026-09-16T00:55:54.679893+00:00",
+      "endpoint": "https://api.smartchoice.or.kr/api/openAPI.xml",
+      "method": "GET",
+      "parameter_names": [
+        "voice",
+        "data",
+        "sms",
+        "age",
+        "type",
+        "dis",
+        "authkey"
+      ],
+      "credential": "public_invalid_control",
+      "http_status": 200,
+      "content_type": "application/xml",
+      "server_date": "Wed, 16 Sep 2026 00:55:28 GMT",
+      "body_bytes": 174,
+      "body_kind": "xml",
+      "xml_tags": [
+        "root",
+        "result_code",
+        "result_date",
+        "result_count"
+      ],
+      "result_code": "001",
+      "reported_count": 0,
+      "plan_name_fields": 0,
+      "live_success": false,
+      "elapsed_seconds": 0.073
+    },
+    {
+      "case": "https_api_configured",
+      "checked_at": "2026-09-16T00:55:55.157832+00:00",
+      "endpoint": "https://api.smartchoice.or.kr/api/openAPI.xml",
+      "method": "GET",
+      "parameter_names": [
+        "voice",
+        "data",
+        "sms",
+        "age",
+        "type",
+        "dis",
+        "authkey"
+      ],
+      "credential": "configured",
+      "http_status": 200,
+      "content_type": "application/xml",
+      "server_date": "Wed, 16 Sep 2026 00:55:28 GMT",
+      "body_bytes": 174,
+      "body_kind": "xml",
+      "xml_tags": [
+        "root",
+        "result_code",
+        "result_date",
+        "result_count"
+      ],
+      "result_code": "001",
+      "reported_count": 0,
+      "plan_name_fields": 0,
+      "live_success": false,
+      "elapsed_seconds": 0.068
+    },
+    {
+      "case": "https_root_configured",
+      "checked_at": "2026-09-16T00:55:55.631614+00:00",
+      "endpoint": "https://api.smartchoice.or.kr/openAPI.xml",
+      "method": "GET",
+      "parameter_names": [
+        "voice",
+        "data",
+        "sms",
+        "age",
+        "type",
+        "dis",
+        "authkey"
+      ],
+      "credential": "configured",
+      "http_status": 404,
+      "content_type": "text/html",
+      "server_date": "Wed, 16 Sep 2026 00:55:29 GMT",
+      "body_bytes": 2705,
+      "body_kind": "non_xml_or_rejected",
+      "elapsed_seconds": 0.089
+    },
+    {
+      "case": "https_api_table_casing",
+      "checked_at": "2026-09-16T00:55:56.125923+00:00",
+      "endpoint": "https://api.smartchoice.or.kr/api/openAPI.xml",
+      "method": "GET",
+      "parameter_names": [
+        "Voice",
+        "data",
+        "sms",
+        "Age",
+        "type",
+        "Dls",
+        "authkey"
+      ],
+      "credential": "configured",
+      "http_status": 200,
+      "content_type": "application/xml",
+      "server_date": "Wed, 16 Sep 2026 00:55:29 GMT",
+      "body_bytes": 174,
+      "body_kind": "xml",
+      "xml_tags": [
+        "root",
+        "result_code",
+        "result_date",
+        "result_count"
+      ],
+      "result_code": "001",
+      "reported_count": 0,
+      "plan_name_fields": 0,
+      "live_success": false,
+      "elapsed_seconds": 0.059
+    },
+    {
+      "case": "https_api_form_post",
+      "checked_at": "2026-09-16T00:55:56.584979+00:00",
+      "endpoint": "https://api.smartchoice.or.kr/api/openAPI.xml",
+      "method": "POST",
+      "parameter_names": [
+        "voice",
+        "data",
+        "sms",
+        "age",
+        "type",
+        "dis",
+        "authkey"
+      ],
+      "credential": "configured",
+      "http_status": 404,
+      "content_type": "text/html",
+      "server_date": "Wed, 16 Sep 2026 00:55:30 GMT",
+      "body_bytes": 305,
+      "body_kind": "non_xml_or_rejected",
+      "elapsed_seconds": 0.101
+    },
+    {
+      "case": "http_root_no_key",
+      "checked_at": "2026-09-16T00:55:57.088298+00:00",
+      "endpoint": "http://api.smartchoice.or.kr/openAPI.xml",
+      "method": "GET",
+      "parameter_names": [
+        "voice",
+        "data",
+        "sms",
+        "age",
+        "type",
+        "dis"
+      ],
+      "credential": "absent",
+      "http_status": 301,
+      "content_type": "text/html",
+      "redirect": {
+        "scheme": "https",
+        "host": "www.smartchoice.or.kr",
+        "path": "/openAPI.xml",
+        "query_present": true
+      },
+      "server_date": "Wed, 16 Sep 2026 00:55:16 GMT",
+      "body_bytes": 316,
+      "body_kind": "non_xml_or_rejected",
+      "elapsed_seconds": 0.024
+    },
+    {
+      "case": "http_api_no_key",
+      "checked_at": "2026-09-16T00:55:57.517928+00:00",
+      "endpoint": "http://api.smartchoice.or.kr/api/openAPI.xml",
+      "method": "GET",
+      "parameter_names": [
+        "voice",
+        "data",
+        "sms",
+        "age",
+        "type",
+        "dis"
+      ],
+      "credential": "absent",
+      "http_status": 301,
+      "content_type": "text/html",
+      "redirect": {
+        "scheme": "https",
+        "host": "www.smartchoice.or.kr",
+        "path": "/api/openAPI.xml",
+        "query_present": true
+      },
+      "server_date": "Wed, 16 Sep 2026 00:55:16 GMT",
+      "body_bytes": 320,
+      "body_kind": "non_xml_or_rejected",
+      "elapsed_seconds": 0.025
+    },
+    {
+      "case": "https_api_configured_repeat",
+      "checked_at": "2026-09-16T00:55:57.946251+00:00",
+      "endpoint": "https://api.smartchoice.or.kr/api/openAPI.xml",
+      "method": "GET",
+      "parameter_names": [
+        "voice",
+        "data",
+        "sms",
+        "age",
+        "type",
+        "dis",
+        "authkey"
+      ],
+      "credential": "configured",
+      "http_status": 200,
+      "content_type": "application/xml",
+      "server_date": "Wed, 16 Sep 2026 00:55:31 GMT",
+      "body_bytes": 174,
+      "body_kind": "xml",
+      "xml_tags": [
+        "root",
+        "result_code",
+        "result_date",
+        "result_count"
+      ],
+      "result_code": "001",
+      "reported_count": 0,
+      "plan_name_fields": 0,
+      "live_success": false,
+      "elapsed_seconds": 0.132
+    },
+    {
+      "case": "https_www_api_no_key",
+      "checked_at": "2026-09-16T00:56:27.128988+00:00",
+      "endpoint": "https://www.smartchoice.or.kr/api/openAPI.xml",
+      "method": "GET",
+      "parameter_names": [
+        "voice",
+        "data",
+        "sms",
+        "age",
+        "type",
+        "dis"
+      ],
+      "credential": "absent",
+      "http_status": 200,
+      "content_type": "application/xml",
+      "server_date": "Wed, 16 Sep 2026 00:56:00 GMT",
+      "body_bytes": 174,
+      "body_kind": "xml",
+      "xml_tags": [
+        "root",
+        "result_code",
+        "result_date",
+        "result_count"
+      ],
+      "result_code": "001",
+      "reported_count": 0,
+      "plan_name_fields": 0,
+      "live_success": false,
+      "elapsed_seconds": 0.066
+    },
+    {
+      "case": "https_www_api_invalid_control",
+      "checked_at": "2026-09-16T00:56:27.602082+00:00",
+      "endpoint": "https://www.smartchoice.or.kr/api/openAPI.xml",
+      "method": "GET",
+      "parameter_names": [
+        "voice",
+        "data",
+        "sms",
+        "age",
+        "type",
+        "dis",
+        "authkey"
+      ],
+      "credential": "public_invalid_control",
+      "http_status": 200,
+      "content_type": "application/xml",
+      "server_date": "Wed, 16 Sep 2026 00:56:01 GMT",
+      "body_bytes": 174,
+      "body_kind": "xml",
+      "xml_tags": [
+        "root",
+        "result_code",
+        "result_date",
+        "result_count"
+      ],
+      "result_code": "001",
+      "reported_count": 0,
+      "plan_name_fields": 0,
+      "live_success": false,
+      "elapsed_seconds": 0.084
+    },
+    {
+      "case": "https_www_api_configured",
+      "checked_at": "2026-09-16T00:56:28.091704+00:00",
+      "endpoint": "https://www.smartchoice.or.kr/api/openAPI.xml",
+      "method": "GET",
+      "parameter_names": [
+        "voice",
+        "data",
+        "sms",
+        "age",
+        "type",
+        "dis",
+        "authkey"
+      ],
+      "credential": "configured",
+      "http_status": 200,
+      "content_type": "application/xml",
+      "server_date": "Wed, 16 Sep 2026 00:56:01 GMT",
+      "body_bytes": 174,
+      "body_kind": "xml",
+      "xml_tags": [
+        "root",
+        "result_code",
+        "result_date",
+        "result_count"
+      ],
+      "result_code": "001",
+      "reported_count": 0,
+      "plan_name_fields": 0,
+      "live_success": false,
+      "elapsed_seconds": 0.058
+    },
+    {
+      "case": "https_www_root_configured",
+      "checked_at": "2026-09-16T00:56:28.555534+00:00",
+      "endpoint": "https://www.smartchoice.or.kr/openAPI.xml",
+      "method": "GET",
+      "parameter_names": [
+        "voice",
+        "data",
+        "sms",
+        "age",
+        "type",
+        "dis",
+        "authkey"
+      ],
+      "credential": "configured",
+      "http_status": 404,
+      "content_type": "text/html",
+      "server_date": "Wed, 16 Sep 2026 00:56:02 GMT",
+      "body_bytes": 2705,
+      "body_kind": "non_xml_or_rejected",
+      "elapsed_seconds": 0.086
+    },
+    {
+      "case": "https_api_official_example",
+      "checked_at": "2026-09-16T00:57:43.253018+00:00",
+      "endpoint": "https://api.smartchoice.or.kr/api/openAPI.xml",
+      "method": "GET",
+      "parameter_names": [
+        "voice",
+        "data",
+        "sms",
+        "age",
+        "type",
+        "dis",
+        "authkey"
+      ],
+      "credential": "official_example",
+      "http_status": 200,
+      "content_type": "application/xml",
+      "server_date": "Wed, 16 Sep 2026 00:57:16 GMT",
+      "body_bytes": 174,
+      "body_kind": "xml",
+      "xml_tags": [
+        "root",
+        "result_code",
+        "result_date",
+        "result_count"
+      ],
+      "result_code": "001",
+      "reported_count": 0,
+      "plan_name_fields": 0,
+      "live_success": false,
+      "elapsed_seconds": 0.064
+    },
+    {
+      "case": "https_www_official_example",
+      "checked_at": "2026-09-16T00:57:43.722068+00:00",
+      "endpoint": "https://www.smartchoice.or.kr/api/openAPI.xml",
+      "method": "GET",
+      "parameter_names": [
+        "voice",
+        "data",
+        "sms",
+        "age",
+        "type",
+        "dis",
+        "authkey"
+      ],
+      "credential": "official_example",
+      "http_status": 200,
+      "content_type": "application/xml",
+      "server_date": "Wed, 16 Sep 2026 00:57:17 GMT",
+      "body_bytes": 174,
+      "body_kind": "xml",
+      "xml_tags": [
+        "root",
+        "result_code",
+        "result_date",
+        "result_count"
+      ],
+      "result_code": "001",
+      "reported_count": 0,
+      "plan_name_fields": 0,
+      "live_success": false,
+      "elapsed_seconds": 0.069
+    },
+    {
+      "case": "key_abab_1_configured",
+      "checked_at": "2026-09-16T01:06:14.581485+00:00",
+      "endpoint": "https://api.smartchoice.or.kr/api/openAPI.xml",
+      "method": "GET",
+      "parameter_names": [
+        "voice",
+        "data",
+        "sms",
+        "age",
+        "type",
+        "dis",
+        "authkey"
+      ],
+      "credential": "configured",
+      "http_status": 200,
+      "content_type": "application/xml",
+      "server_date": "Wed, 16 Sep 2026 01:05:48 GMT",
+      "body_bytes": 174,
+      "body_kind": "xml",
+      "xml_tags": [
+        "root",
+        "result_code",
+        "result_date",
+        "result_count"
+      ],
+      "result_code": "001",
+      "reported_count": 0,
+      "plan_name_fields": 0,
+      "live_success": false,
+      "elapsed_seconds": 0.082
+    },
+    {
+      "case": "key_abab_2_issued",
+      "checked_at": "2026-09-16T01:06:15.065555+00:00",
+      "endpoint": "https://api.smartchoice.or.kr/api/openAPI.xml",
+      "method": "GET",
+      "parameter_names": [
+        "voice",
+        "data",
+        "sms",
+        "age",
+        "type",
+        "dis",
+        "authkey"
+      ],
+      "credential": "official_issued",
+      "http_status": 200,
+      "content_type": "application/xml",
+      "server_date": "Wed, 16 Sep 2026 01:05:48 GMT",
+      "body_bytes": 3363,
+      "body_kind": "xml",
+      "xml_tags": [
+        "root",
+        "result_code",
+        "result_date",
+        "result_count",
+        "items",
+        "item",
+        "v_tel",
+        "v_plan_price",
+        "v_dis_price",
+        "v_plan_over",
+        "v_add_name",
+        "v_plan_name",
+        "v_plan_display_voice",
+        "v_plan_display_data",
+        "v_plan_display_sms",
+        "rn"
+      ],
+      "result_code": "100",
+      "reported_count": 8,
+      "plan_name_fields": 8,
+      "live_success": true,
+      "elapsed_seconds": 0.109
+    },
+    {
+      "case": "key_abab_3_configured",
+      "checked_at": "2026-09-16T01:06:15.575728+00:00",
+      "endpoint": "https://api.smartchoice.or.kr/api/openAPI.xml",
+      "method": "GET",
+      "parameter_names": [
+        "voice",
+        "data",
+        "sms",
+        "age",
+        "type",
+        "dis",
+        "authkey"
+      ],
+      "credential": "configured",
+      "http_status": 200,
+      "content_type": "application/xml",
+      "server_date": "Wed, 16 Sep 2026 01:05:49 GMT",
+      "body_bytes": 174,
+      "body_kind": "xml",
+      "xml_tags": [
+        "root",
+        "result_code",
+        "result_date",
+        "result_count"
+      ],
+      "result_code": "001",
+      "reported_count": 0,
+      "plan_name_fields": 0,
+      "live_success": false,
+      "elapsed_seconds": 0.076
+    },
+    {
+      "case": "key_abab_4_issued",
+      "checked_at": "2026-09-16T01:06:16.057885+00:00",
+      "endpoint": "https://api.smartchoice.or.kr/api/openAPI.xml",
+      "method": "GET",
+      "parameter_names": [
+        "voice",
+        "data",
+        "sms",
+        "age",
+        "type",
+        "dis",
+        "authkey"
+      ],
+      "credential": "official_issued",
+      "http_status": 200,
+      "content_type": "application/xml",
+      "server_date": "Wed, 16 Sep 2026 01:05:49 GMT",
+      "body_bytes": 3363,
+      "body_kind": "xml",
+      "xml_tags": [
+        "root",
+        "result_code",
+        "result_date",
+        "result_count",
+        "items",
+        "item",
+        "v_tel",
+        "v_plan_price",
+        "v_dis_price",
+        "v_plan_over",
+        "v_add_name",
+        "v_plan_name",
+        "v_plan_display_voice",
+        "v_plan_display_data",
+        "v_plan_display_sms",
+        "rn"
+      ],
+      "result_code": "100",
+      "reported_count": 8,
+      "plan_name_fields": 8,
+      "live_success": true,
+      "elapsed_seconds": 0.089
+    }
+  ],
+  "local_predicate_checks": {
+    "checks": [
+      {
+        "sample": "error_snake",
+        "old_shell_says_success": true,
+        "old_java_success_guard": false,
+        "normalized_success_with_plan": false
+      },
+      {
+        "sample": "success_snake_synthetic",
+        "old_shell_says_success": true,
+        "old_java_success_guard": false,
+        "normalized_success_with_plan": true
+      },
+      {
+        "sample": "success_camel_synthetic",
+        "old_shell_says_success": true,
+        "old_java_success_guard": true,
+        "normalized_success_with_plan": true
+      }
+    ],
+    "method": "Python reproduction of archived shell regex and Java success predicate; success XMLs are synthetic, not provider data"
+  },
+  "official_guide": {
+    "url": "https://www.smartchoice.or.kr/smc/openapi/openapiguide_02.do?type=m",
+    "retrieval": "direct HTTPS GET 200",
+    "sha256": "8ed780168e0d355402f60eb134022b0b940379f6ded44e1b8c57082acd483b26"
+  },
+  "account_portal": {
+    "url": "https://www.smartchoice.or.kr/smc/openapi/openapiguide_03.do",
+    "observed": "authenticated issued-key management table and usage statistics; no pending-review message",
+    "mobile_login": {
+      "url": "https://m.smartchoice.or.kr/smc/member/loginOk.do",
+      "observed": "user screenshot and browser title show 500 and secondary ErrorDocument 400; login HTTP POST status was not independently captured"
+    },
+    "desktop_login": "user login success; authenticated management table independently observed",
+    "same_root_cause_as_api_auth_error": false
+  },
+  "source_checks": [
+    {
+      "archived_path": "src/main/java/com/palsaekjo/yogobi/recommend/SmartChoiceClient.java",
+      "sha256": "297d2fecd310f22021be85a22167cdcbb65aa6914096edc3e527b36131078bbe"
+    },
+    {
+      "archived_path": "scripts/check_smartchoice.sh",
+      "sha256": "dbcd2c6a1d237708138ead33f091414a54ed7774f230cc3d5c6096eaa9c0817b"
+    }
+  ],
+  "key_comparison": {
+    "source": "authenticated official API key management screen",
+    "configured_equals_issued": false,
+    "configured_missing_one_character": true
+  },
+  "key_only_abab_control": true,
+  "configuration_modified": false,
+  "runtime_integration_restored": false,
+  "causal_findings": {
+    "key_rejection": "configured key omits exactly one character from officially issued key; same-request ABAB yields 001,100,001,100",
+    "default_path": "/openAPI.xml returns 404 independently of key presence",
+    "legacy_parser": "actual success uses result_code, v_plan_display_data; former resultCode guard rejects it",
+    "legacy_shell_diagnostic": "<result regex matches error XML and falsely reports success"
+  }
+}

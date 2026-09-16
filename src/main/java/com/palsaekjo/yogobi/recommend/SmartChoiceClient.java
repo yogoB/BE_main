@@ -33,7 +33,7 @@ public class SmartChoiceClient {
 
     public SmartChoiceClient(RestClient.Builder builder,
                              @Value("${SMARTCHOICE_API_KEY:}") String apiKey,
-                             @Value("${SMARTCHOICE_API_URL:http://api.smartchoice.or.kr/openAPI.xml}") String baseUrl) {
+                             @Value("${SMARTCHOICE_API_URL:https://api.smartchoice.or.kr/api/openAPI.xml}") String baseUrl) {
         this.apiKey = apiKey == null ? "" : apiKey.trim();
         var factory = new JdkClientHttpRequestFactory(HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(5)).followRedirects(HttpClient.Redirect.NEVER).build());
@@ -88,14 +88,14 @@ public class SmartChoiceClient {
             factory.setXIncludeAware(false);
             factory.setExpandEntityReferences(false);
             Document doc = factory.newDocumentBuilder().parse(new InputSource(new StringReader(xml)));
-            if (!"100".equals(firstText(doc, "resultCode"))) {
+            if (!"100".equals(firstText(doc, "result_code"))) {
                 return List.of();
             }
             NodeList names = doc.getElementsByTagName("v_plan_name");
             NodeList tels = doc.getElementsByTagName("v_tel");
             NodeList prices = doc.getElementsByTagName("v_plan_price");
             NodeList disPrices = doc.getElementsByTagName("v_dis_price");
-            NodeList displays = doc.getElementsByTagName("v_display_data");
+            NodeList displays = doc.getElementsByTagName("v_plan_display_data");
             NodeList ranks = doc.getElementsByTagName("rn");
             var out = new ArrayList<SmartChoiceRecommendation>();
             for (int i = 0; i < names.getLength(); i++) {

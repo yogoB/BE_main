@@ -9,7 +9,7 @@ public final class SwitchTiming {
     }
 
     public enum Status {
-        SWITCH_NOW,          // 회수개월 < 약정 잔여 → 지금 바꾸는 게 이득
+        SWITCH_NOW,          // 약정 잔여 0 또는 회수개월 < 약정 잔여 → 지금 바꾸는 게 이득
         WAIT_UNTIL_EXPIRY,   // 회수가 약정 잔여 이상 → 만료까지 기다림
         NO_BENEFIT           // 월 절감액 <= 0 → 바꿀 이유 없음
     }
@@ -32,7 +32,9 @@ public final class SwitchTiming {
             return new Result(switchingCost, monthlySavings, null, remainingContractMonths, Status.NO_BENEFIT);
         }
         int paybackMonths = Math.toIntExact(Math.ceilDiv(switchingCost, monthlySavings));
-        Status status = paybackMonths < remainingContractMonths ? Status.SWITCH_NOW : Status.WAIT_UNTIL_EXPIRY;
+        // 약정 잔여 0 = 기다릴 대상이 없다. 비교만 쓰면 "회수 4 < 잔여 0"이 거짓이라 끝난 약정을 기다리게 된다(G-11 g).
+        Status status = remainingContractMonths == 0 || paybackMonths < remainingContractMonths
+                ? Status.SWITCH_NOW : Status.WAIT_UNTIL_EXPIRY;
         return new Result(switchingCost, monthlySavings, paybackMonths, remainingContractMonths, status);
     }
 }

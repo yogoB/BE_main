@@ -74,15 +74,15 @@
 
 | 한국어 | 식별자 | 비고 |
 |---|---|---|
+| CSV 버전 반영 | `CatalogCsvSync` | 승인 CSV 버전/해시 검증·단일 DB 반영, 60초 주기 |
+| CSV 운영 도구 | `catalog_csv.py` | 작업 사본·검수·불변 버전 발행 |
+| 수집 혜택 추출 | `catalog_benefits_from_matrix.py` | 요금제명 공식 표기 → `plan_benefit.csv`. 등급 표기가 있으면 `FREE`+`tier_id`, 없으면 `BUNDLE_INCLUDED`(표시만) |
+| 수집 매트릭스 변환 | `catalog_matrix_to_csv.py` | 팀 수집 매트릭스(35열) → `mobile_plan.csv`(12열). 매핑 불가 행은 사유별 개수로 보고하고 **지어내지 않는다** |
+| 정보 오류 제보 | `catalog_report` / `CatalogReportController` | 공개 접수·원본 자동 변경 없음·90일 파기 |
+| 카탈로그 결손 | `catalog_candidate` / `CatalogCandidateRecorder` | **"아예 없다"** 를 센다(제보는 "있는데 틀렸다"). `REQUESTED` 기록·`requested_cnt`=수집 우선순위, **계산 미사용**(D-17). fail-soft·행 상한 10,000 |
+| 결손 수집 후보 검증 | `CandidateVerifier` | P2. 출처·형식/범위·2소스 일치 3단계. 결정적 규칙이며 AI는 판정하지 않는다 |
 | 카탈로그 시드 로더 | `CatalogSeedLoader` | `catalog` 내부, CSV 스냅샷 적재 |
 | AI 서버 게이트웨이 | `AiGateway` | `/parse`·`/narrate` HTTP 호출과 응답 검증 |
-| 우체국알뜰폰 어댑터 | `PostOfficeMvnoClient` | 우정사업본부 Open API 조회·XML 파싱·fail-soft. `MvnoPlan` |
-| 알뜰폰 카탈로그 적재 | `MvnoCatalogLoader` | MVNO 요금제 → carrier(MVNO)+mobile_plan upsert(캐시), 무효행 스킵·하루 1회 @Scheduled |
-| 스마트초이스 어댑터 | `SmartChoiceClient` | Open API 단건 조회(추천 3건)·XML 파싱·fail-soft. `SmartChoiceRecommendation` |
-| 스마트초이스 격자 스윕 | `SmartChoiceSweepService` | data×type×dis 격자 호출·dedup 업서트·하루 3회 @Scheduled |
-| 요금제 라이브 시세 | `smartchoice_plan_snapshot` | 교차검증·시세 스냅샷(카탈로그 대체 아님). 유니크 (carrier,plan_name,network_type,contract_months) |
-| 시세 스냅샷 읽기 | `SmartChoiceSnapshotReader` | (통신사,요금제명)→정상가 조회. 무약정·최신 우선 |
-| 시세 교차검증 | `PriceCrossCheck` | 추천 결과의 시드 기본료↔라이브 시세 대조(표시용, 계산 미사용). `/narrate` 미전달 |
 | 서버 간 내부 토큰 | `AI_INTERNAL_TOKEN` | BE와 AI만 공유. 사용자 인증 토큰과 별도이며 프론트에 노출하지 않음 |
 | 챗봇 요청 진입점 | `ChatController` | 기존 추천 서비스 재사용, 추가 입력·필터 폴백 안내 |
 | 챗봇 응답 | `ChatResponse` | `status`, `message`, `recommendation` |
@@ -201,7 +201,7 @@
 
 같은 값에 여러 소스가 있으면 **`OFFICIAL`/`DERIVED`(인가 API·공식·계산) > `USER_PROVIDED`(사용자 확정) > `ESTIMATED`(AI추출·크롤 미확인)** 순으로 채택한다.
 `ESTIMATED`는 표시·보조만 — 계산 우선순위 최하이며, 확인되면 상위로 승격한다. **금액을 만드는 건 pricing 단독(D-03)**: AI·크롤은 소스 후보만 제공하고, 런타임 크롤·AI 실시간 가격 소싱은 하지 않는다(D-05, 배치/오프라인만).
-소스별: MVNO 요금제=우체국 API(주)+CSV/사용자, MNO 요금제=CSV(팀)+사용자입력(공개 API 없음), 시세=SmartChoice(교차검증·표시), OTT 티어·번들·제휴혜택=CSV/오프라인 크롤.
+소스별: D-18에 따라 카탈로그 원본은 검수 CSV이며 AI는 허용된 자료의 후보 추출을 보조한다. 우체국·스마트초이스 실행 연동은 제거한다.
 
 ---
 
@@ -241,9 +241,9 @@ N≈300, |S|≈5면 밀리초다. **조기 최적화 금지.**
 월절감액 = 현재 실질월비용 - 추천 조합 실질월비용
 회수개월 = ceil(전환비용 / 월절감액)
 
-월절감액 <= 0        → NO_BENEFIT
-회수개월 < 약정잔여   → SWITCH_NOW
-그 외                → WAIT_UNTIL_EXPIRY (만료일 명시)
+월절감액 <= 0                      → NO_BENEFIT
+약정잔여 = 0 또는 회수개월 < 약정잔여  → SWITCH_NOW
+그 외                              → WAIT_UNTIL_EXPIRY (만료일 명시)
 ```
 
 이 계산 하나가 "변경 시점 추천"과 "프로모션 종료 알림"의 공통 엔진이다.

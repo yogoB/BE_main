@@ -1,5 +1,7 @@
 package com.palsaekjo.yogobi.recommend;
 
+import com.palsaekjo.yogobi.catalog.CatalogCandidateRecorder;
+import com.palsaekjo.yogobi.catalog.CatalogCandidateRecorder.Kind;
 import com.palsaekjo.yogobi.catalog.CatalogReader;
 import com.palsaekjo.yogobi.catalog.CatalogReader.CandidatePlan;
 import com.palsaekjo.yogobi.common.Accuracy;
@@ -15,7 +17,9 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 
 /**
@@ -28,12 +32,12 @@ public class RecommendationService {
     private static final int MB_PER_GB = 1024;
 
     private final CatalogReader catalog;
-    private final SmartChoiceSnapshotReader snapshots;
+    private final CatalogCandidateRecorder gaps;
     private final CostCalculator calculator = new CostCalculator();
 
-    public RecommendationService(CatalogReader catalog, SmartChoiceSnapshotReader snapshots) {
+    public RecommendationService(CatalogReader catalog, CatalogCandidateRecorder gaps) {
         this.catalog = catalog;
-        this.snapshots = snapshots;
+        this.gaps = gaps;
     }
 
     public RecommendationResponse recommend(RecommendationRequest request) {
@@ -45,10 +49,10 @@ public class RecommendationService {
             throw ApiException.requiredMissing("wantedServiceIds", "원하는 서비스를 하나 이상 선택하세요.");
         }
 
+        // 카탈로그에 없는 서비스는 막지 않는다(G-12·D-17). 아는 것으로 계산하고 모르는 것은 안내·기록한다.
         List<SubscriptionTier> tiers = catalog.findRepresentativeTiers(required.wantedServiceIds());
-        if (tiers.size() != distinct(required.wantedServiceIds())) {
-            throw ApiException.requiredMissing("wantedServiceIds", "존재하지 않는 서비스 ID가 포함됐습니다.");
-        }
+        List<Long> unknownServiceIds = unknown(required.wantedServiceIds(), tiers);
+        unknownServiceIds.forEach(id -> gaps.record(Kind.SUBSCRIPTION_TIER, "serviceId:" + id));
         Set<SubscriptionTier> wanted = new LinkedHashSet<>(tiers);
         Set<Long> wantedTierIds = new LinkedHashSet<>(tiers.stream().map(SubscriptionTier::id).toList());
         List<BundleProduct> bundles = catalog.findApplicableBundles(wantedTierIds);
@@ -61,18 +65,25 @@ public class RecommendationService {
         long dataMb = (long) required.monthlyDataGb() * MB_PER_GB;
         List<CandidatePlan> candidates = catalog.findCandidatePlans(dataMb, networkType);
         if (candidates.isEmpty()) {
-            throw ApiException.noCandidate("조건을 만족하는 요금제가 없습니다.");
+            gaps.record(Kind.MOBILE_PLAN, "dataMb>=" + dataMb + ",network=" + (networkType == null ? "ANY" : networkType));
+            var noPlan = missingInputs(optional, unknownServiceIds);
+            noPlan.add(new MissingInput("monthlyDataGb",
+                    "조건을 만족하는 요금제가 아직 카탈로그에 없어요. 확인 중이에요",
+                    "데이터 사용량을 낮추거나 망 종류를 바꿔서 다시 찾아보세요"));
+            return new RecommendationResponse(Accuracy.PARTIAL, noPlan, List.of());
         }
 
         // 요금제별 planContractDiscount 는 CostCalculator 가 plan 에서 가져가므로 여기선 0 (placeholder).
         var ctx = new PricingContext(contractType, hasFamilyBundle, 0, bundles);
+        // 같은 계산 결과로 정렬하고 상위 N개만 응답으로 변환한다.
         List<CostResult> results = candidates.stream()
-                .map(c -> toResult(c, calculator.calculate(c.plan(), wanted, ctx)))
-                .sorted(Comparator.comparingLong(CostResult::monthlyTotal))
+                .map(c -> Map.entry(c, calculator.calculate(c.plan(), wanted, ctx)))
+                .sorted(Comparator.comparingLong(e -> e.getValue().effectiveMonthlyCost()))
                 .limit(TOP_N)
+                .map(e -> toResult(e.getKey(), e.getValue()))
                 .toList();
 
-        List<MissingInput> missing = missingInputs(optional);
+        List<MissingInput> missing = missingInputs(optional, unknownServiceIds);
         Accuracy accuracy = missing.isEmpty() ? Accuracy.FULL : Accuracy.PARTIAL;
         return new RecommendationResponse(accuracy, missing, results);
     }
@@ -101,7 +112,8 @@ public class RecommendationService {
                 optional == null ? null : optional.hasFamilyBundle(), 0, bundles);
         CostResult result = toResult(candidate, calculator.calculate(candidate.plan(), wanted, ctx));
 
-        List<MissingInput> missing = missingInputs(optional);
+        // 계산기는 사용자가 카탈로그에서 고른 ID를 받는다 — 없는 ID는 결손이 아니라 잘못된 요청이라 400 그대로다.
+        List<MissingInput> missing = missingInputs(optional, List.of());
         Accuracy accuracy = missing.isEmpty() ? Accuracy.FULL : Accuracy.PARTIAL;
         return new CalculatorResponse(accuracy, missing, result);
     }
@@ -110,16 +122,7 @@ public class RecommendationService {
         var lines = breakdown.lines().stream().map(RecommendationService::toLine).toList();
         return new CostResult(candidate.plan().id(), candidate.plan().name(), candidate.carrier(),
                 breakdown.effectiveMonthlyCost(), breakdown.baseline(),
-                breakdown.monthlySavings(), breakdown.annualSavings(), lines,
-                crossCheck(candidate));
-    }
-
-    /** 시드 기본료를 스마트초이스 라이브 시세와 대조한다. 매칭 스냅샷이 없으면 null(교차검증 생략) — 계산에는 영향 없음. */
-    private PriceCrossCheck crossCheck(CandidatePlan candidate) {
-        return snapshots.find(candidate.carrier(), candidate.plan().name())
-                .map(s -> new PriceCrossCheck(s.planPrice(), candidate.plan().basePrice(),
-                        s.planPrice() == candidate.plan().basePrice(), s.source(), s.collectedAt()))
-                .orElse(null);
+                breakdown.monthlySavings(), breakdown.annualSavings(), lines);
     }
 
     private static BreakdownLine toLine(CostLine line) {
@@ -127,9 +130,14 @@ public class RecommendationService {
                 line.value().provenance().name(), line.note());
     }
 
-    /** 채워지지 않은 선택 입력을 안내한다. accuracy 는 이 목록이 비었는지로 정한다. */
-    private static List<MissingInput> missingInputs(RecommendationRequest.Optional o) {
+    /** 채워지지 않은 선택 입력과 카탈로그 결손을 안내한다. accuracy 는 이 목록이 비었는지로 정한다. */
+    private static List<MissingInput> missingInputs(RecommendationRequest.Optional o, List<Long> unknownServiceIds) {
         var missing = new ArrayList<MissingInput>();
+        if (!unknownServiceIds.isEmpty()) {
+            missing.add(new MissingInput("wantedServiceIds",
+                    "아직 카탈로그에 없는 서비스(ID " + join(unknownServiceIds) + ")는 계산에서 뺐어요",
+                    "확인 중이에요. 금액을 알고 있다면 계산기에서 직접 입력해 바로 반영할 수 있어요"));
+        }
         if (o == null || o.contractType() == null) {
             missing.add(new MissingInput("contractType",
                     "선택약정 25% 적용 시 통신비가 약 25% 절감될 수 있어요",
@@ -176,7 +184,13 @@ public class RecommendationService {
         };
     }
 
-    private static long distinct(List<Long> ids) {
-        return ids.stream().distinct().count();
+    /** 요청한 서비스 중 카탈로그에 없는(또는 비활성인) 것. 순서 유지·중복 제거. */
+    private static List<Long> unknown(List<Long> requestedServiceIds, List<SubscriptionTier> found) {
+        Set<Long> known = found.stream().map(SubscriptionTier::serviceId).collect(Collectors.toSet());
+        return requestedServiceIds.stream().distinct().filter(id -> !known.contains(id)).toList();
+    }
+
+    private static String join(List<Long> ids) {
+        return ids.stream().map(String::valueOf).collect(Collectors.joining(", "));
     }
 }

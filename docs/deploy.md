@@ -1,9 +1,26 @@
 # 배포 (Fly.io)
 
-스마트초이스 Open API 발급에 필요한 **서비스 URL**을 빠르게 확보하고, 데모를 띄우기 위한 최소 배포.
-나중에 도메인을 사면 DNS만 붙이면 되고(아래 §7), 이 `*.fly.dev` URL·API 키는 그대로 유효하다.
+데모를 띄우기 위한 최소 배포. 나중에 도메인을 사면 DNS만 붙이면 되고(아래 §7), 이 `*.fly.dev` URL은 그대로 유효하다.
 
 > 스코프 주의: 이건 데모용 단일 배포다. CI/CD·k8s·오토스케일은 범위 밖(`AGENTS.md`).
+
+## 앱이 둘이다 — 이름을 겹치지 마라 (2026-09-16)
+
+| 앱 | 레포 | 역할 |
+|---|---|---|
+| `yogob` | github.com/yogoB/Front | 정적 프론트 + **API 프록시**(nginx) |
+| **`yogob-api`** | 이 레포 | Spring BE |
+
+**브라우저에 노출되는 오리진은 `https://yogob.fly.dev` 하나다.** 프론트의 `nginx.conf`가
+`/api`·`/oauth2`·`/login/oauth2`를 `yogob-api`로 넘긴다. 같은 오리진이므로 CORS 설정도,
+교차 사이트 쿠키(현재 `SameSite=Lax`로는 불가)도 필요 없다.
+
+⚠️ **두 레포의 `fly.toml` app 이름을 같게 두면 나중에 배포한 쪽이 앞선 배포를 덮어쓴다.**
+2026-09-16에 실제로 프론트 배포가 BE를 덮어 API가 전부 404가 됐다. 이름 분리가 그 재발 방지책이다.
+
+`yogob-api`에 설정한 값: `POSTGRES_*`(`yogob-db` attach), `JWT_SECRET`(**표준 Base64여야 한다** —
+URL-safe 문자열을 넣으면 `JWT_SECRET must be Base64`로 기동에 실패한다), `AUTH_RETURN_URL`·
+`AUTH_EMAIL_LINK_URL`(프론트 `account.html`), `YOGOBI_CORS_ALLOWED_ORIGINS`(프록시라 사실상 미사용).
 
 ---
 

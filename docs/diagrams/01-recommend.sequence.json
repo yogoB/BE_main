@@ -33,7 +33,7 @@
       "id": "catalog",
       "type": "database",
       "label": "DB 읽기 계층",
-      "sublabel": "카탈로그·시세 스냅샷"
+      "sublabel": "검수 CSV 기반 카탈로그"
     },
     {
       "id": "pricing",
@@ -47,7 +47,7 @@
       "id": "submit",
       "from": "visitor",
       "to": "endpoint",
-      "y": 170.0,
+      "y": 170,
       "label": "추천 또는 계산 요청",
       "note": "POST /api/v1/recommendations 또는 POST /api/v1/calculator. 비회원 이용 가능",
       "variant": "emphasis"
@@ -56,21 +56,22 @@
       "id": "dispatch",
       "from": "endpoint",
       "to": "recommend",
-      "y": 201.1,
+      "y": 210,
       "label": "recommend / calculate"
     },
     {
       "id": "load",
       "from": "recommend",
       "to": "catalog",
-      "y": 232.2,
-      "label": "요금제·티어·혜택·번들 조회"
+      "y": 250,
+      "label": "요금제·티어·혜택·번들 조회",
+      "note": "신규 추천은 active 상품만 조회. 없는 서비스는 제외·결손 기록, 후보 0건은 빈 결과와 missingInputs를 반환한다."
     },
     {
       "id": "inputs",
       "from": "catalog",
       "to": "recommend",
-      "y": 263.3,
+      "y": 290,
       "label": "계산할 조합 반환",
       "variant": "return"
     },
@@ -78,7 +79,7 @@
       "id": "compute",
       "from": "recommend",
       "to": "pricing",
-      "y": 294.4,
+      "y": 330,
       "label": "조합별 calculate 호출",
       "note": "추천은 후보마다 반복, 계산기는 지정 조합 1회. 미사용 혜택은 0원. 번들은 first-fit이며 전역 최적 조합 탐색은 미구현",
       "variant": "emphasis"
@@ -87,32 +88,15 @@
       "id": "breakdown",
       "from": "pricing",
       "to": "recommend",
-      "y": 325.6,
+      "y": 370,
       "label": "총액·절감액·항목별 출처",
       "variant": "return"
-    },
-    {
-      "id": "snapshot",
-      "from": "recommend",
-      "to": "catalog",
-      "label": "저장된 시세 조회",
-      "note": "SmartChoiceSnapshotReader.find(통신사, 요금제명). 외부 API는 이 요청에서 호출하지 않음",
-      "y": 356.7
-    },
-    {
-      "id": "crosscheck",
-      "from": "catalog",
-      "to": "recommend",
-      "label": "priceCrossCheck / 자료 없으면 null",
-      "variant": "return",
-      "note": "시드 기본료와 저장 시세·수집일·출처 비교. 총액 계산이나 추천 순서를 변경하지 않음",
-      "y": 387.8
     },
     {
       "id": "result",
       "from": "recommend",
       "to": "endpoint",
-      "y": 418.9,
+      "y": 410,
       "label": "추천 상위 5개 / 계산 1개",
       "note": "monthlyTotal 오름차순 추천. accuracy와 missingInputs를 함께 반환",
       "variant": "return"
@@ -121,9 +105,9 @@
       "id": "render",
       "from": "endpoint",
       "to": "visitor",
-      "y": 450.0,
+      "y": 450,
       "label": "결과와 부족한 조건 표시",
-      "note": "후보 없음 422, 잘못된 입력 400",
+      "note": "자료 결손은 200 PARTIAL과 안내. 잘못된 입력은 400. CSV 미검수 AI 가격은 계산하지 않는다.",
       "variant": "return"
     }
   ]

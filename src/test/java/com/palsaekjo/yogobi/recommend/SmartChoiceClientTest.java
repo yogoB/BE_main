@@ -14,11 +14,11 @@ import org.springframework.web.client.RestClient;
 class SmartChoiceClientTest {
     static final String OK_XML = """
             <openAPI>
-              <resultCode>100</resultCode>
+              <result_code>100</result_code>
               <item><rn>2</rn><v_tel>KT</v_tel><v_plan_name>요고2</v_plan_name>
-                <v_plan_price>39,000</v_plan_price><v_dis_price>29,250</v_dis_price><v_display_data>11GB</v_display_data></item>
+                <v_plan_price>39,000</v_plan_price><v_dis_price>29,250</v_dis_price><v_plan_display_data>11GB</v_plan_display_data></item>
               <item><rn>1</rn><v_tel>SKT</v_tel><v_plan_name>요고1</v_plan_name>
-                <v_plan_price>55000</v_plan_price><v_dis_price>41250</v_dis_price><v_display_data>무제한</v_display_data></item>
+                <v_plan_price>55000</v_plan_price><v_dis_price>41250</v_dis_price><v_plan_display_data>무제한</v_plan_display_data></item>
             </openAPI>""";
 
     @Test void parseExtractsAndSortsByRankAndStripsSeparators() {
@@ -33,7 +33,7 @@ class SmartChoiceClientTest {
     }
 
     @Test void nonSuccessCodeAndMalformedYieldEmpty() {
-        assertThat(SmartChoiceClient.parse("<openAPI><resultCode>500</resultCode></openAPI>")).isEmpty();
+        assertThat(SmartChoiceClient.parse("<openAPI><result_code>500</result_code></openAPI>")).isEmpty();
         assertThat(SmartChoiceClient.parse("not xml <<<")).isEmpty();
         assertThat(SmartChoiceClient.parse("")).isEmpty();
         assertThat(SmartChoiceClient.parse(null)).isEmpty();

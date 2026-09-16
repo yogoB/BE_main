@@ -2,9 +2,8 @@
 
 [다이어그램 목차 열기](index.html)
 
-2026-09-15에 실제 Controller → Service → DB/외부 호출을 확인해 15개 흐름으로 정리했다.
-기준은 `78e3921` 및 작업 트리의 변경 시점 경계값·빈 구독 조회 보완이다.
-작성 중 들어온 회원 구독·탐지·변경 시점·결제 업로드 커밋도 반영했다.
+2026-09-15에 실제 Controller → Service → DB/외부 호출을 확인해 16개 흐름으로 정리했다.
+현재 작업 트리의 D-18 CSV 운영·정보 제보·API 제거와 병행 V8 결제 중복 방지·V10 결손 기록을 포함한다.
 각 그림의 근거 파일과 확인 시점의 SHA-256은 [코드 근거](sources.json)에 기록한다.
 시퀀스 검증은 그림의 검증이며, 실제 Google·SMTP·운영 환경 성공을 뜻하지 않는다.
 
@@ -26,7 +25,8 @@
 | [12 변경 시점](12-switch.html) | 현재·대상 비용을 계산해 회수 개월·상태 반환 | `recommend/SwitchTimingController.java`, `SwitchTimingService.java`, `pricing/SwitchTiming.java` |
 | [13 OCR](13-ocr.html) | AI 내부 API만 구현. BE 이미지 수신/사용자 확인 경로는 미연결 | 별도 AI 레포 `app/main.py`, `app/ocr.py` |
 | [14 결제 업로드](14-payment-import.html) | 회원 Mock JSON 검증·가맹점 정규화·외부 결제 분석본 저장 | `subscription/MePaymentController.java`, `PaymentImportService.java`, `port/MockMydataProvider.java`, `MerchantNormalizer.java` |
-| [15 공식 API 정기 수집](15-catalog-refresh.html) | 우체국 카탈로그와 스마트초이스 시세를 독립된 일정으로 수집 | `catalog/MvnoCatalogLoader.java`, `PostOfficeMvnoClient.java`, `recommend/SmartChoiceSweepService.java`, `SmartChoiceClient.java` |
+| [15 검수 CSV 발행과 DB 반영](15-catalog-refresh.html) | 운영자 검수·승인 파일 발행, 60초마다 전체 트랜잭션 반영 | `scripts/catalog_csv.py`(레포 루트), `catalog/CatalogCsvSync.java`, `CatalogSeedLoader.java`, V9 |
+| [16 비회원 정보 오류 제보](16-catalog-report.html) | CSRF·입력·빈도·대상 검증 후 PENDING 접수 | `catalog/CatalogReportController.java`, `user/AuthRateLimit.java`, `SecurityConfig.java` |
 
 ## 읽는 방법과 현재 제한
 
@@ -39,7 +39,7 @@
 - 추천과 챗봇은 **같은 `RecommendationService`를 직접 호출**한다. 챗봇이 추천 HTTP API를 다시 호출하지 않는다.
   금액은 `pricing`에서 계산하고, AI `/narrate`는 LLM 없이 입력 금액을 문장에 삽입한다.
 - 추천 계산은 원하는 서비스만 혜택을 반영한다. 번들은 현재 first-fit이며 전역 최적 조합 탐색은 없다.
-  저장 시세의 `priceCrossCheck`는 비교 표시이며 계산 금액·추천 순서를 바꾸지 않고 AI 요청에서도 제외한다.
+  우체국·스마트초이스 코드와 `priceCrossCheck`는 D-18에서 제거했다. 자료 결손은 200 PARTIAL과 안내·결손 기록으로 처리한다.
 - 중복 탐지의 `wastedAmount`는 현재 `DuplicateDetector`에서 산출한다. 이를 모두 `pricing` 호출로 그리지 않았다.
 - 변경 시점은 현재·대상에 같은 활성 티어를 적용하되 **카탈로그 가격**을 사용한다.
   저장된 `monthly_price`를 실제 청구액 기준으로 합산하는 경로가 아니며 약정/가족결합은 null이다.
@@ -50,10 +50,11 @@
   법정 대상은 `PaymentRetentionService.preserve`를 원본 삭제 전에 명시 호출한 사본만 별도 보관한다.
   자동 5년 보존이나 익명화 보장을 뜻하지 않는다. 사본은 한국시간 확정 기한에 파기한다.
 - 결제 업로드는 KRW 정수·승인 내역·실제 일시를 검증한 뒤 전부 저장한다. 미인식 가맹점은 null로 남긴다.
-  같은 파일 재업로드 중복 방지와 자동 구독 생성은 미구현이다. 실제 금융기관 API 연동이 아니다.
-- 우체국·스마트초이스 수집 그림은 설정된 경우의 코드 흐름이다. 실제 성공 응답·데이터 품질을 검증했다는 뜻이 아니다.
-  CSV 정기 갱신과 API 실수신의 현재 검토는 [데이터·개인화·수익 모델 검토](../proposals/2026-09-15-service-direction.md)를 따른다.
-- 백엔드 `test bootJar` 전체 160개 실패·오류·스킵 0. 변경 시점 음수 입력·회수 개월 범위 초과는 400이며,
+  V8 자연키로 재업로드 중복을 제외하고 새 행만 집계한다. 자동 구독 생성은 하지 않으며 실제 금융기관 API 연동이 아니다.
+- CSV 발행은 형식·승인 해시 검증이며 출처 내용·사용 권한은 운영자가 확인한다. AI 자동 수집기는 미연결이다.
+  발행과 DB 갱신은 별도 단계이며 DB 실패 시 이전 조회 자료를 유지한다. [운영 가이드](../catalog-data.md)를 따른다.
+- 제보는 가격을 직접 바꾸지 않으며 원문 IP·회원 ID·이메일을 저장하지 않는다. 90일 경과 후 별도 정기 파기한다.
+- 백엔드 `test bootJar` 전체 153개 실패·오류·스킵 0. 변경 시점 음수 입력·회수 개월 범위 초과는 400이며,
   구독이 없는 회원도 통신 요금제 비교를 이용할 수 있다.
 - 대화 이력·다중 발화 병합, BE OCR 화면 연결, 종료 예정 알림은 이 그림의 구현 범위에 포함하지 않았다.
 

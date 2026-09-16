@@ -38,6 +38,12 @@ class SwitchTimingGoldenTest {
         assertThat(r.paybackMonths()).isNull();
     }
 
+    @Test void g11g_expiredContractSwitchesNowRegardlessOfPayback() {
+        var r = SwitchTiming.evaluate(60_000, 17_700, 0); // 약정 끝 → 기다릴 대상 없음 (회수 4 > 잔여 0 이어도)
+        assertThat(r.paybackMonths()).isEqualTo(4);
+        assertThat(r.status()).isEqualTo(Status.SWITCH_NOW);
+    }
+
     @Test void g11d_zeroSwitchingCostSwitchesNow() {
         var r = SwitchTiming.evaluate(0, 17_700, 10); // ceil(0)=0 < 10
         assertThat(r.paybackMonths()).isZero();

@@ -1,6 +1,11 @@
 # Fly.io 배포 설정. `fly launch` 가 이 파일을 감지해 재사용한다.
-# app 이름은 전역 유일해야 하므로 이미 쓰이면 바꾼다. region nrt = 도쿄(한국에서 가장 가까움).
-app = "yogob"
+# region nrt = 도쿄(한국에서 가장 가까움).
+#
+# app 이름 주의: 프론트(github.com/yogoB/Front)도 fly 앱을 쓴다. 이름이 같으면 나중에 배포한 쪽이
+# 앞선 배포를 덮어쓴다(2026-09-16 실제로 프론트 배포가 BE 를 덮었다). BE 는 yogob-api,
+# 프론트는 yogob 로 분리하고, 브라우저에는 프론트 오리진 하나만 노출한다
+# (프론트 nginx 가 /api·/oauth2·/login/oauth2 를 이 앱으로 프록시 → 같은 오리진이라 쿠키·CORS 문제가 없다).
+app = "yogob-api"
 primary_region = "nrt"
 
 [build]

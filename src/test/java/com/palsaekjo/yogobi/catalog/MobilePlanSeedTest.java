@@ -40,6 +40,7 @@ class MobilePlanSeedTest {
 
     @BeforeEach
     void clean() {
+        jdbc.execute("DELETE FROM plan_benefit");   // 요금제를 참조하므로 먼저 지운다(실 혜택 시드 적재 후 FK 위반)
         jdbc.execute("DELETE FROM mobile_plan");
         jdbc.execute("DELETE FROM carrier");
     }

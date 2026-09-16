@@ -108,7 +108,7 @@
       "y": 387.8,
       "label": "POST /narrate · 계산 결과",
       "variant": "security",
-      "note": "1위 결과와 missingInputs 전달. narrate는 LLM 없이 고정 문구로 금액을 그대로 설명. priceCrossCheck는 AI 요청에서 제외"
+      "note": "1위 결과와 missingInputs 전달. narrate는 LLM 없이 고정 문구로 금액을 그대로 설명한다."
     },
     {
       "id": "y02-chat-m9",

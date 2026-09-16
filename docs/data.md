@@ -1,62 +1,67 @@
 # 데이터
 
-**여기 없는 소스를 임의로 크롤링하지 않는다.**
+**현재 정책은 D-18 및 [CSV 카탈로그 운영](catalog-data.md)을 따른다.**
 
-## 1. 인벤토리
+## 1. 데이터 원본과 조회
 
-| # | 데이터 | 소스 | 방식 | 페이즈 |
-|---|---|---|---|---|
-| D1 | OTT 요금 티어 | 스마트초이스 | ✅ 시드 확보 완료 | MVP |
-| D2 | 요금제 추천 (교차검증) | 스마트초이스 Open API | ✅ 인증키 발급 | MVP |
-| D3 | 요금제↔OTT 제휴 혜택 | 스마트초이스 | ⚠️ 1회 크롤링 | MVP |
-| D4 | 요금제 카탈로그 | 통신사 공식 | 🟡 팀원 스프레드시트 | MVP |
-| D5 | 선택약정 25% 등 | 공개 정책 | ✅ 코드 상수 | MVP |
-| D6 | 데이터 사용량 | 통신사 마이페이지 | 🟡 사용자 입력 (+OCR) | MVP |
-| D7 | 구독 목록 | — | 🟡 입력 / 결제내역 역산 | P1 |
-| D8 | 결제 내역 | 이메일·카드 | ❌ → §4 5개 경로 | P1 |
-| D9 | 실사용 빈도 | OTT 사업자 | ❌ → 자기보고 | P1 |
-| D10~12 | 약정·프로모션·위약금 | 통신사 | 🟡 입력 + 공식 산식 | P2 |
+카탈로그는 팀의 검수 CSV가 원본이며 PostgreSQL에 반영해 조회한다.
+AI 모델의 출력은 이용 조건을 확인한 자료에서 추출한 후보로 받아 검수 후 CSV에 반영한다.
+우체국·스마트초이스 클라이언트/수집 스케줄/시세 교차검증은 제거한다. 과거 출처 표기는 실제 자료의 출처로 보존한다.
 
-## 2. 스마트초이스 Open API (D2)
+| 데이터 | 관리 파일 | 현재 확보 |
+|---|---|---|
+| 구독 서비스 | subscription_service.csv | 6건 |
+| 구독 티어 | subscription_tier.csv | 17건 |
+| 번들 | bundle_product.csv | 7건 |
+| 통신 요금제 | mobile_plan.csv | **1,706건** (2026-09-16 팀 수집 매트릭스 1,853행 → `catalog_matrix_to_csv.py` 변환·검수 대기) |
+| 제휴 혜택 | plan_benefit.csv | **46건** (요금제명 공식 표기에서 추출. FREE 5·BUNDLE_INCLUDED 41 — 아래 §1-C) |
 
-KTOA 운영. 회원가입 후 인증키 발급 신청 → 승인. 하루 10,000회, 응답 XML.
+## 1-C. 제휴 혜택을 어디서 얻는가 (2026-09-16)
 
-```
-GET http://api.smartchoice.or.kr/openAPI.xml
-    ?authkey={KEY}&voice=100&data=300&sms=50&age=20&type=3&dis=24
-```
+**스마트초이스 크롤링은 하지 않는다.** 저작권 보호 정책이 "단체에서 내부적으로 이용하기 위해 복제하는
+경우에는 그 회사가 영리회사가 아니더라도 복제가 불허"되고 "전체 내용의 10% 이상 인용 시 저작권 침해"라고
+명시한다(https://www.smartchoice.or.kr/smc/etc/rightsRule.do, 2026-09-16 확인). 표 전체를 CSV로 옮겨
+배포하는 것은 이 조건에 어긋난다. 이용이 필요하면 smartchoice@ktoa.or.kr 에 사전 허락을 받아야 한다.
 
-| 파라미터 | 값 |
-|---|---|
-| `voice` | 통화량(분), 무제한 `999999` |
-| `data` | 데이터(**MB**), 무제한 `999999` |
-| `sms` | 문자(건) |
-| `age` | 성인 `20` / 청소년 `18` / 실버 `65` |
-| `type` | 3G `2` / LTE `3` / 5G `6` |
-| `dis` | 무약정 `0` / `12` / `24` |
+대신 **요금제 매트릭스의 공식 표기**에서 읽는다 — `scripts/catalog_benefits_from_matrix.py`.
+통신사 공식 페이지의 요금제명이 근거다: "베스트 Max(넷플릭스)", "모두다 맘껏 11GB+(웨이브 광고형)".
 
-응답: `resultCode`(성공 `100`), `v_tel`, `v_plan_name`, `v_plan_price`, `v_dis_price`,
-`v_display_data`, `rn`(으뜸1/알뜰2/넉넉3).
+| 표기 | 처리 | 계산 |
+|---|---|---|
+| 서비스 + **등급**("웨이브 광고형") | `FREE` + 해당 `tier_id` | ✅ 반영 |
+| 서비스만("넷플릭스") | `BUNDLE_INCLUDED` + `tier_id` 비움 | ❌ 금액 효과 0, 표시만 |
 
-**메인 소스로 쓰지 않는다.** 추천 3건만 반환하고, 카탈로그도 OTT 제휴 정보도 요금제 ID도 없다.
-용도는 **우리 계산 결과의 교차검증**이다. 실패해도 추천은 정상 동작해야 한다 (fail-soft).
+**등급을 모르면 금액을 만들지 않는다.** `tier_id`를 비우면 그 서비스의 모든 등급에 매칭되므로
+(`PlanBenefit.matches`), `FREE`로 넣으면 프리미엄 등급까지 0원이 되어 **실제보다 싸게 추천**한다.
+등급 표기를 확인한 행만 계산에 넣는 이유다. 나머지 41건은 "이 요금제는 그 OTT를 포함한다"는 사실만 남긴다.
 
-`data` 파라미터가 **MB 단위**다. 사용자 입력은 GB이므로 변환한다.
+## 1-A. 검수와 변경
 
-**구현(2026-09-14, D-12):** `SmartChoiceClient`(단건 조회·XXE 차단·fail-soft) + `SmartChoiceSweepService`(data×type×dis 격자 스윕·dedup 업서트·하루 3회 `@Scheduled`) → `smartchoice_plan_snapshot`(V7) 라이브 시세 스냅샷. 하루 호출 162회(10,000 제한 내). **카탈로그(시드)를 대체하지 않는다**(스냅샷엔 요금제 ID·OTT·정확 스펙 없음). `SMARTCHOICE_API_KEY` 없으면 스윕 비활성(추천은 시드 기반으로 정상).
+`python3 scripts/catalog_csv.py init/prepare/publish`로 작업 사본·검수 해시·변경 사유·출처 이용 근거를 남긴다.
+정수 금액·단위·참조 관계·확인일·출처를 검증하고, 운영자가 원자료와 숫자를 대조한 승인 파일로만 발행한다.
+추가·수정은 CSV 행을 변경하고 삭제는 행 제외 후 명시적 삭제 옵션으로 발행한다.
+`CATALOG_CSV_DIR`을 설정한 앱은 60초마다 새 버전을 확인하고 전체 CSV를 한 DB 트랜잭션으로 반영한다.
+검증/DB 반영 실패는 기존 정상 DB를 유지한다. 회원이 참조한 삭제 상품은 active=false로 남긴다.
 
-**추천 연결(교차검증 오버레이):** `SmartChoiceSnapshotReader`가 추천 결과의 (통신사, 요금제명)으로 스냅샷 정상가를 찾아 `results[].priceCrossCheck`(livePrice·seedPrice·matches·source·collectedAt)로 붙인다. **계산은 시드 그대로, 표시만.** 매칭 없으면 null. AI `/narrate`로는 전달하지 않는다(extra=forbid). 가격 override(시드 갱신)는 명명 충돌·계산 정합 위험으로 하지 않음.
+AI 후보의 confidence나 두 모델의 같은 답만으로 정확성을 확정하지 않는다. 임의 크롤링·접근 제한 우회는 하지 않는다.
+검증 전 후보는 계산/추천에서 제외한다. `OFFICIAL`은 파일 형식이 아니라 확인한 원자료의 성격에 따라 정한다.
+상세 실행법·제보 처리·알려진 제한: [catalog-data.md](catalog-data.md).
 
-## 2-A. 우체국알뜰폰 요금제조회 API (알뜰폰 주 소스)
+## 2. 제거한 실시간 요금 API
 
-우정사업본부 Open API(공공데이터포털, 무료·자동승인·10,000회/일·이용허락 제한 없음). `ServiceKey` 하나로 우체국 입점 알뜰폰 전체를 1회 XML 조회.
-필드: 통신망·업체명(bizName)·요금제명·통신상품구분(5G/LTE/3G)·요금제구분(무약정/약정/선불)·기본료·기본음성/문자/데이터(MB)·초과단가.
-구현: `PostOfficeMvnoClient`(fail-soft·XXE 차단) + `MvnoCatalogLoader`(carrier(MVNO)+mobile_plan 캐시 upsert, 무효행 스킵, 하루 1회). MNO 3사 전용 공개 API는 없음 → CSV/오프라인 크롤.
-엔드포인트: `openapi.epost.go.kr/postal/retrieveAlddlChargeService/retrieveAlddlChargeService/getAlddlChargeList`. **파서 가정(무제한 표기·단위·wrapper)은 실 응답으로 확정 필요.**
+과거 우체국 키 미설정과 스마트초이스 성공 데이터 미확보를 확인했고 사용자 지시에 따라 연동을 제거했다.
+9/16 재조사에서 스마트초이스는 **로컬 키 한 문자 누락**이 인증 거부 원인이었고, 발급 키로 100·8건을 두 번 받았다.
+잘못된 기본 경로·실제 XML 태그와 파서의 불일치·진단 성공 오판도 확인했다. [원인 검증과 20개 대조 요청](smartchoice-integration-findings.md).
+D-18 제거 정책은 유지한다. 이번 실요청 성공은 운영 재연동·가격 최신성 검증·DB 적재 완료를 뜻하지 않는다.
+`SmartChoice*`, `PostOfficeMvnoClient`, `MvnoCatalogLoader`, `PriceCrossCheck` 및 환경 변수 예시/진단 스크립트는 사용하지 않는다.
+V7은 이미 적용된 Flyway 이력으로 유지하고 V9에서 사용하지 않는 시세 테이블을 제거한다.
+이전 검증 기록은 worklog와 D-12~D-17에 남기며, 현재 카탈로그 운영 절차로 해석하지 않는다.
 
-## 3. 제휴 혜택 크롤링 (D3) — 1회성
+## 3. 제휴 혜택 자료 (D3) — 과거 수집안
 
-대상: `https://www.smartchoice.or.kr/smc/plan/ottPdt.do`
+D-18 이후 아래는 과거 자료의 출처/형식 참고다. 신규 수집은 이용 조건 확인 후 허용된 자료를 입력하며 이 절차를 자동 실행하지 않는다.
+
+과거 대상: `https://www.smartchoice.or.kr/smc/plan/ottPdt.do`
 OTT 아이콘(넷플·티빙·웨이브·디즈니+·유튜브프리미엄) 선택 시 AJAX로 두 표가 로드된다.
 
 | 표 | 컬럼 → 매핑 |

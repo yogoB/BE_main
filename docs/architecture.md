@@ -61,7 +61,7 @@ public interface PaymentHistoryProvider {   // subscription/port
 POST /api/v1/chat/messages  (BE_main)
   → AI: POST /parse    → { required, optional, confidence }
   → 내부 recommend 호출 (필터 경로와 동일 로직)
-  → AI: POST /narrate  → { message }
+  → AI: POST /narrate  → { message, reasons }
 ```
 
 **BE_main이 AI-를 호출한다. 반대 방향은 없다.** `confidence < 0.7`이면 되묻는다.
@@ -84,8 +84,10 @@ AI의 `/parse`·`/narrate`·`/ocr`는 토큰 누락·불일치 시 401, 서버 �
 
 - 금액·조합은 `pricing`(순수 Java, 골든케이스·분기 100%)이 독점한다. **AI는 숫자를 만들지 않는다**
   (절대 원칙 2, D-03). AI가 하는 건 둘뿐: `/parse`(자연어→파라미터), `/narrate`(BE가 계산한 숫자를 문장으로 포장).
-- 경계는 코드로 강제된다: `/narrate`는 LLM도 안 쓰는 **결정론적 템플릿**, BE `AiGateway`가 AI 응답
-  (confidence·정수 GB·서비스 ID·enum)을 **전부 재검증**해 어긋나면 폐기, 필터·챗봇이 **같은 recommend 엔진**을 탄다(원칙 3).
+- 경계는 코드로 강제된다: `/narrate`의 **금액 문장(`message`)은 LLM을 쓰지 않는 결정론적 템플릿**이고,
+  **추천 사유(`reasons`)만 LLM이 만들되 BE가 보낸 금액 외의 금액이 섞이면 그 줄을 버린다**(D-19).
+  BE `AiGateway`가 AI 응답(confidence·정수 GB·서비스 ID·enum)을 **전부 재검증**해 어긋나면 폐기,
+  필터·챗봇이 **같은 recommend 엔진**을 탄다(원칙 3).
 
 **부수 근거(핵심은 아니지만 정당화):**
 - **기술 적합성** — 결정론적 계산은 Java(BigDecimal·타입), 자연어 파싱/생성은 Python/LLM 생태계.
@@ -108,6 +110,7 @@ AI의 `/parse`·`/narrate`·`/ocr`는 토큰 누락·불일치 시 401, 서버 �
 | GET | `/api/v1/catalog/plans` | 요금제 카탈로그 |
 | GET | `/api/v1/catalog/services` | 구독 서비스·티어 |
 | GET | `/api/v1/catalog/plans/{id}/benefits` | 요금제별 혜택 |
+| POST | `/api/v1/catalog/reports` | 정보 오류 제보(비회원 허용·CSRF 필수), 접수만 수행 — D-18 사용자 요청 |
 
 ### Phase 1
 | Method | Path | 설명 |
@@ -116,7 +119,7 @@ AI의 `/parse`·`/narrate`·`/ocr`는 토큰 누락·불일치 시 401, 서버 �
 | POST | `/api/v1/auth/login` `/logout` | 로그인 `{email,password}` · 로그아웃 |
 | POST | `/api/v1/auth/email/verification` | 가입용 본인 확인 메일 발송 — `{email}` |
 | POST | `/api/v1/auth/password/reset-request` `/reset` | 재설정 메일 발송 · 토큰으로 재설정 `{token,password}` |
-| GET | `/api/v1/auth/csrf` | 회원 요청용 CSRF 토큰 |
+| GET | `/api/v1/auth/csrf` | 회원 변경·비회원 제보 요청용 CSRF 토큰 |
 | GET | `/oauth2/authorization/google` → `/login/oauth2/code/google` | Google OIDC 로그인·콜백 |
 | POST | `/api/v1/auth/google/link` | 자체 계정 비밀번호 재확인 후 Google 연결 시작 |
 | POST | `/api/v1/auth/password` | Google 전용 회원의 자체 비밀번호 등록 시작; Google 재인증 필요 |
@@ -184,17 +187,40 @@ Google 전용 계정은 동일 Google `sub` 재인증으로 자체 비밀번호�
       { "label": "선택약정 25% 할인", "amount": -13750, "provenance": "DERIVED" },
       { "label": "넷플릭스 스탠다드", "amount": 13500, "provenance": "OFFICIAL",
         "note": "제휴 혜택으로 4,000원 할인 적용" }
-    ],
-    "priceCrossCheck": {                       // 스마트초이스 라이브 시세 대조(D-12). 매칭 스냅샷 없으면 null
-      "livePrice": 54000, "seedPrice": 55000, "matches": false,
-      "source": "스마트초이스(KTOA)", "collectedAt": "2026-09-14"
-    }
-  }]
+    ]
+  }],
+  "reasons": [                                            // 1순위 조합에 대한 AI 큐레이션 사유, 0~3개
+    "따로 내시던 넷플릭스 스탠다드 13,500원이 요금제에 포함돼 있어요.",
+    "선택약정 25% 할인으로 월 13,750원이 빠져요."
+  ]
 }
 ```
 
 `baseline`은 아무 할인 없이 정가로만 냈을 때다. 절감액 표시의 기준선.
-`priceCrossCheck`는 시드 기본료를 스마트초이스 라이브 시세와 대조한 **표시용**이며 계산에 쓰지 않는다(매칭 없으면 null). AI `/narrate`로는 전달하지 않는다.
+D-18에서 우체국·스마트초이스 연동과 `priceCrossCheck` 응답 필드를 제거했다.
+D-19에서 AI `/narrate` **응답**에 `reasons`를 더했다. 요청 필드는 그대로다.
+D-19 후속(2026-09-16): BE가 `/narrate`를 호출해 `reasons`를 `/recommendations` 응답 최상위에 싣는다.
+필터·챗봇 두 경로 모두 1순위 결과(`results[0]`)에 대한 사유를 담으며, AI 장애 시 **빈 배열**이고 `results`는 정상이다.
+narrate 오케스트레이션은 컨트롤러가 한다(`RecommendationController`·`ChatController`) — `RecommendationService`는 AI를 모른다.
+`recommend`가 `chat`의 `AiGateway`에 직접 의존하면 순환이 되므로 포트 `recommend.Narrator`(구현: `AiGateway`)로 역전한다.
+
+```jsonc
+// AI: POST /narrate 200
+{
+  "message": "“SKT 5G 슬림+”의 실제 내시는 금액은 월 71,300원이에요. ...",  // 고정 템플릿
+  "reasons": [                                                            // LLM 큐레이션, 0~3개
+    "따로 내시던 넷플릭스 스탠다드 13,500원이 요금제에 포함돼 있어요.",
+    "선택약정 25% 할인으로 월 13,750원이 빠져요."
+  ]
+}
+```
+
+`reasons`는 화면의 "왜 나에게 이 상품이 추천됐나요?" 목록을 채운다. 보조 정보이므로 **비어 있을 수 있고**,
+모델 장애 시 빈 배열로 내려간다. `message`와 추천 결과는 그 경우에도 정상이다.
+AI는 요청의 `breakdown`·`missingInputs`에 **실제로 있는 금액만** 인용하며, 그 밖의 금액이 섞인 줄은 AI 서버가 폐기한다.
+`breakdown`에 없는 항목은 근거로 쓰지 않으므로 **미사용 혜택은 사유 문장에도 등장하지 않는다**(절대 원칙 1).
+카탈로그 원본은 검수·승인된 CSV이며 PostgreSQL에 반영된 값으로 계산한다. 발행·복구 절차는 `docs/catalog-data.md`,
+제보 요청·응답 상세는 `docs/BE_API.md`를 따른다. 제보는 카탈로그를 직접 수정하지 않는다.
 
 ---
 
@@ -204,7 +230,7 @@ Google 전용 계정은 동일 Google `sub` 재인증으로 자체 비밀번호�
 | 테이블 | 주요 컬럼 |
 |---|---|
 | `carrier` | id, name, carrier_type |
-| `mobile_plan` | id, carrier_id, name, network_type, base_price, data_mb, voice_min, sms_cnt, contract_discount_12m, contract_discount_24m, source_url |
+| `mobile_plan` | id, carrier_id, name, network_type, base_price, data_mb, voice_min*, sms_cnt*, contract_discount_12m, contract_discount_24m, source_url (*는 미확인 시 NULL, V11) |
 | `subscription_service` | id, name, category, official_url |
 | `subscription_tier` | id, service_id, name, price, concurrent_streams, quality |
 | `plan_benefit` | ↓ |
@@ -261,10 +287,17 @@ V4에서 `email_verified`(자체 가입은 검증 토큰 소비 시 TRUE), `cred
 `PaymentRetentionService.preserve`는 원본 생성/분류 트랜잭션에서 명시적으로 호출하고, 일반 반입/탈퇴가 자동으로 사본을 생성하지 않는다.
 `RetentionService`는 사본의 확정 기한에만 파기한다. 회원 API·추천·AI에 사본 접근 경로 없음. 익명화를 보장하지 않으며 상세 조건은 `docs/privacy.md`.
 
-### 통신요금 라이브 시세 (V7 마이그레이션, D-12)
-`smartchoice_plan_snapshot`(carrier, plan_name, network_type, contract_months, plan_price, discounted_price, display_data, source, source_url, collected_at,
-UNIQUE(carrier,plan_name,network_type,contract_months)): 스마트초이스 Open API 격자 스윕(`SmartChoiceSweepService`, 하루 3회 @Scheduled)이 dedup 업서트로 채운다.
-**카탈로그(시드)를 대체하지 않는다** — 교차검증·시세 참고용(요금제 ID·OTT·정확 스펙 없음). fail-soft(키 없으면 스윕 비활성). 추천 응답 연결은 §3 계약 결정 후.
+### CSV 운영·정보 오류 제보 (V9, D-18)
+V7의 `smartchoice_plan_snapshot`은 V9에서 제거한다. 기존 Flyway V7 파일은 적용 이력 때문에 유지한다.
+`mobile_plan`·`subscription_service`·`subscription_tier`·`bundle_product`에 `active`를 추가한다.
+CSV에 없는 상품은 비활성화하며 기존 회원 FK를 보존한다. 신규 카탈로그 조회·추천·선택은 활성 상품만 허용한다.
+`CatalogCsvSync`는 승인 해시를 확인한 5종 전체 CSV를 단일 DB 트랜잭션으로 반영한다. 실패하면 이전 DB를 유지한다.
+`catalog_report`는 UUID, 대상 종류/ID, 오류 항목, 설명, 선택 출처 URL, 상태, 생성 시각을 저장한다.
+회원 ID·이메일·원문 IP를 수집하지 않으며 제보 본문은 90일 경과 후 정기 파기한다.
+
+### 카탈로그 결손 기록 (V10)
+`catalog_candidate`는 추천에서 찾지 못한 서비스 ID·요금제 조건의 요청 횟수를 기록한다. 금액 계산에 쓰지 않는다.
+기존 정보 정정용 `catalog_report`와 별도이며, 실제 AI 수집·검증 작업의 실행기는 아직 연결하지 않았다.
 
 ### 초기 구현 범위 (D-07)
 V1은 위 MVP 테이블 8개를 생성한다. P1/P2 테이블은 해당 단계에서 새 마이그레이션으로 추가한다.
@@ -297,7 +330,7 @@ Flyway `db/migration/V{n}__{설명}.sql`.
 |---|---|---|
 | `YGB-REQ-001` | 필수 입력 누락 | 400 |
 | `YGB-CAT-001` | 요금제 없음 | 404 |
-| `YGB-CAL-001` | 계산 가능한 조합 없음 | 422 |
+| `YGB-CAL-001` | 계산 가능한 조합 없음 (D-17 이후 미사용 — 추천의 후보 0건은 200+`missingInputs`) | 422 |
 | `YGB-IMP-001` | 결제내역 파일 형식 오류 | 400 |
 | `YGB-IMP-002` | 인식 불가 가맹점 포함 | 200 + 경고 |
 | `YGB-EXT-001` | 외부 API 실패 | 200 + 경고, **추천은 정상 반환** |

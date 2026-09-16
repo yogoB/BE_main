@@ -4,6 +4,48 @@
 
 ## 기본 정보
 
+D-18 변경: 우체국·스마트초이스 연동과 `CostResult.priceCrossCheck`를 제거했다.
+카탈로그 목록·신규 선택은 활성 상품만 사용하며, 기존 회원의 참조는 판매 종료 후에도 보존한다.
+
+## 정보 오류 제보 — 구현
+
+`POST /api/v1/catalog/reports`는 비회원도 이용한다. 먼저 `GET /api/v1/auth/csrf`에서 받은 쿠키와
+토큰을 유지하고, 응답의 `headerName`을 헤더 이름으로 사용한다. 두 요청 모두 `credentials: include`가 필요하다.
+회원 JWT는 필수가 아니며 CSRF 토큰은 필수다.
+
+```json
+{
+  "targetType": "MOBILE_PLAN",
+  "targetId": 42,
+  "field": "PRICE",
+  "description": "공식 요금표의 월 기본료와 다릅니다.",
+  "sourceUrl": "https://provider.example/pricing"
+}
+```
+
+| 필드 | 허용 값 |
+|---|---|
+| targetType | `MOBILE_PLAN`, `SUBSCRIPTION_SERVICE`, `SUBSCRIPTION_TIER`, `BUNDLE_PRODUCT` |
+| targetId | 실제 존재하는 대상의 양의 정수 ID |
+| field | `PRICE`, `DATA`, `BENEFIT`, `AVAILABILITY`, `OTHER` |
+| description | 공백만 불가, 1~2,000자. 개인정보를 요청하지 않는다 |
+| sourceUrl | 선택(null/빈 문자열 허용). 최대 2,000자 HTTPS, 인증정보·query·fragment 불가 |
+
+```json
+{
+  "data": {"id": "c03c8c81-e012-4fa4-b31d-08fefeb9ba50", "status": "PENDING"},
+  "warnings": []
+}
+```
+
+성공 HTTP 200. 입력 오류 400, CSRF 누락/불일치 403, 대상 없음 404, 동일 접속 IP의 15분간 5회 초과는 429다.
+서버가 출처 링크를 자동 조회하지 않는다. 공개 조회·수정 API는 없고, GET 요청으로 제보 본문을 열람할 수 없다.
+화면은 접수 완료를 안내하며 가격 변경 완료로 표시하지 않는다. 운영자가 검수한 CSV를 발행해야 가격이 바뀐다.
+내장 `/` 화면의 요금제·추천·계산 카드에서 같은 흐름을 사용한다. 제보는 90일 경과 후 정기 파기한다.
+운영 절차: [CSV와 제보 관리](catalog-data.md).
+
+## 연결 설정
+
 | 항목 | 값 |
 |---|---|
 | 배포 Base URL | `https://yogob.fly.dev` |
@@ -50,7 +92,7 @@ AI 연결과 내부 인증은 BE가 담당하며 프론트에는 AI 주소·내�
 | 코드 | HTTP | 의미 |
 |---|---|---|
 | `YGB-REQ-001` | 400 | 필수 입력 누락·형식 오류 |
-| `YGB-CAL-001` | 422 | 계산 가능한 조합(후보 요금제) 없음 |
+| `YGB-CAL-001` | 422 | 계산 가능한 조합 없음 — **현재 어떤 엔드포인트도 반환하지 않는다**(D-17로 추천은 200+안내로 바뀜) |
 | `YGB-CAT-001` | 404 | 요금제 없음 |
 | `YGB-EXT-001` | 200 + `warnings` | 외부(AI) 연동 실패 — 추천 자체는 정상 반환 |
 
@@ -130,6 +172,10 @@ AI 연결과 내부 인증은 BE가 담당하며 프론트에는 AI 주소·내�
           { "label": "넷플릭스 스탠다드", "amount": 0, "provenance": "OFFICIAL", "note": "제휴 혜택 적용" }
         ]
       }
+    ],
+    "reasons": [
+      "따로 내시던 넷플릭스 스탠다드가 요금제에 포함돼 있어요.",
+      "약정할인으로 월 5,000원이 빠져요."
     ]
   },
   "warnings": []
@@ -145,11 +191,24 @@ AI 연결과 내부 인증은 BE가 담당하며 프론트에는 AI 주소·내�
 | `results[].baseline` | long(원) | 할인 없이 정가 합 |
 | `results[].monthlySavings` / `annualSavings` | long(원) | `baseline - monthlyTotal` / ×12 |
 | `results[].breakdown[]` | object[] | 항목별 내역. `amount` 할인은 음수. `provenance`·`note` |
+| `reasons[]` | string[] | 1순위 조합에 대한 AI 큐레이션 사유 0~3개(화면 "왜 나에게 이 상품이 추천됐나요?"). **보조 정보** — AI 장애 시 빈 배열, 결과·금액은 그대로. 요청에 없는 금액이 섞인 줄은 BE·AI가 폐기(D-19). 결손으로 `results`가 비면 빈 배열 |
+
+### 카탈로그 결손은 오류가 아니다 (D-17 · G-12)
+
+CSV에 없는 것을 물어도 **200으로 답한다.** 아는 것으로 계산하고, 모르는 것은 `missingInputs`로 안내한다.
+
+| 상황 | 이전 | 현재 |
+|---|---|---|
+| 없는 `serviceId` 포함 | 400 `YGB-REQ-001` | **200** — 그 서비스만 계산에서 빼고 `missingInputs`에 `wantedServiceIds` 항목 |
+| 조건 만족 요금제 0건 | 422 `YGB-CAL-001` | **200** — `results: []` + `missingInputs`에 `monthlyDataGb` 항목 |
+
+두 경우 모두 `accuracy=PARTIAL`이며, 결손은 `catalog_candidate`에 `REQUESTED`로 기록돼 팀의 CSV 수집
+우선순위가 된다(계산에는 쓰지 않는다). 기록 실패는 추천을 깨뜨리지 않는다(fail-soft).
 
 ### 에러
 
-- `400 YGB-REQ-001` — `monthlyDataGb` 누락/≤0, `wantedServiceIds` 비었거나 없는 서비스 ID, 잘못된 `contractType`/`networkType`
-- `422 YGB-CAL-001` — 조건을 만족하는 요금제 없음
+- `400 YGB-REQ-001` — `monthlyDataGb` 누락/≤0, `wantedServiceIds` **비었음**, 잘못된 `contractType`/`networkType`
+- `422 YGB-CAL-001` — 이 엔드포인트는 더 이상 반환하지 않는다 (위 표 참고)
 
 ---
 
@@ -235,7 +294,9 @@ AI 연결과 내부 인증은 BE가 담당하며 프론트에는 AI 주소·내�
 }
 ```
 
-> 실 요금제 시드(D3/D4) 전에는 빈 배열이거나 개발용 더미 데이터가 나온다.
+> `voiceMin`·`smsCnt`는 **null일 수 있다** — 공식 표기에 수량이 없는 요금제("기본제공" 등)의 미확인 값이다.
+> `0`(미제공)과 구분한다. 두 값은 추천 후보 선별·금액 계산에 쓰지 않는다.
+> 제휴 혜택(D3) 시드 전에는 `benefits`가 비어 있다.
 
 ### 3-3. 요금제별 제휴 혜택 — `GET /api/v1/catalog/plans/{id}/benefits`
 
@@ -355,10 +416,13 @@ JWT 절대 수명 15분·유휴 제한 5분. 상세 실행법·설정 점검은 
 { "data": { "imported": 2, "recognized": 1, "unrecognized": ["배달의민족"] } }
 ```
 
-- `imported` 저장 건수(취소 제외), `recognized` 가맹점→서비스 매칭 성공 건수.
+- `imported` **이번에 새로 저장된** 건수(취소 제외), `recognized` 그중 가맹점→서비스 매칭 성공 건수.
 - 미인식 가맹점은 `service_id=null`로 저장하고 `unrecognized`로 되돌려 **사용자에게 확인**을 요청한다(추측 매핑 금지).
 - 형식 오류는 **400** `YGB-REQ-001`이며 전체 입력을 저장하지 않는다(부분 저장 없음).
-- 재업로드 중복 제거는 미구현. 법정 보존 사본은 자동 생성하지 않는다.
+- **재업로드는 중복을 만들지 않는다.** (회원, 가맹점 원문, 금액, 결제일, 출처)가 같으면 같은 결제로 보고 건너뛴다.
+  같은 파일을 다시 올리면 `{ "imported": 0, "recognized": 0, "unrecognized": [] }` 이고 저장된 건수는 그대로다.
+  업로드 항목에 승인번호가 없어 이 5개가 자연키다 — 같은 날 같은 금액의 별개 결제는 중복으로 흡수된다(알려진 한계).
+- 법정 보존 사본은 자동 생성하지 않는다.
 
 ### 5-4. 변경 시점(회수기간) — `GET /api/v1/me/switch-timing`
 
@@ -381,7 +445,7 @@ JWT 절대 수명 15분·유휴 제한 5분. 상세 실행법·설정 점검은 
 } }
 ```
 
-- `status` = `SWITCH_NOW`(회수개월 < 약정잔여) · `WAIT_UNTIL_EXPIRY`(회수개월 ≥ 약정잔여) · `NO_BENEFIT`(월 절감 ≤ 0, `paybackMonths=null`).
+- `status` = `SWITCH_NOW`(약정잔여 0 이거나 회수개월 < 약정잔여) · `WAIT_UNTIL_EXPIRY`(그 외) · `NO_BENEFIT`(월 절감 ≤ 0, `paybackMonths=null`).
 - 현재 요금제 미설정 → **400** `YGB-REQ-001`(먼저 5-2 호출). `targetPlanId` 미존재 → 404 `YGB-CAT-001`.
 - `switchingCost`·`remainingContractMonths` 음수, 회수 개월 Integer 초과 → 400. 활성 구독이 없어도 비교 가능.
 - 현재 계산은 카탈로그 티어 가격 기준이며 저장한 실제 청구액·약정·가족결합을 완전히 반영하지 않는다.

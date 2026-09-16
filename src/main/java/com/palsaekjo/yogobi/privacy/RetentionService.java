@@ -35,6 +35,8 @@ public class RetentionService {
                 PrivacyPolicy.DETECTION_RETENTION_MONTHS));
         deleted.put("auth_email_token", jdbc.update("DELETE FROM auth_email_token WHERE expires_at <= now()"));
         deleted.put("auth_session", jdbc.update("DELETE FROM auth_session WHERE expires_at <= now()"));
+        deleted.put("catalog_report", jdbc.update("DELETE FROM catalog_report WHERE created_at < now() - (? * interval '1 day')",
+                PrivacyPolicy.REPORT_RETENTION_DAYS));
         return deleted;
     }
 

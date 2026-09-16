@@ -1,6 +1,6 @@
 # 개인정보 처리방침 · 처리 인벤토리 (V5/V6)
 
-작성 2026-09-11 · 수정 2026-09-12 · 정책 버전 `PrivacyPolicy.VERSION = 2026-09-12`.
+작성 2026-09-11 · 수정 2026-09-15 · 정책 버전 `PrivacyPolicy.VERSION = 2026-09-15`.
 코드 단일 출처는 `privacy/PrivacyPolicy.java`이며 `GET /api/v1/privacy-policy`로 공개한다.
 **보유기간·동의 항목은 정책값이다. 확정되면 이 문서·`PrivacyPolicy`·처리방침 버전을 함께 올린다.**
 
@@ -13,8 +13,11 @@
 | 법정 보존 결제 사본 | retained_payment_record(기존 거래 식별자·가맹점·서비스·금액·결제일·출처·보존 근거·기산일·만료일) | 확인된 법정 보존 의무 이행 | 기록별로 확인한 법령 근거 | 탈퇴와 무관하게 확정 retain_until까지 분리 보관 후 파기 |
 | 인증 세션 | auth_session(SHA-256 지문), user_agent | 로그인 유지·세션 관리 | 계약 이행 | 만료 15분·유휴 5분 후 파기 |
 | 동의 증빙 | user_consent | 수집·이용 동의 기록 보관 | 법령상 의무 | 탈퇴 시 파기 |
+| 정보 오류 제보 | catalog_report(대상 상품·오류 항목·설명·선택 출처 링크) | 제보 검토·카탈로그 정정 | 제보자의 자발적 제출 | 90일 경과 후 정기 파기 |
 
 원문 JWT·브라우저 확인값·비밀번호 평문은 저장하지 않는다. DB에는 지문/해시만 둔다.
+제보에는 회원 ID·이메일·원문 IP를 저장하지 않으며 개인정보를 적지 않도록 안내한다. 본문에 잘못 포함된 정보는 운영자가 정리한다.
+IP 기반 요청 제한은 기존 `auth_rate_limit`의 해시 버킷으로 15분 단위 적용한다. 제보 출처 URL은 문자열만 보관하고 자동 접속하지 않는다.
 
 ## 정보주체 권리 — 구현 상태
 
@@ -37,6 +40,7 @@
 `RetentionService`(@Scheduled 기본 매일 한국시간 04:00, `yogobi.retention.cron`으로 조정)가 보유기간 초과분을 파기한다:
 - payment_record: paid_at 기준 12개월 초과
 - detection_result: detected_at 기준 6개월 초과
+- catalog_report: created_at 기준 90일 초과(회원 탈퇴와 독립, 처리 상태와 무관)
 - 만료된 auth_email_token·auth_session (로그인 없이도 정리)
 - retained_payment_record: 해당 기록의 `retain_until`이 한국시간 오늘 이하일 때만 파기(12개월 분석 기준 미적용)
 

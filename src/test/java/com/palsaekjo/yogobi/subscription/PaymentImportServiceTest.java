@@ -62,6 +62,19 @@ class PaymentImportServiceTest {
         assertThat(jdbc.queryForObject("SELECT service_id FROM payment_record WHERE merchant_raw='배달의민족'", Long.class)).isNull();
     }
 
+    @Test void reimportingSameFileAddsNothing() {
+        long userId = jdbc.queryForObject(
+                "INSERT INTO app_user(email,password_hash,email_verified) VALUES ('b@example.com','x',TRUE) RETURNING id", Long.class);
+        service.importPayments(userId, provider, MOCK);
+
+        var again = service.importPayments(userId, provider, MOCK);   // 같은 파일 재업로드
+
+        assertThat(again.imported()).isZero();
+        assertThat(again.recognized()).isZero();
+        assertThat(again.unrecognized()).isEmpty();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM payment_record WHERE user_id=?", Integer.class, userId)).isEqualTo(2);
+    }
+
     @Test void malformedPayloadIsRejected() {
         assertThatThrownBy(() -> service.importPayments(1, provider, "not json"))
                 .isInstanceOf(ApiException.class);

@@ -8,6 +8,7 @@ import javax.sql.DataSource;
 import org.postgresql.PGConnection;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
@@ -19,6 +20,8 @@ public class CatalogSeedLoader implements ApplicationRunner {
     private static final List<String> TABLES = List.of(
             "subscription_service", "subscription_tier", "bundle_product");
     private final DataSource dataSource;
+    @Value("${CATALOG_CSV_DIR:}")
+    private String catalogDirectory = "";
 
     public CatalogSeedLoader(DataSource dataSource) {
         this.dataSource = dataSource;
@@ -26,6 +29,8 @@ public class CatalogSeedLoader implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) throws SQLException, IOException {
+        // 외부 관리 모드에서는 내장 시드가 운영 CSV나 마지막 정상 DB를 덮어쓰면 안 된다.
+        if (!catalogDirectory.isBlank()) return;
         load(new ClassPathResource("db/seed/subscription_service.csv"),
                 new ClassPathResource("db/seed/subscription_tier.csv"),
                 new ClassPathResource("db/seed/bundle_product.csv"));
@@ -43,11 +48,12 @@ public class CatalogSeedLoader implements ApplicationRunner {
 
     void load(Resource services, Resource tiers, Resource bundles) throws SQLException, IOException {
         try (var connection = dataSource.getConnection()) {
-            connection.setAutoCommit(false);
+            boolean ownTransaction = connection.getAutoCommit();
+            if (ownTransaction) connection.setAutoCommit(false);
             try {
                 for (String table : TABLES) {
                     execute(connection, "CREATE TEMP TABLE seed_" + table
-                            + " (LIKE " + table + ") ON COMMIT DROP");
+                            + " (LIKE " + table + " INCLUDING DEFAULTS) ON COMMIT DROP");
                 }
                 execute(connection, "ALTER TABLE seed_bundle_product ADD COLUMN tier_ids TEXT NOT NULL"
                         + " CHECK (btrim(tier_ids) <> '')");
@@ -58,16 +64,16 @@ public class CatalogSeedLoader implements ApplicationRunner {
                         INSERT INTO subscription_service SELECT * FROM seed_subscription_service
                         ON CONFLICT (id) DO UPDATE SET
                             name = EXCLUDED.name, category = EXCLUDED.category,
-                            official_url = EXCLUDED.official_url;
+                            official_url = EXCLUDED.official_url, active = TRUE;
                         INSERT INTO subscription_tier SELECT * FROM seed_subscription_tier
                         ON CONFLICT (id) DO UPDATE SET
                             service_id = EXCLUDED.service_id, name = EXCLUDED.name,
                             price = EXCLUDED.price, concurrent_streams = EXCLUDED.concurrent_streams,
-                            quality = EXCLUDED.quality, note = EXCLUDED.note;
+                            quality = EXCLUDED.quality, note = EXCLUDED.note, active = TRUE;
                         INSERT INTO bundle_product (id, name, price, provider)
                         SELECT id, name, price, provider FROM seed_bundle_product
                         ON CONFLICT (id) DO UPDATE SET
-                            name = EXCLUDED.name, price = EXCLUDED.price, provider = EXCLUDED.provider;
+                            name = EXCLUDED.name, price = EXCLUDED.price, provider = EXCLUDED.provider, active = TRUE;
                         DELETE FROM bundle_item WHERE bundle_id IN (SELECT id FROM seed_bundle_product);
                         INSERT INTO bundle_item (bundle_id, tier_id)
                         SELECT id, unnest(string_to_array(tier_ids, ','))::BIGINT FROM seed_bundle_product;
@@ -86,9 +92,9 @@ public class CatalogSeedLoader implements ApplicationRunner {
                             + "GREATEST((SELECT max(id) FROM " + table + "), "
                             + "(SELECT last_value FROM " + table + "_id_seq)))");
                 }
-                connection.commit();
+                if (ownTransaction) connection.commit();
             } catch (SQLException | IOException | RuntimeException e) {
-                connection.rollback();
+                if (ownTransaction) connection.rollback();
                 throw e;
             }
         }
@@ -103,7 +109,8 @@ public class CatalogSeedLoader implements ApplicationRunner {
      */
     void loadMobilePlans(Resource mobilePlans) throws SQLException, IOException {
         try (var connection = dataSource.getConnection()) {
-            connection.setAutoCommit(false);
+            boolean ownTransaction = connection.getAutoCommit();
+            if (ownTransaction) connection.setAutoCommit(false);
             try {
                 execute(connection, """
                         CREATE TEMP TABLE seed_mobile_plan (
@@ -127,7 +134,8 @@ public class CatalogSeedLoader implements ApplicationRunner {
                             CASE btrim(s.network_type)
                                 WHEN '5G' THEN 'FIVE_G' WHEN '4G' THEN 'LTE' WHEN '3G' THEN 'THREE_G'
                                 ELSE btrim(s.network_type) END,
-                            s.base_price::BIGINT, s.data_mb::BIGINT, s.voice_min::BIGINT, s.sms_cnt::BIGINT,
+                            s.base_price::BIGINT, s.data_mb::BIGINT,
+                            nullif(btrim(s.voice_min), '')::BIGINT, nullif(btrim(s.sms_cnt), '')::BIGINT,
                             nullif(btrim(s.contract_discount_12m), '')::BIGINT,
                             nullif(btrim(s.contract_discount_24m), '')::BIGINT,
                             nullif(btrim(s.age_limit), ''), btrim(s.source_url), s.collected_at::DATE
@@ -139,11 +147,11 @@ public class CatalogSeedLoader implements ApplicationRunner {
                             contract_discount_12m = EXCLUDED.contract_discount_12m,
                             contract_discount_24m = EXCLUDED.contract_discount_24m,
                             age_limit = EXCLUDED.age_limit, source_url = EXCLUDED.source_url,
-                            collected_at = EXCLUDED.collected_at;
+                            collected_at = EXCLUDED.collected_at, active = TRUE;
                         """);
-                connection.commit();
+                if (ownTransaction) connection.commit();
             } catch (SQLException | IOException | RuntimeException e) {
-                connection.rollback();
+                if (ownTransaction) connection.rollback();
                 throw e;
             }
         }
@@ -160,7 +168,8 @@ public class CatalogSeedLoader implements ApplicationRunner {
      */
     void loadPlanBenefits(Resource planBenefits) throws SQLException, IOException {
         try (var connection = dataSource.getConnection()) {
-            connection.setAutoCommit(false);
+            boolean ownTransaction = connection.getAutoCommit();
+            if (ownTransaction) connection.setAutoCommit(false);
             try {
                 execute(connection, """
                         CREATE TEMP TABLE seed_plan_benefit (
@@ -199,6 +208,32 @@ public class CatalogSeedLoader implements ApplicationRunner {
                         JOIN mobile_plan m ON m.carrier_id = c.id AND m.name = btrim(s.plan_name)
                         WHERE btrim(s.source_url) <> '';
                         """);
+                if (ownTransaction) connection.commit();
+            } catch (SQLException | IOException | RuntimeException e) {
+                if (ownTransaction) connection.rollback();
+                throw e;
+            }
+        }
+    }
+
+    /** 외부 CSV 전체를 단일 트랜잭션으로 반영한다. 기존 회원 참조는 active=false로 보존한다. */
+    void loadSnapshot(java.util.Map<String, Resource> files) throws SQLException, IOException {
+        try (var connection = dataSource.getConnection()) {
+            connection.setAutoCommit(false);
+            var shared = new CatalogSeedLoader(new org.springframework.jdbc.datasource.SingleConnectionDataSource(connection, true));
+            try {
+                shared.load(files.get("subscription_service"), files.get("subscription_tier"), files.get("bundle_product"));
+                shared.loadMobilePlans(files.get("mobile_plan"));
+                execute(connection, "DELETE FROM plan_benefit");
+                shared.loadPlanBenefits(files.get("plan_benefit"));
+                execute(connection, """
+                        UPDATE subscription_service SET active = FALSE WHERE id NOT IN (SELECT id FROM seed_subscription_service);
+                        UPDATE subscription_tier SET active = FALSE WHERE id NOT IN (SELECT id FROM seed_subscription_tier);
+                        UPDATE bundle_product SET active = FALSE WHERE id NOT IN (SELECT id FROM seed_bundle_product);
+                        UPDATE mobile_plan m SET active = FALSE WHERE NOT EXISTS (
+                            SELECT 1 FROM seed_mobile_plan s JOIN carrier c ON c.name = btrim(s.carrier)
+                            WHERE m.carrier_id = c.id AND m.name = btrim(s.plan_name) AND btrim(s.source_url) <> '');
+                        """);
                 connection.commit();
             } catch (SQLException | IOException | RuntimeException e) {
                 connection.rollback();
@@ -214,11 +249,20 @@ public class CatalogSeedLoader implements ApplicationRunner {
         }
     }
 
+    private static String copyColumns(String table) {
+        return switch (table) {
+            case "subscription_service" -> " (id,name,category,official_url)";
+            case "subscription_tier" -> " (id,service_id,name,price,concurrent_streams,quality,note)";
+            case "bundle_product" -> " (id,name,price,provider,tier_ids)";
+            default -> "";
+        };
+    }
+
     private static void copy(Connection connection, String table, Resource resource)
             throws SQLException, IOException {
         try (var input = resource.getInputStream()) {
             connection.unwrap(PGConnection.class).getCopyAPI().copyIn(
-                    "COPY seed_" + table + " FROM STDIN WITH (FORMAT csv, HEADER MATCH, ENCODING 'UTF8')",
+                    "COPY seed_" + table + copyColumns(table) + " FROM STDIN WITH (FORMAT csv, HEADER MATCH, ENCODING 'UTF8')",
                     input);
         }
     }

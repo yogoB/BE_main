@@ -5179,80 +5179,63 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
         </g>
 
         <g data-edge-from="endpoint" data-edge-to="recommend" data-edge-label="recommend / calculate" data-edge-key="1" data-edge-id="dispatch">
-          <path data-composition-edge-from="endpoint" data-composition-edge-to="recommend" data-composition-edge-id="dispatch" data-composition-points="355.25,201.1;544,201.1" d="M 355.25 201.1 L 544 201.1" class="a-default" stroke-width="1.4" marker-end="url(#arrowhead)"/>
+          <path data-composition-edge-from="endpoint" data-composition-edge-to="recommend" data-composition-edge-id="dispatch" data-composition-points="355.25,210;544,210" d="M 355.25 210 L 544 210" class="a-default" stroke-width="1.4" marker-end="url(#arrowhead)"/>
         <g data-detail="context">
-          <rect x="389.025" y="181.1" width="121.2" height="16" rx="3" class="c-mask"/>
-          <text x="449.625" y="191.1" class="t-backend" font-size="9" text-anchor="middle">recommend / calculate</text>
+          <rect x="389.025" y="190" width="121.2" height="16" rx="3" class="c-mask"/>
+          <text x="449.625" y="200" class="t-backend" font-size="9" text-anchor="middle">recommend / calculate</text>
         </g>
         </g>
 
         <g data-edge-from="recommend" data-edge-to="catalog" data-edge-label="요금제·티어·혜택·번들 조회" data-edge-key="2" data-edge-id="load">
-          <path data-composition-edge-from="recommend" data-composition-edge-to="catalog" data-composition-edge-id="load" data-composition-points="558,232.2;746.75,232.2" d="M 558 232.2 L 746.75 232.2" class="a-default" stroke-width="1.4" marker-end="url(#arrowhead)"/>
+          <path data-composition-edge-from="recommend" data-composition-edge-to="catalog" data-composition-edge-id="load" data-composition-points="558,250;746.75,250" d="M 558 250 L 746.75 250" class="a-default" stroke-width="1.4" marker-end="url(#arrowhead)"/>
         <g data-detail="context">
-          <rect x="578.775" y="212.2" width="147.20000000000002" height="16" rx="3" class="c-mask"/>
-          <text x="652.375" y="222.2" class="t-backend" font-size="9" text-anchor="middle">요금제·티어·혜택·번들 조회</text>
+          <rect x="578.775" y="230" width="147.20000000000002" height="16" rx="3" class="c-mask"/>
+          <text x="652.375" y="240" class="t-backend" font-size="9" text-anchor="middle">요금제·티어·혜택·번들 조회</text>
         </g>
+        <text data-detail="fine" x="570" y="268" class="t-dim" font-size="7">신규 추천은 active 상품만 조회. 없는 서비스는 제외·결손 기록, 후보 0건은 빈 결과와 missingInputs를 반환한다.</text>
         </g>
 
         <g data-edge-from="catalog" data-edge-to="recommend" data-edge-label="계산할 조합 반환" data-edge-key="3" data-edge-id="inputs">
-          <path data-composition-edge-from="catalog" data-composition-edge-to="recommend" data-composition-edge-id="inputs" data-composition-points="746.75,263.3;558,263.3" d="M 746.75 263.3 L 558 263.3" class="a-default" stroke-width="1.4" stroke-dasharray="3,5" marker-end="url(#arrowhead)"/>
+          <path data-composition-edge-from="catalog" data-composition-edge-to="recommend" data-composition-edge-id="inputs" data-composition-points="746.75,290;558,290" d="M 746.75 290 L 558 290" class="a-default" stroke-width="1.4" stroke-dasharray="3,5" marker-end="url(#arrowhead)"/>
         <g data-detail="context">
-          <rect x="604.775" y="243.3" width="95.2" height="16" rx="3" class="c-mask"/>
-          <text x="652.375" y="253.3" class="t-muted" font-size="9" text-anchor="middle">계산할 조합 반환</text>
+          <rect x="604.775" y="270" width="95.2" height="16" rx="3" class="c-mask"/>
+          <text x="652.375" y="280" class="t-muted" font-size="9" text-anchor="middle">계산할 조합 반환</text>
         </g>
         </g>
 
         <g data-edge-from="recommend" data-edge-to="pricing" data-edge-label="조합별 calculate 호출" data-edge-key="4" data-edge-id="compute">
-          <path data-composition-edge-from="recommend" data-composition-edge-to="pricing" data-composition-edge-id="compute" data-composition-points="558,294.4;949.5,294.4" d="M 558 294.4 L 949.5 294.4" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+          <path data-composition-edge-from="recommend" data-composition-edge-to="pricing" data-composition-edge-id="compute" data-composition-points="558,330;949.5,330" d="M 558 330 L 949.5 330" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
         <g data-detail="context">
-          <rect x="693.15" y="274.4" width="121.2" height="16" rx="3" class="c-mask"/>
-          <text x="753.75" y="284.4" class="t-backend" font-size="9" text-anchor="middle">조합별 calculate 호출</text>
+          <rect x="693.15" y="310" width="121.2" height="16" rx="3" class="c-mask"/>
+          <text x="753.75" y="320" class="t-backend" font-size="9" text-anchor="middle">조합별 calculate 호출</text>
         </g>
-        <text data-detail="fine" x="570" y="312.4" class="t-dim" font-size="7">추천은 후보마다 반복, 계산기는 지정 조합 1회. 미사용 혜택은 0원. 번들은 first-fit이며 전역 최적 조합 탐색은 미구현</text>
+        <text data-detail="fine" x="570" y="348" class="t-dim" font-size="7">추천은 후보마다 반복, 계산기는 지정 조합 1회. 미사용 혜택은 0원. 번들은 first-fit이며 전역 최적 조합 탐색은 미구현</text>
         </g>
 
         <g data-edge-from="pricing" data-edge-to="recommend" data-edge-label="총액·절감액·항목별 출처" data-edge-key="5" data-edge-id="breakdown">
-          <path data-composition-edge-from="pricing" data-composition-edge-to="recommend" data-composition-edge-id="breakdown" data-composition-points="949.5,325.6;558,325.6" d="M 949.5 325.6 L 558 325.6" class="a-default" stroke-width="1.4" stroke-dasharray="3,5" marker-end="url(#arrowhead)"/>
+          <path data-composition-edge-from="pricing" data-composition-edge-to="recommend" data-composition-edge-id="breakdown" data-composition-points="949.5,370;558,370" d="M 949.5 370 L 558 370" class="a-default" stroke-width="1.4" stroke-dasharray="3,5" marker-end="url(#arrowhead)"/>
         <g data-detail="context">
-          <rect x="687.95" y="305.6" width="131.60000000000002" height="16" rx="3" class="c-mask"/>
-          <text x="753.75" y="315.6" class="t-muted" font-size="9" text-anchor="middle">총액·절감액·항목별 출처</text>
+          <rect x="687.95" y="350" width="131.60000000000002" height="16" rx="3" class="c-mask"/>
+          <text x="753.75" y="360" class="t-muted" font-size="9" text-anchor="middle">총액·절감액·항목별 출처</text>
         </g>
         </g>
 
-        <g data-edge-from="recommend" data-edge-to="catalog" data-edge-label="저장된 시세 조회" data-edge-key="6" data-edge-id="snapshot">
-          <path data-composition-edge-from="recommend" data-composition-edge-to="catalog" data-composition-edge-id="snapshot" data-composition-points="558,356.7;746.75,356.7" d="M 558 356.7 L 746.75 356.7" class="a-default" stroke-width="1.4" marker-end="url(#arrowhead)"/>
+        <g data-edge-from="recommend" data-edge-to="endpoint" data-edge-label="추천 상위 5개 / 계산 1개" data-edge-key="6" data-edge-id="result">
+          <path data-composition-edge-from="recommend" data-composition-edge-to="endpoint" data-composition-edge-id="result" data-composition-points="544,410;355.25,410" d="M 544 410 L 355.25 410" class="a-default" stroke-width="1.4" stroke-dasharray="3,5" marker-end="url(#arrowhead)"/>
         <g data-detail="context">
-          <rect x="604.775" y="336.7" width="95.2" height="16" rx="3" class="c-mask"/>
-          <text x="652.375" y="346.7" class="t-backend" font-size="9" text-anchor="middle">저장된 시세 조회</text>
+          <rect x="381.225" y="390" width="136.8" height="16" rx="3" class="c-mask"/>
+          <text x="449.625" y="400" class="t-muted" font-size="9" text-anchor="middle">추천 상위 5개 / 계산 1개</text>
         </g>
-        <text data-detail="fine" x="570" y="374.7" class="t-dim" font-size="7">SmartChoiceSnapshotReader.find(통신사, 요금제명). 외부 API는 이 요청에서 호출하지 않음</text>
+        <text data-detail="fine" x="367.25" y="428" class="t-dim" font-size="7">monthlyTotal 오름차순 추천. accuracy와 missingInputs를 함께 반환</text>
         </g>
 
-        <g data-edge-from="catalog" data-edge-to="recommend" data-edge-label="priceCrossCheck / 자료 없으면 null" data-edge-key="7" data-edge-id="crosscheck">
-          <path data-composition-edge-from="catalog" data-composition-edge-to="recommend" data-composition-edge-id="crosscheck" data-composition-points="746.75,387.8;558,387.8" d="M 746.75 387.8 L 558 387.8" class="a-default" stroke-width="1.4" stroke-dasharray="3,5" marker-end="url(#arrowhead)"/>
-        <g data-detail="context">
-          <rect x="557.975" y="367.8" width="188.8" height="16" rx="3" class="c-mask"/>
-          <text x="652.375" y="377.8" class="t-muted" font-size="9" text-anchor="middle">priceCrossCheck / 자료 없으면 null</text>
-        </g>
-        <text data-detail="fine" x="570" y="405.8" class="t-dim" font-size="7">시드 기본료와 저장 시세·수집일·출처 비교. 총액 계산이나 추천 순서를 변경하지 않음</text>
-        </g>
-
-        <g data-edge-from="recommend" data-edge-to="endpoint" data-edge-label="추천 상위 5개 / 계산 1개" data-edge-key="8" data-edge-id="result">
-          <path data-composition-edge-from="recommend" data-composition-edge-to="endpoint" data-composition-edge-id="result" data-composition-points="544,418.9;355.25,418.9" d="M 544 418.9 L 355.25 418.9" class="a-default" stroke-width="1.4" stroke-dasharray="3,5" marker-end="url(#arrowhead)"/>
-        <g data-detail="context">
-          <rect x="381.225" y="398.9" width="136.8" height="16" rx="3" class="c-mask"/>
-          <text x="449.625" y="408.9" class="t-muted" font-size="9" text-anchor="middle">추천 상위 5개 / 계산 1개</text>
-        </g>
-        <text data-detail="fine" x="367.25" y="436.9" class="t-dim" font-size="7">monthlyTotal 오름차순 추천. accuracy와 missingInputs를 함께 반환</text>
-        </g>
-
-        <g data-edge-from="endpoint" data-edge-to="visitor" data-edge-label="결과와 부족한 조건 표시" data-edge-key="9" data-edge-id="render">
+        <g data-edge-from="endpoint" data-edge-to="visitor" data-edge-label="결과와 부족한 조건 표시" data-edge-key="7" data-edge-id="render">
           <path data-composition-edge-from="endpoint" data-composition-edge-to="visitor" data-composition-edge-id="render" data-composition-points="341.25,450;152.5,450" d="M 341.25 450 L 152.5 450" class="a-default" stroke-width="1.4" stroke-dasharray="3,5" marker-end="url(#arrowhead)"/>
         <g data-detail="context">
           <rect x="181.075" y="430" width="131.60000000000002" height="16" rx="3" class="c-mask"/>
           <text x="246.875" y="440" class="t-muted" font-size="9" text-anchor="middle">결과와 부족한 조건 표시</text>
         </g>
-        <text data-detail="fine" x="164.5" y="468" class="t-dim" font-size="7">후보 없음 422, 잘못된 입력 400</text>
+        <text data-detail="fine" x="164.5" y="468" class="t-dim" font-size="7">자료 결손은 200 PARTIAL과 안내. 잘못된 입력은 400. CSV 미검수 AI 가격은 계산하지 않는다.</text>
         </g>
 
         <!-- Segment Labels -->
@@ -5295,8 +5278,8 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
           <text data-detail="context" x="551" y="111" class="t-muted" font-size="7" text-anchor="middle">공통 처리</text>
         </g>
 
-        <g id="node-catalog" data-node-id="catalog" data-node-label="DB 읽기 계층" tabindex="0" role="button" aria-label="Focus DB 읽기 계층, 카탈로그·시세 스냅샷, Sequence participant" aria-pressed="false" data-node-kind="database" data-node-sublabel="카탈로그·시세 스냅샷" data-node-context="Sequence participant">
-          <title>DB 읽기 계층 · 카탈로그·시세 스냅샷 · Sequence participant</title>
+        <g id="node-catalog" data-node-id="catalog" data-node-label="DB 읽기 계층" tabindex="0" role="button" aria-label="Focus DB 읽기 계층, 검수 CSV 기반 카탈로그, Sequence participant" aria-pressed="false" data-node-kind="database" data-node-sublabel="검수 CSV 기반 카탈로그" data-node-context="Sequence participant">
+          <title>DB 읽기 계층 · 검수 CSV 기반 카탈로그 · Sequence participant</title>
           <rect x="670.25" y="72" width="167" height="54" rx="6" class="c-mask"/>
           <rect x="670.25" y="72" width="167" height="54" rx="6" class="c-database" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="database" class="semantic-sigil s-database" transform="translate(676.25 78) scale(0.6875)">
@@ -5304,7 +5287,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
             <path d="M3 4v8c0 1.1 2.2 2 5 2s5-.9 5-2V4M3 8c0 1.1 2.2 2 5 2s5-.9 5-2"/>
           </g>
           <text data-node-label="" data-detail-anchor="" x="753.75" y="94" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">DB 읽기 계층</text>
-          <text data-detail="context" x="753.75" y="111" class="t-muted" font-size="7" text-anchor="middle">카탈로그·시세 스냅샷</text>
+          <text data-detail="context" x="753.75" y="111" class="t-muted" font-size="7" text-anchor="middle">검수 CSV 기반 카탈로그</text>
         </g>
 
         <g id="node-pricing" data-node-id="pricing" data-node-label="CostCalculator" tabindex="0" role="button" aria-label="Focus CostCalculator, 순수 Java · pricing, Sequence participant" aria-pressed="false" data-node-kind="backend" data-node-sublabel="순수 Java · pricing" data-node-context="Sequence participant">

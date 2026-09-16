@@ -1,0 +1,128 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "요고비 · 비회원 정보 오류 제보",
+    "quality_profile": "showcase",
+    "column_fit": "spread",
+    "viewBox": [
+      1080,
+      560
+    ]
+  },
+  "participants": [
+    {
+      "id": "visitor",
+      "type": "frontend",
+      "label": "사용자 화면",
+      "sublabel": "요금제 · 결과 카드"
+    },
+    {
+      "id": "security",
+      "type": "security",
+      "label": "SecurityConfig",
+      "sublabel": "CSRF · 공개 POST"
+    },
+    {
+      "id": "controller",
+      "type": "backend",
+      "label": "CatalogReportController",
+      "sublabel": "접수만 수행"
+    },
+    {
+      "id": "limits",
+      "type": "backend",
+      "label": "AuthRateLimit",
+      "sublabel": "접속 IP 해시 버킷"
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "대상 확인 · 제보 저장"
+    }
+  ],
+  "messages": [
+    {
+      "id": "y16-catalog-report-m1",
+      "from": "visitor",
+      "to": "security",
+      "y": 170,
+      "label": "GET /auth/csrf → POST 제보",
+      "note": "전체 경로 /api/v1/auth/csrf, /api/v1/catalog/reports. credentials: include와 발급된 CSRF 헤더 필요. 회원 JWT는 선택.",
+      "variant": "security"
+    },
+    {
+      "id": "y16-catalog-report-m2",
+      "from": "security",
+      "to": "controller",
+      "y": 205,
+      "label": "CSRF 통과한 요청",
+      "note": "대상 종류·ID, 오류 항목, 설명 1~2000자, 선택 HTTPS 링크 검증. URL을 서버가 접속하지 않는다.",
+      "variant": "default"
+    },
+    {
+      "id": "y16-catalog-report-m3",
+      "from": "controller",
+      "to": "limits",
+      "y": 240,
+      "label": "접속 주소 기준 제한 검사",
+      "note": "기존 제한 도구를 재사용한다. 원문 IP는 제보 테이블에 저장하지 않는다.",
+      "variant": "security"
+    },
+    {
+      "id": "y16-catalog-report-m4",
+      "from": "limits",
+      "to": "controller",
+      "y": 275,
+      "label": "15분간 5회 허용 / 초과 429",
+      "note": "로그인 여부와 무관하며 운영 프록시 주소 전달 설정은 별도 점검 대상이다.",
+      "variant": "return"
+    },
+    {
+      "id": "y16-catalog-report-m5",
+      "from": "controller",
+      "to": "db",
+      "y": 310,
+      "label": "대상 상품 존재 조회",
+      "note": "고정 테이블 allowlist와 바인딩 ID. 대상 없으면 404, 허용하지 않는 입력 400. 카탈로그 값 수정 없음.",
+      "variant": "emphasis"
+    },
+    {
+      "id": "report-target",
+      "from": "db",
+      "to": "controller",
+      "label": "대상 상품 확인",
+      "note": "대상이 확인된 경우만 제보 저장을 진행한다.",
+      "variant": "return",
+      "y": 345
+    },
+    {
+      "id": "report-insert",
+      "from": "controller",
+      "to": "db",
+      "label": "제보 INSERT · 가격 변경 없음",
+      "note": "catalog_report 생성. 입력 링크는 자동 조회하지 않는다.",
+      "variant": "emphasis",
+      "y": 380
+    },
+    {
+      "id": "y16-catalog-report-m6",
+      "from": "db",
+      "to": "controller",
+      "y": 415,
+      "label": "UUID · PENDING",
+      "note": "catalog_report에 설명·선택 링크·대상·상태·시각 저장. 회원 ID·이메일 없음.",
+      "variant": "return"
+    },
+    {
+      "id": "y16-catalog-report-m7",
+      "from": "controller",
+      "to": "visitor",
+      "y": 450,
+      "label": "접수 완료 안내",
+      "note": "공개 제보 조회 API 없음. 운영자 원자료 검토 후 15번 CSV 발행 경로로 수정한다.",
+      "variant": "return"
+    }
+  ]
+}

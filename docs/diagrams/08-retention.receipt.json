@@ -6,12 +6,12 @@
   "input": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/08-retention.sequence.json",
   "output": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/08-retention.html",
   "specification": {
-    "sha256": "b1e871300b1cd13664e2d68f343c9fcf9b7981f85413bce43055563ed9db43d9",
-    "bytes": 3091
+    "sha256": "22685162bc38aa1ae7120984546b204ec1e9690367b8d0e671340898004b98ed",
+    "bytes": 3218
   },
   "artifact": {
-    "sha256": "6fee93114ee00752b6269a573dab55de96e8e56b6cfef7545959ac91d8e9c13f",
-    "bytes": 804288
+    "sha256": "4105bf1537842b9d91abe25358a17ec971c135a6383c6aa0ef38bfefd2a06f55",
+    "bytes": 804482
   },
   "validation": {
     "checksPassed": 9,

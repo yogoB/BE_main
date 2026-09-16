@@ -92,7 +92,8 @@
       "from": "retention",
       "to": "db",
       "y": 370.0,
-      "label": "분석 12개월 · 탐지 6개월 파기"
+      "label": "분석 12개월 · 탐지 6개월 파기",
+      "note": "payment_record 12개월, detection_result 6개월, catalog_report 90일 경과 자료를 정기 파기한다."
     },
     {
       "id": "y08-retention-m7",

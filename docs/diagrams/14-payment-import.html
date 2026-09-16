@@ -5235,7 +5235,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
           <rect x="578.775" y="367" width="147.20000000000002" height="16" rx="3" class="c-mask"/>
           <text x="652.375" y="377" class="t-backend" font-size="9" text-anchor="middle">본인 payment_record에 저장</text>
         </g>
-        <text data-detail="fine" x="367.25" y="405" class="t-dim" font-size="7">트랜잭션 안에서 저장. source=MOCK_MYDATA. user_subscription 생성이나 법정 사본 자동 보존은 하지 않음</text>
+        <text data-detail="fine" x="367.25" y="405" class="t-dim" font-size="7">V8 자연키(회원·가맹점·금액·결제일·출처) 중복은 ON CONFLICT DO NOTHING. 전체 트랜잭션. 구독 생성·법정 사본 자동 보존 없음.</text>
         </g>
 
         <g data-edge-from="db" data-edge-to="service" data-edge-label="삽입 성공 · 트랜잭션 완료" data-edge-key="8" data-edge-id="payment-saved">
@@ -5252,7 +5252,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
           <rect x="168.075" y="429" width="157.6" height="16" rx="3" class="c-mask"/>
           <text x="246.875" y="439" class="t-muted" font-size="9" text-anchor="middle">등록·인식 건수 / 미인식 목록</text>
         </g>
-        <text data-detail="fine" x="164.5" y="467" class="t-dim" font-size="7">같은 파일 재업로드 중복 방지는 현재 미구현. API 응답 이후 UI에서 구독 목록을 별도로 정리해야 탐지 입력에 반영</text>
+        <text data-detail="fine" x="164.5" y="467" class="t-dim" font-size="7">응답 건수와 미인식 목록은 새로 저장된 행만 집계한다. UI에서 구독 목록을 별도로 정리해야 탐지 입력에 반영한다.</text>
         </g>
 
         <!-- Segment Labels -->

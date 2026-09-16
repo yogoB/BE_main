@@ -12,10 +12,11 @@ public final class PrivacyPolicy {
     }
 
     /** 처리방침·동의 기록의 버전. 항목·보유기간이 바뀌면 올린다. */
-    public static final String VERSION = "2026-09-12";
+    public static final String VERSION = "2026-09-15";
     public static final String RETENTION_ZONE = "Asia/Seoul";
     public static final int PAYMENT_RETENTION_MONTHS = 12;
     public static final int DETECTION_RETENTION_MONTHS = 6;
+    public static final int REPORT_RETENTION_DAYS = 90;
 
     public record Item(String category, List<String> fields, String purpose, String legalBasis, String retention) {
     }
@@ -38,7 +39,10 @@ public final class PrivacyPolicy {
                 new Item("인증 세션", List.of("auth_session(SHA-256 지문)", "user_agent"),
                         "로그인 유지·세션 관리", "계약 이행", "만료 15분·유휴 5분 후 파기"),
                 new Item("동의 증빙", List.of("user_consent"),
-                        "수집·이용 동의 기록 보관", "법령상 의무", "탈퇴 시 파기")),
+                        "수집·이용 동의 기록 보관", "법령상 의무", "탈퇴 시 파기"),
+                new Item("정보 오류 제보", List.of("대상 상품·오류 항목·설명·선택 출처 링크"),
+                        "제보 확인·카탈로그 정정", "제보자의 자발적 제출",
+                        REPORT_RETENTION_DAYS + "일 후 파기. 회원 ID·이메일·원문 IP는 접수 기록에 저장하지 않음")),
                 // 정보주체의 권리(고지). 구현: 열람(GET /me)·삭제(DELETE /me)·처리정지(동의 철회 POST /me/consent/marketing).
                 List.of("열람", "정정", "삭제(탈퇴)", "처리정지(동의 철회)", "본인 데이터 내려받기(마이데이터, 미구현)"));
     }

@@ -6,12 +6,12 @@
   "input": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/01-recommend.sequence.json",
   "output": "/Users/lsh/Desktop/yogoB/BE_main/docs/diagrams/01-recommend.html",
   "specification": {
-    "sha256": "4f39e7577f3238d86b2ab783cd2b1918d21c5255c35dd8353dc55f32de19f005",
-    "bytes": 3370
+    "sha256": "e134e46b68d9a7dccf72279dba99204f9d6077b3d59f9535f4a17e43a6b5b3ba",
+    "bytes": 2995
   },
   "artifact": {
-    "sha256": "7e97b3b82123e4edd327bf468fbfe57985a60a92ed9785721fdd8f4c033845cf",
-    "bytes": 805554
+    "sha256": "03dea3d4b3603ce9ee96ddfdad497d703f615eebfc01fe0b1ef1105c95a4e71a",
+    "bytes": 803947
   },
   "validation": {
     "checksPassed": 9,

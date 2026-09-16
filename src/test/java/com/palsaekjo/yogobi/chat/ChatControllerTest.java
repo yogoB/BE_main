@@ -40,9 +40,7 @@ class ChatControllerTest {
              "optional":{"currentCarrier":null,"networkType":null,"contractType":null,"hasFamilyBundle":null}}
             """;
     private final CostResult cost = new CostResult(42, "넷플플랜", "SKT", 55000, 68500, 13500, 162000,
-            List.of(new BreakdownLine("기본료", 55000, "OFFICIAL", null)),
-            // 교차검증 표시값이 있어도 /narrate 로는 전달되지 않아야 한다(아래 본문 대조로 검증).
-            new com.palsaekjo.yogobi.recommend.PriceCrossCheck(54000, 55000, false, "스마트초이스(KTOA)", "2026-09-14"));
+            List.of(new BreakdownLine("기본료", 55000, "OFFICIAL", null)));
     private final RecommendationResponse recommendation = new RecommendationResponse(Accuracy.PARTIAL,
             List.of(new MissingInput("hasFamilyBundle", "확인 필요", "통신사 마이페이지")), List.of(cost));
 
@@ -55,7 +53,8 @@ class ChatControllerTest {
             authorizations.add(exchange.getRequestHeaders().getFirst("Authorization"));
             bodies.add(json.readTree(exchange.getRequestBody()));
             byte[] body = (path.equals("/parse") ? parseBody :
-                    "{\"message\":\"실제 내시는 금액은 월 55,000원이에요.\"}").getBytes(StandardCharsets.UTF_8);
+                    "{\"message\":\"실제 내시는 금액은 월 55,000원이에요.\","
+                            + "\"reasons\":[\"넷플릭스 스탠다드가 요금제에 포함돼요.\"]}").getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().add("Content-Type", "application/json");
             exchange.sendResponseHeaders(path.equals("/parse") ? parseStatus : narrateStatus, body.length);
             try (var output = exchange.getResponseBody()) { output.write(body); }
@@ -75,6 +74,7 @@ class ChatControllerTest {
         send().andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("RECOMMENDED"))
                 .andExpect(jsonPath("$.data.recommendation.results[0].monthlyTotal").value(55000))
+                .andExpect(jsonPath("$.data.recommendation.reasons[0]").value("넷플릭스 스탠다드가 요금제에 포함돼요."))
                 .andExpect(jsonPath("$.data.message").value("실제 내시는 금액은 월 55,000원이에요."))
                 .andExpect(jsonPath("$.warnings").isEmpty());
         verify(service).recommend(new RecommendationRequest(new RecommendationRequest.Required(20, List.of(1L)),
@@ -83,7 +83,6 @@ class ChatControllerTest {
         assertEquals(List.of("Bearer test-backend-only-token", "Bearer test-backend-only-token"), authorizations);
         assertEquals(json.readTree("{\"text\":\"데이터 20기가 넷플릭스\"}"), bodies.getFirst());
         var expected = json.valueToTree(cost).deepCopy();
-        ((com.fasterxml.jackson.databind.node.ObjectNode) expected).remove("priceCrossCheck"); // AI 로 전달 안 함
         ((com.fasterxml.jackson.databind.node.ObjectNode) expected)
                 .set("missingInputs", json.valueToTree(recommendation.missingInputs()));
         assertEquals(json.readTree(json.writeValueAsString(expected)), bodies.get(1));

@@ -3,6 +3,7 @@ package com.palsaekjo.yogobi.catalog;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import org.junit.jupiter.api.Test;
@@ -36,7 +37,7 @@ class CatalogSeedLoaderTest {
     @Test
     void restoresSnapshotReloadsWithoutDuplicatesAndRollsBackInvalidCsv() throws Exception {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM flyway_schema_history WHERE success", Integer.class))
-                .isEqualTo(7);
+                .isEqualTo(11);   // V1~V11
         assertSnapshot();
         loader.run(null);
         assertSnapshot();
@@ -78,13 +79,26 @@ class CatalogSeedLoaderTest {
         assertThat(jdbc.queryForObject("SELECT nextval('subscription_tier_id_seq')", Long.class)).isEqualTo(19L);
     }
 
-    private void assertSnapshot() {
+    private void assertSnapshot() throws IOException {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM subscription_service", Integer.class)).isEqualTo(6);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM subscription_tier", Integer.class)).isEqualTo(17);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM bundle_product", Integer.class)).isEqualTo(7);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM bundle_item", Integer.class)).isEqualTo(15);
         assertThat(jdbc.queryForObject("SELECT price FROM subscription_tier WHERE id = 2", Long.class)).isEqualTo(13500L);
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM mobile_plan", Integer.class)).isZero();
+        // 실제 요금제 CSV(D4)가 들어왔다. 건수를 박아두면 CSV 갱신마다 깨지므로 파일 행수와 맞춘다.
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM mobile_plan", Integer.class))
+                .isEqualTo(seedRowCount("db/seed/mobile_plan.csv"));
+    }
+
+    /** 시드 CSV 의 데이터 행수(헤더 제외). 없으면 0. */
+    private static int seedRowCount(String path) throws IOException {
+        var resource = new ClassPathResource(path);
+        if (!resource.exists()) {
+            return 0;
+        }
+        try (var lines = resource.getContentAsString(StandardCharsets.UTF_8).lines()) {
+            return (int) lines.filter(line -> !line.isBlank()).count() - 1;
+        }
     }
 
     private static ByteArrayResource csv(String content) {

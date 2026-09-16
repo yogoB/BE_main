@@ -23,6 +23,11 @@ Compose는 PostgreSQL만 실행하며, 앱은 `.env`를 직접 읽고 기본 808
 번들 구성 15건을 CSV에서 적재한다. CSV와 마이그레이션은 JAR에도 포함된다.
 추천·계산기·카탈로그 HTTP API와 챗봇 게이트웨이가 구현되어 있다.
 
+카탈로그 원본은 CSV다. 우체국·스마트초이스 실행 연동은 제거했다.
+`CATALOG_CSV_DIR` 설정 시 내장 시드 대신 승인된 CSV 버전을 시작 시·60초마다 DB에 반영한다.
+[CSV 편집·AI 자료 검수·발행·복구·제보 처리](docs/catalog-data.md)에 팀원 실행 절차가 있다.
+비회원 오류 제보는 `/api/v1/catalog/reports`(CSRF 필수), 내장 검증 화면의 결과 카드에서 이용할 수 있다.
+
 [현재 구현 시퀀스 다이어그램](docs/diagrams/index.html) · [코드 근거와 구현 범위](docs/diagrams/README.md)
 
 ## 챗봇 게이트웨이

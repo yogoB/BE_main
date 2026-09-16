@@ -99,7 +99,7 @@
       "y": 410.0,
       "label": "회수 개월 · 변경 시점 상태",
       "variant": "return",
-      "note": "월 차액 <=0은 NO_BENEFIT. 회수 개월 < 약정 잔여면 SWITCH_NOW, 아니면 WAIT_UNTIL_EXPIRY"
+      "note": "월 차액 <=0은 NO_BENEFIT. 약정 잔여 0 또는 회수 개월 < 약정 잔여면 SWITCH_NOW, 나머지는 WAIT_UNTIL_EXPIRY."
     },
     {
       "id": "y12-switch-m8",
