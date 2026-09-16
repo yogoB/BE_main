@@ -20,16 +20,21 @@ class PriceCrossCheckTest {
         return new CandidatePlan(new MobilePlan(1L, "5G 시그니처", basePrice, 0, List.of()), "SKT");
     }
 
-    /** 스냅샷을 대신 돌려주는 리더. DB 없이 규칙만 본다. */
-    private static PriceCrossCheck checkWith(Long officialPrice) {
+    /** 조회 결과를 대신 돌려주는 리더. DB 없이 규칙만 본다. */
+    private static PriceCrossCheck checkWith(boolean collected, boolean carrierCovered, Long officialPrice) {
         var reader = new SmartChoiceSnapshotReader((JdbcTemplate) null) {
             @Override
-            public Optional<Snapshot> find(String carrier, String planName) {
-                return officialPrice == null ? Optional.empty()
-                        : Optional.of(new Snapshot(officialPrice, "스마트초이스(KTOA)", "https://x", Instant.EPOCH));
+            public Lookup lookup(String carrier, String planName) {
+                return new Lookup(collected, carrierCovered, officialPrice == null ? Optional.empty()
+                        : Optional.of(new Snapshot(officialPrice, "스마트초이스(KTOA)", "https://x", Instant.EPOCH)));
             }
         };
         return new PriceCrossCheck(reader);
+    }
+
+    /** 모았고, 통신사도 있고, 요금제도 찾은 경우. */
+    private static PriceCrossCheck checkWith(Long officialPrice) {
+        return checkWith(true, officialPrice != null, officialPrice);
     }
 
     @Test
@@ -48,8 +53,22 @@ class PriceCrossCheckTest {
     }
 
     @Test
-    void 스냅샷에_없으면_UNVERIFIED_이고_금액을_지어내지_않는다() {
-        var verdict = checkWith(null).check(plan(89_000L));
+    void 아직_모으지_않았으면_UNVERIFIED() {
+        var verdict = checkWith(false, false, null).check(plan(89_000L));
+        assertThat(verdict.status()).isEqualTo(PriceCrossCheck.Status.UNVERIFIED);
+    }
+
+    @Test
+    void 스마트초이스가_주지_않는_통신사면_대조_대상이_아니다() {
+        // 실측 응답의 통신사는 SKT·KT·LGU+ 뿐 — 알뜰폰은 영영 안 온다. "확인 못 했다"와 구분한다.
+        var verdict = checkWith(true, false, null).check(plan(89_000L));
+        assertThat(verdict.status()).isEqualTo(PriceCrossCheck.Status.NOT_APPLICABLE);
+        assertThat(verdict.officialPrice()).isNull();
+    }
+
+    @Test
+    void 모았고_통신사도_있는데_요금제만_없으면_UNVERIFIED_이고_금액을_지어내지_않는다() {
+        var verdict = checkWith(true, true, null).check(plan(89_000L));
         assertThat(verdict.status()).isEqualTo(PriceCrossCheck.Status.UNVERIFIED);
         assertThat(verdict.officialPrice()).isNull();             // 0원으로 적지 않는다
         assertThat(verdict.source()).isNull();
