@@ -3,6 +3,8 @@ package com.palsaekjo.yogobi.admin;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.palsaekjo.yogobi.common.ApiException;
 import com.palsaekjo.yogobi.common.ApiResponse;
+import com.palsaekjo.yogobi.catalog.ExchangeRates;
+import com.palsaekjo.yogobi.privacy.RetentionService;
 import com.palsaekjo.yogobi.recommend.SmartChoiceSweepService;
 import com.palsaekjo.yogobi.user.AdminAccount;
 import com.palsaekjo.yogobi.user.AuthService;
@@ -32,14 +34,19 @@ public class BackofficeController {
     private final BackofficeMetrics metrics;
     private final CatalogDailyHarvest harvest;
     private final SmartChoiceSweepService sweep;
+    private final ExchangeRates rates;
+    private final RetentionService retention;
 
     public BackofficeController(AdminAccount admin, AuthTokens tokens, BackofficeMetrics metrics,
-                                CatalogDailyHarvest harvest, SmartChoiceSweepService sweep) {
+                                CatalogDailyHarvest harvest, SmartChoiceSweepService sweep,
+                                ExchangeRates rates, RetentionService retention) {
         this.admin = admin;
         this.tokens = tokens;
         this.metrics = metrics;
         this.harvest = harvest;
         this.sweep = sweep;
+        this.rates = rates;
+        this.retention = retention;
     }
 
     /**
@@ -88,5 +95,35 @@ public class BackofficeController {
     @PostMapping("/smartchoice/sweep")
     public ApiResponse<Map<String, Object>> runSweep() {
         return ApiResponse.ok(sweep.sweep());
+    }
+
+    /** 환율을 지금 갱신한다(정기 실행은 09:15 KST). 실패해도 이전 값이 남는다 — 응답의 updated 로 구분한다. */
+    @PostMapping("/fx/refresh")
+    public ApiResponse<Map<String, Object>> refreshFx() {
+        return ApiResponse.ok(rates.refreshNow());
+    }
+
+    /**
+     * 파기 대상이 지금 몇 건인지만 센다. 지우지 않는다.
+     * 파기는 되돌릴 수 없으므로 화면은 항상 이걸 먼저 보여준다.
+     */
+    @GetMapping("/retention/pending")
+    public ApiResponse<Map<String, Integer>> retentionPending() {
+        return ApiResponse.ok(retention.pending());
+    }
+
+    /**
+     * 보유기간이 지난 개인정보를 지금 파기한다(정기 실행은 04:00 KST).
+     *
+     * <p><b>되돌릴 수 없다.</b> 그래서 본문에 {@code {"confirm":"파기"}} 를 요구한다 —
+     * 실수로 누른 버튼 하나로 개인 데이터가 사라지지 않게 하는 마지막 관문이다.
+     * 무엇이 지워졌는지 유형별 건수로 돌려주므로 운영자가 기록으로 남길 수 있다.
+     */
+    @PostMapping("/retention/purge")
+    public ApiResponse<Map<String, Integer>> runRetention(@RequestBody JsonNode body) {
+        if (!"파기".equals(body.path("confirm").asText(null))) {
+            throw ApiException.requiredMissing("confirm", "되돌릴 수 없는 작업이에요. 확인 문구를 입력해 주세요.");
+        }
+        return ApiResponse.ok(retention.purge());
     }
 }

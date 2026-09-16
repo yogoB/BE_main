@@ -82,7 +82,23 @@ public class ExchangeRates {
         refresh("USD", "KRW");
     }
 
-    void refresh(String base, String quote) {
+    /**
+     * 지금 한 번 갱신하고 결과를 돌려준다(백오피스 수동 실행).
+     * 실패해도 예외를 던지지 않는다 — 이전 값이 그대로 남고 화면이 그 사실을 적는다.
+     */
+    public Map<String, Object> refreshNow() {
+        boolean updated = refresh("USD", "KRW");
+        var out = new java.util.LinkedHashMap<String, Object>();
+        out.put("updated", updated);
+        rate("USD", "KRW").ifPresent(r -> {
+            out.put("rate", r.rate());
+            out.put("rateDate", r.rateDate().toString());
+            out.put("sourceUrl", r.sourceUrl());
+        });
+        return out;
+    }
+
+    boolean refresh(String base, String quote) {
         try {
             Map<?, ?> body = client.get()
                     .uri(url + "?base={base}&symbols={quote}", base, quote)
@@ -91,7 +107,7 @@ public class ExchangeRates {
             LocalDate date = LocalDate.parse(String.valueOf(body.get("date")));
             if (value == null || value.signum() <= 0) {
                 log.warn("환율 응답에 {} 값이 없어 이전 값을 유지합니다", quote);
-                return;
+                return false;
             }
             jdbc.update("""
                     INSERT INTO fx_rate (base, quote, rate, rate_date, source_url, fetched_at)
@@ -101,9 +117,11 @@ public class ExchangeRates {
                         source_url = EXCLUDED.source_url, fetched_at = EXCLUDED.fetched_at
                     """, base, quote, value, java.sql.Date.valueOf(date), url);
             log.info("환율 갱신 {}/{} = {} (기준일 {})", base, quote, value, date);
+            return true;
         } catch (RuntimeException e) {
             // 네트워크·형식 문제는 표시 품질 문제일 뿐 서비스 장애가 아니다. 이전 값을 유지한다.
             log.warn("환율 갱신 실패 — 이전 값을 유지합니다: {}", e.getClass().getSimpleName());
+            return false;
         }
     }
 

@@ -29,14 +29,16 @@ async function showSession() {
     $('login-section').hidden = true;
     $('dashboard-section').hidden = false;
     $('review-section').hidden = false;
+    $('jobs-section').hidden = false;
     $('audit-section').hidden = false;
     $('who').textContent = `${session.loginId} (회원번호 ${session.userId})로 로그인했어요.`;
-    await Promise.all([loadDashboard(), loadRequests(), loadAudit()]);
+    await Promise.all([loadDashboard(), loadRequests(), loadAudit(), loadRetentionPending()]);
     return true;
   } catch {
     $('login-section').hidden = false;
     $('dashboard-section').hidden = true;
     $('review-section').hidden = true;
+    $('jobs-section').hidden = true;
     $('audit-section').hidden = true;
     return false;
   }
@@ -257,6 +259,55 @@ $('sweep').addEventListener('click', async () => {
       + `등록 IP·접속 국가 제한일 수 있어요. 스냅샷 ${r.snapshotRows}행은 그대로 유지했어요.`);
     else say(`시세 수집 완료 — 조건 ${r.conditions}건에서 ${r.stored}행 갱신, 스냅샷 총 ${r.snapshotRows}행.`);
     await loadDashboard();
+  } catch (error) {
+    say(error.message);
+  }
+});
+
+/* ── 정기 작업 수동 실행 ── */
+
+/** 파기 대상 건수. 지우기 전에 항상 이걸 먼저 보여준다 — 파기는 되돌릴 수 없다. */
+async function loadRetentionPending() {
+  const box = $('retention-pending');
+  try {
+    const counts = await call('/api/v1/admin/retention/pending');
+    const total = Object.values(counts).reduce((sum, n) => sum + n, 0);
+    box.textContent = total
+      ? `지금 파기 대상 ${total}건 — ` + Object.entries(counts).filter(([, n]) => n)
+          .map(([name, n]) => `${name} ${n}`).join(', ')
+      : '지금 파기 대상이 없어요.';
+  } catch (error) {
+    box.textContent = `대상 건수를 읽지 못했어요: ${error.message}`;
+  }
+}
+
+$('retention-check').addEventListener('click', () => loadRetentionPending());
+
+$('fx').addEventListener('click', async () => {
+  say('환율을 갱신하는 중이에요…');
+  try {
+    const r = await call('/api/v1/admin/fx/refresh', { method: 'POST', body: {} });
+    say(r.updated
+      ? `환율 갱신 완료 — USD/KRW ${r.rate} (기준일 ${r.rateDate})`
+      : `갱신하지 못해 이전 값을 유지했어요${r.rate ? ` — USD/KRW ${r.rate} (기준일 ${r.rateDate})` : ''}.`);
+  } catch (error) {
+    say(error.message);
+  }
+});
+
+/* 파기는 되돌릴 수 없다. 버튼 한 번으로 지우지 않고 확인 문구를 직접 입력받는다.
+   서버도 같은 문구를 요구하므로, 화면을 건너뛰어 호출해도 실수로는 지워지지 않는다. */
+$('retention-purge').addEventListener('click', async () => {
+  const typed = prompt('보유기간이 지난 개인정보를 지금 파기합니다. 되돌릴 수 없어요.\n계속하려면 "파기"를 입력해 주세요.');
+  if (typed === null) return;
+  if (typed.trim() !== '파기') { say('확인 문구가 달라서 취소했어요. 아무것도 지우지 않았습니다.'); return; }
+  say('파기하는 중이에요…');
+  try {
+    const deleted = await call('/api/v1/admin/retention/purge', { method: 'POST', body: { confirm: '파기' } });
+    const total = Object.values(deleted).reduce((sum, n) => sum + n, 0);
+    say(`파기 완료 — 총 ${total}건 삭제 (` + Object.entries(deleted)
+      .map(([name, n]) => `${name} ${n}`).join(', ') + ')');
+    await Promise.all([loadRetentionPending(), loadDashboard()]);
   } catch (error) {
     say(error.message);
   }

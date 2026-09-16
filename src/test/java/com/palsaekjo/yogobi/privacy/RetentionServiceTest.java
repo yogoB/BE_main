@@ -45,8 +45,13 @@ class RetentionServiceTest {
         // 만료된 인증 흔적도 파기 대상.
         jdbc.update("INSERT INTO auth_email_token(token_hash,purpose,email,expires_at) VALUES (repeat('a',64),'SIGNUP','r@example.com',now()-interval '1 minute')");
 
+        // 미리보기가 실제 삭제와 같은 조건을 봐야 한다 — 어긋나면 운영자가 잘못된 수를 보고 파기를 누른다.
+        var preview = retention.pending();
+
         var deleted = retention.purge();
 
+        assertThat(deleted).isEqualTo(preview);
+        assertThat(retention.pending().values()).allMatch(n -> n == 0);   // 지운 뒤에는 대상이 없다
         assertThat(deleted.get("payment_record")).isEqualTo(1);
         assertThat(deleted.get("detection_result")).isEqualTo(1);
         assertThat(deleted.get("auth_email_token")).isEqualTo(1);
