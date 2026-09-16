@@ -42,8 +42,6 @@ class RetentionServiceTest {
         // detection_result: 보유 6개월. 7개월 전은 파기, 1개월 전은 보존.
         jdbc.update("INSERT INTO detection_result(user_id,rule_code,target_ref,wasted_amount,detected_at) VALUES (?,?,?,?,now()-interval '7 months')", id, "TIER_DUPLICATE", "old", 1000);
         jdbc.update("INSERT INTO detection_result(user_id,rule_code,target_ref,wasted_amount,detected_at) VALUES (?,?,?,?,now()-interval '1 month')", id, "TIER_DUPLICATE", "new", 1000);
-        // 만료된 인증 흔적도 파기 대상.
-        jdbc.update("INSERT INTO auth_email_token(token_hash,purpose,email,expires_at) VALUES (repeat('a',64),'SIGNUP','r@example.com',now()-interval '1 minute')");
 
         // 미리보기가 실제 삭제와 같은 조건을 봐야 한다 — 어긋나면 운영자가 잘못된 수를 보고 파기를 누른다.
         var preview = retention.pending();
@@ -54,10 +52,8 @@ class RetentionServiceTest {
         assertThat(retention.pending().values()).allMatch(n -> n == 0);   // 지운 뒤에는 대상이 없다
         assertThat(deleted.get("payment_record")).isEqualTo(1);
         assertThat(deleted.get("detection_result")).isEqualTo(1);
-        assertThat(deleted.get("auth_email_token")).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT merchant_raw FROM payment_record", String.class)).isEqualTo("NEW");
         assertThat(jdbc.queryForObject("SELECT target_ref FROM detection_result", String.class)).isEqualTo("new");
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM auth_email_token", Integer.class)).isZero();
     }
 
     long oldPayment() {

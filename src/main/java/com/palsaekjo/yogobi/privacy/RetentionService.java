@@ -39,7 +39,6 @@ public class RetentionService {
                         "retain_until <= ?", LocalDate.now(ZoneId.of(PrivacyPolicy.RETENTION_ZONE))),
                 new Target("detection_result", "detection_result",
                         "detected_at < now() - (? * interval '1 month')", PrivacyPolicy.DETECTION_RETENTION_MONTHS),
-                new Target("auth_email_token", "auth_email_token", "expires_at <= now()"),
                 new Target("auth_session", "auth_session", "expires_at <= now()"),
                 new Target("catalog_report", "catalog_report",
                         "created_at < now() - (? * interval '1 day')", PrivacyPolicy.REPORT_RETENTION_DAYS));
