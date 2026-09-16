@@ -62,6 +62,11 @@ POST /api/v1/chat/messages  (BE_main)
   → AI: POST /parse    → { required, optional, confidence }
   → 내부 recommend 호출 (필터 경로와 동일 로직)
   → AI: POST /narrate  → { message, reasons }
+
+POST /api/v1/admin/catalog/{dataset}  (운영자 변경 제안, D-29)
+  → 스마트초이스 Open API  → 공식 시세 대조 (1차)
+  → AI: POST /catalog/candidates → { status, candidate, confidence, sources } (2차 더블체크)
+  → 판정은 BE 가 한다: VERIFIED / MISMATCH(승인 차단) / UNVERIFIED(통과 후 사용자 제보로 보완)
 ```
 
 **BE_main이 AI-를 호출한다. 반대 방향은 없다.** `confidence < 0.7`이면 되묻는다.
@@ -85,7 +90,7 @@ AI의 `/parse`·`/narrate`·`/ocr`는 토큰 누락·불일치 시 401, 서버 �
 - 금액·조합은 `pricing`(순수 Java, 골든케이스·분기 100%)이 독점한다. **AI는 숫자를 만들지 않는다**
   (절대 원칙 2, D-03). AI가 하는 건 둘뿐: `/parse`(자연어→파라미터), `/narrate`(BE가 계산한 숫자를 문장으로 포장).
 - 경계는 코드로 강제된다: `/narrate`의 **금액 문장(`message`)은 LLM을 쓰지 않는 결정론적 템플릿**이고,
-  **추천 사유(`reasons`)만 LLM이 만들되 BE가 보낸 금액 외의 금액이 섞이면 그 줄을 버린다**(D-20).
+  **추천 사유(`reasons`)만 LLM이 만들되 BE가 보낸 금액 외의 금액이 섞이면 그 줄을 버린다**(D-26).
   BE `AiGateway`가 AI 응답(confidence·정수 GB·서비스 ID·enum)을 **전부 재검증**해 어긋나면 폐기,
   필터·챗봇이 **같은 recommend 엔진**을 탄다(원칙 3).
 
@@ -113,9 +118,13 @@ AI의 `/parse`·`/narrate`·`/ocr`는 토큰 누락·불일치 시 401, 서버 �
 | POST | `/api/v1/catalog/reports` | 정보 오류 제보(비회원 허용·CSRF 필수), 접수만 수행 — D-18 사용자 요청 |
 | GET | `/api/v1/admin/catalog` | 카탈로그 원본(합본 CSV) 데이터셋 목록·행 수 — **운영자 전용**, D-24 |
 | GET | `/api/v1/admin/catalog/{dataset}` | 데이터셋 전체 행 |
-| POST | `/api/v1/admin/catalog/{dataset}` | 행 추가. 키 중복은 409 |
-| PATCH | `/api/v1/admin/catalog/{dataset}/{key}` | 행 부분 수정. 키 필드 변경은 409 |
-| DELETE | `/api/v1/admin/catalog/{dataset}/{key}` | 행 삭제(DB에서는 `active=false`) |
+| POST | `/api/v1/admin/catalog/{dataset}` | 행 추가 **제안** — 202, 승인 전까지 반영 없음 (D-28) |
+| PATCH | `/api/v1/admin/catalog/{dataset}/{key}` | 행 부분 수정 **제안** — 202 |
+| DELETE | `/api/v1/admin/catalog/{dataset}/{key}` | 행 삭제 **제안** — 202 |
+| GET | `/api/v1/admin/catalog/requests` | 제안 목록. `?status=PENDING\|APPROVED\|REJECTED\|FAILED` |
+| POST | `/api/v1/admin/catalog/requests/{id}/approve` | 승인 — **이때 파일·DB에 반영**. 재승인·검토 불일치는 409 (D-29) |
+| POST | `/api/v1/admin/catalog/requests/{id}/reject` | 거절 — `{reason}`, 영영 반영하지 않음 |
+| GET | `/api/v1/admin/catalog/audit` | 원본 변경 이력(최신순, `?limit=1~500`) — 행위자·시각·전/후 행·결과, D-27 |
 
 ### Phase 1
 | Method | Path | 설명 |
@@ -194,7 +203,13 @@ Google 전용 계정은 동일 Google `sub` 재인증으로 자체 비밀번호�
       { "label": "선택약정 25% 할인", "amount": -13750, "provenance": "DERIVED" },
       { "label": "넷플릭스 스탠다드", "amount": 13500, "provenance": "OFFICIAL",
         "note": "제휴 혜택으로 4,000원 할인 적용" }
-    ]
+    ],
+    "priceCrossCheck": {                                // 스마트초이스 공식 시세 대조(D-20 1차 교차검증)
+      "status": "MATCH",                                // MATCH | MISMATCH | UNVERIFIED | NOT_APPLICABLE
+      "officialPrice": 55000,                           // 확인 못 했으면 null (0원으로 적지 않는다)
+      "source": "스마트초이스(KTOA)", "sourceUrl": "https://www.smartchoice.or.kr/",
+      "checkedAt": "2026-09-16T03:40:00Z"               // 스냅샷을 모은 시각
+    }
   }],
   "reasons": [                                            // 1순위 조합에 대한 AI 큐레이션 사유, 0~3개
     "따로 내시던 넷플릭스 스탠다드 13,500원이 요금제에 포함돼 있어요.",
@@ -205,8 +220,19 @@ Google 전용 계정은 동일 Google `sub` 재인증으로 자체 비밀번호�
 
 `baseline`은 아무 할인 없이 정가로만 냈을 때다. 절감액 표시의 기준선.
 D-18에서 우체국·스마트초이스 연동과 `priceCrossCheck` 응답 필드를 제거했다.
-D-20에서 AI `/narrate` **응답**에 `reasons`를 더했다. 요청 필드는 그대로다.
-D-20 후속(2026-09-16): BE가 `/narrate`를 호출해 `reasons`를 `/recommendations` 응답 최상위에 싣는다.
+**2026-09-16 사용자 승인으로 `priceCrossCheck`를 복구했다**(D-12 마지막 줄이 남겨 둔 §3 계약 결정).
+대조 대상은 요금제 **기본료**이며 `baseline`(구독 포함 정가 합계)이 아니다.
+`status`는 네 값이다. `UNVERIFIED`는 **"틀렸다"가 아니라 "확인 못 했다"**이고,
+`NOT_APPLICABLE`은 **스마트초이스가 그 통신사를 아예 주지 않아 대조 대상이 아니다**라는 뜻이다.
+실측 응답의 통신사는 `SKT·KT·LGU+` 뿐이라 알뜰폰 요금제(카탈로그 1,711건 중 1,451건)가 여기 해당한다
+(evidence/smartchoice-operation-2026-09-16.json). 둘을 합치면 화면이 알뜰폰 사용자에게 영영 오지 않을
+"확인"을 기다리게 만든다.
+통신사 표기는 소문자·공백 제거 후 비교한다 — 카탈로그 `LG U+` 와 응답 `LGU+` 가 달라 88건이 전부 실패했다.
+값은 **표시·신뢰용이며 금액에도 추천 순위에도 넣지 않는다**(D-03). 서비스는 정렬이 끝난 뒤에 붙인다.
+채우는 값의 출처는 배치가 모은 `smartchoice_plan_snapshot` 뿐이다 — 요청 경로는 외부를 호출하지 않는다(D-05 유지).
+`SMARTCHOICE_API_KEY`가 없으면 스윕이 돌지 않아 전 결과가 `UNVERIFIED`다(fail-soft).
+D-26에서 AI `/narrate` **응답**에 `reasons`를 더했다. 요청 필드는 그대로다.
+D-26 후속(2026-09-16): BE가 `/narrate`를 호출해 `reasons`를 `/recommendations` 응답 최상위에 싣는다.
 필터·챗봇 두 경로 모두 1순위 결과(`results[0]`)에 대한 사유를 담으며, AI 장애 시 **빈 배열**이고 `results`는 정상이다.
 narrate 오케스트레이션은 컨트롤러가 한다(`RecommendationController`·`ChatController`) — `RecommendationService`는 AI를 모른다.
 `recommend`가 `chat`의 `AiGateway`에 직접 의존하면 순환이 되므로 포트 `recommend.Narrator`(구현: `AiGateway`)로 역전한다.

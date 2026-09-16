@@ -37,7 +37,14 @@ AI 모델의 출력은 이용 조건을 확인한 자료에서 추출한 후보�
   `ROLE_ADMIN`을 받고, 비어 있으면 아무도 쓸 수 없다(기본 잠금). 일반 회원은 403. 키는 데이터셋별 자연키를 `|`로 이은 값
   (요금제 `SKT|베스트 Max(T 우주)`, 서비스·티어·번들은 `id`, 혜택은 `통신사|요금제명|service_id|tier_id`).
 - 삭제는 파일에서 행을 지우고 DB에서는 `active=false`로 내린다(회원 참조 보존).
-- 코드: `CombinedCatalogCsv`(파서) · `CombinedCatalogStore`(CRUD·되쓰기) · `CombinedCatalogLoader`(시작 적재) · `CatalogAdminController`.
+- **쓰기는 제안·승인 2단계다**(D-28): `POST/PATCH/DELETE`는 `catalog_change_request`(V15)에 PENDING 제안을 만들고 202를 준다.
+  `POST /api/v1/admin/catalog/requests/{id}/approve` 로 승인해야 파일·DB에 반영된다. 자기 승인은 허용하되 제안자·승인자를 따로 남긴다.
+- **제안 내용은 자동 검토된다**(D-29): ① 스마트초이스 시세 ② AI `POST /catalog/candidates` 두 소스와 금액을 대조한다(±100원).
+  한 곳이라도 **다른 금액**이면 `MISMATCH` — 승인이 막힌다. 둘 다 확인 못 하면 `UNVERIFIED` 로 **통과시키고 사용자 제보로 보완**한다(D-18).
+  판정은 BE 가 한다 — AI 는 출처를 찾아 보고할 뿐 숫자를 확정하지 않는다(절대 원칙 2).
+- **모든 변경은 `catalog_audit`(V14)에 남는다**(D-27): 행위자·시각·데이터셋·행 키·변경 전/후 행·결과(APPLIED/FAILED).
+  원본이 파일이라 git 이력이 없으므로 이 표가 유일한 변경 이력이다. 조회는 `GET /api/v1/admin/catalog/audit`.
+- 코드: `CombinedCatalogCsv`(파서) · `CombinedCatalogStore`(CRUD·되쓰기) · `CombinedCatalogLoader`(시작 적재) · `CatalogAdminController` · `CatalogAuditLog`(감사) · `CatalogChangeRequests`(제안·승인) · `CatalogProposalReview`(검토 판정) · `SmartChoicePriceOracle`·`AiGateway`(두 소스).
 
 ## 1-C. 제휴 혜택을 어디서 얻는가 (2026-09-16)
 

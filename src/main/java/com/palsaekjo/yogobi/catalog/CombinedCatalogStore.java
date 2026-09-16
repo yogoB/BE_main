@@ -39,11 +39,13 @@ public class CombinedCatalogStore {
             "bundle_product", List.of("id"));
 
     private final CatalogSeedLoader loader;
+    private final CatalogAuditLog audit;
     private final Path file;
 
-    public CombinedCatalogStore(CatalogSeedLoader loader,
+    public CombinedCatalogStore(CatalogSeedLoader loader, CatalogAuditLog audit,
                                 @Value("${yogobi.catalog.combined-csv:}") String path) {
         this.loader = loader;
+        this.audit = audit;
         this.file = path.isBlank() ? null : Path.of(path);
     }
 
@@ -77,51 +79,76 @@ public class CombinedCatalogStore {
     }
 
     /** 행 추가. 같은 키가 이미 있으면 409다 — 조용한 덮어쓰기는 데이터 유실이다. */
-    public Map<String, String> create(String dataset, Map<String, String> values) {
-        return mutate(dataset, (columns, rows) -> {
+    public Map<String, String> create(String dataset, Map<String, String> values, long actorId) {
+        return create(dataset, values, actorId, null);
+    }
+
+    /** {@code trace} 는 감사 기록에 함께 남길 경위(승인 요청 번호·제안자 등). D-28. */
+    public Map<String, String> create(String dataset, Map<String, String> values, long actorId, String trace) {
+        return mutate(dataset, actorId, trace, (columns, rows) -> {
             String key = key(dataset, columns, values);
             if (indexOf(dataset, columns, rows, key) >= 0)
                 throw ApiException.conflict("이미 존재하는 행입니다: " + key);
-            rows.add(CombinedCatalogCsv.row(ordered(columns, values)));
-            return values;
+            String row = CombinedCatalogCsv.row(ordered(columns, values));
+            rows.add(row);
+            return new Mutation(values, CatalogAuditLog.Action.CREATE, key, null, row);
         });
     }
 
     /** 행 수정. 보낸 필드만 덮어쓰고 나머지는 유지한다(부분 수정). */
-    public Map<String, String> update(String dataset, String key, Map<String, String> values) {
-        return mutate(dataset, (columns, rows) -> {
+    public Map<String, String> update(String dataset, String key, Map<String, String> values, long actorId) {
+        return update(dataset, key, values, actorId, null);
+    }
+
+    public Map<String, String> update(String dataset, String key, Map<String, String> values,
+                                      long actorId, String trace) {
+        return mutate(dataset, actorId, trace, (columns, rows) -> {
             int index = indexOf(dataset, columns, rows, key);
             if (index < 0) throw ApiException.planNotFound("행을 찾을 수 없습니다: " + key);
-            Map<String, String> merged = toMap(columns, rows.get(index));
+            String before = rows.get(index);
+            Map<String, String> merged = toMap(columns, before);
             merged.putAll(values);
             if (!key(dataset, columns, merged).equals(key))
                 throw ApiException.conflict("키 필드는 수정할 수 없습니다. 삭제 후 다시 추가하세요.");
-            rows.set(index, CombinedCatalogCsv.row(ordered(columns, merged)));
-            return merged;
+            String after = CombinedCatalogCsv.row(ordered(columns, merged));
+            rows.set(index, after);
+            return new Mutation(merged, CatalogAuditLog.Action.UPDATE, key, before, after);
         });
     }
 
     /** 행 삭제. 파일에서 지우면 DB 재적재에서 active=false로 내려간다(회원 참조는 보존). */
-    public void delete(String dataset, String key) {
-        mutate(dataset, (columns, rows) -> {
+    public void delete(String dataset, String key, long actorId) {
+        delete(dataset, key, actorId, null);
+    }
+
+    public void delete(String dataset, String key, long actorId, String trace) {
+        mutate(dataset, actorId, trace, (columns, rows) -> {
             int index = indexOf(dataset, columns, rows, key);
             if (index < 0) throw ApiException.planNotFound("행을 찾을 수 없습니다: " + key);
-            rows.remove(index);
-            return Map.of();
+            String before = rows.remove(index);
+            return new Mutation(Map.of(), CatalogAuditLog.Action.DELETE, key, before, null);
         });
     }
 
-    private interface Change {
-        Map<String, String> apply(List<String> columns, List<String> rows);
+    /** 변경 결과와 감사 기록에 필요한 전/후 행. */
+    private record Mutation(Map<String, String> result, CatalogAuditLog.Action action,
+                            String key, String before, String after) {
     }
 
-    /** 파일 → 변경 → 파일 쓰기 → DB 반영. DB가 실패하면 파일을 원상복구하고 예외를 올린다. */
-    private synchronized Map<String, String> mutate(String dataset, Change change) {
+    private interface Change {
+        Mutation apply(List<String> columns, List<String> rows);
+    }
+
+    /**
+     * 파일 → 변경 → 파일 쓰기 → DB 반영 → 감사 기록. DB가 실패하면 파일을 원상복구하고 FAILED 로 남긴 뒤 올린다.
+     * 변경 전 검증(404·409)에서 막힌 요청은 원본을 건드리지 않았으므로 기록하지 않는다 — 감사 대상은 실제 쓰기 시도다.
+     */
+    private synchronized Map<String, String> mutate(String dataset, long actorId, String trace, Change change) {
         Map<String, Section> sections = read();
         Section section = section(sections, dataset);
         List<String> columns = CombinedCatalogCsv.fields(section.header());
         var rows = new ArrayList<>(section.rows());
-        Map<String, String> result = change.apply(columns, rows);
+        Mutation mutation = change.apply(columns, rows);
 
         var updated = new LinkedHashMap<>(sections);
         updated.put(dataset, new Section(section.header(), rows));
@@ -133,9 +160,19 @@ public class CombinedCatalogStore {
             reload(updated);
         } catch (RuntimeException | SQLException | IOException e) {
             write(previous); // DB 실패 시 파일을 되돌린다 — 원본과 투영이 갈라지면 안 된다.
+            audit.failed(actorId, mutation.action(), dataset, mutation.key(),
+                    mutation.before(), mutation.after(), detail(trace, e.getClass().getSimpleName()));
             throw new IllegalStateException("DB 반영 실패 — 변경을 되돌렸습니다", e);
         }
-        return result;
+        audit.applied(actorId, mutation.action(), dataset, mutation.key(),
+                mutation.before(), mutation.after(), trace);
+        return mutation.result();
+    }
+
+    /** 경위와 사유를 한 칸에 담는다 — 감사 표의 detail 하나로 "왜·어떤 승인으로" 를 함께 본다. */
+    private static String detail(String trace, String reason) {
+        if (trace == null) return reason;
+        return reason == null ? trace : trace + " · " + reason;
     }
 
     /** 합본 전체를 DB에 반영한다. 기존 스냅샷 적재 경로를 그대로 쓴다(단일 트랜잭션·미포함 행 active=false). */
