@@ -23,9 +23,11 @@ import org.springframework.stereotype.Component;
 @Component
 public class CatalogReader {
     private final NamedParameterJdbcTemplate jdbc;
+    private final ExchangeRates exchangeRates;
 
-    public CatalogReader(NamedParameterJdbcTemplate jdbc) {
+    public CatalogReader(NamedParameterJdbcTemplate jdbc, ExchangeRates exchangeRates) {
         this.jdbc = jdbc;
+        this.exchangeRates = exchangeRates;
     }
 
     /** 요금제 + 통신사 이름. 응답에 통신사명이 필요하지만 MobilePlan 은 통신사를 모르므로 함께 싣는다. */
@@ -36,7 +38,14 @@ public class CatalogReader {
     public record ServiceView(long id, String name, String category, String officialUrl, List<TierView> tiers) {
     }
 
-    public record TierView(long id, String name, long price, Integer concurrentStreams, String quality, String note) {
+    /**
+     * 구독 등급 표시용. {@code price}는 {@code currency} 단위의 공식 표기 금액이다.
+     * 해외 결제 등급은 {@code krwEstimate}(환율 환산·ESTIMATED)와 기준일을 함께 주고, 원화 등급은 둘 다 null 이다.
+     * 환산값은 표시 전용 — 계산에는 쓰지 않는다(D-17).
+     */
+    public record TierView(long id, String name, long price, String currency,
+                           Long krwEstimate, java.time.LocalDate krwRateDate,
+                           Integer concurrentStreams, String quality, String note) {
     }
 
     /** voiceMin·smsCnt 는 공식 표기에 수량이 없으면 null(미확인)이다 — 0(미제공)과 구분한다. */
@@ -48,15 +57,22 @@ public class CatalogReader {
                               java.math.BigDecimal discountValue, boolean exclusive, String exclusiveGroup) {
     }
 
-    /** 구독 서비스 + 소속 티어 목록. */
+    /** 구독 서비스 + 소속 티어 목록. 해외 결제 등급에는 원화 환산(표시용)을 붙인다. */
     public List<ServiceView> listServices() {
+        // 환율은 배치가 넣어둔 마지막 값만 읽는다 — 요청 경로에서 외부를 부르지 않는다(D-05).
+        var usdKrw = exchangeRates.rate("USD", "KRW").orElse(null);
         var tiersByService = new LinkedHashMap<Long, List<TierView>>();
         jdbc.query("""
-                SELECT service_id, id, name, price, concurrent_streams, quality, note
+                SELECT service_id, id, name, price, currency, concurrent_streams, quality, note
                 FROM subscription_tier WHERE active AND service_id IN (SELECT id FROM subscription_service WHERE active) ORDER BY service_id, price
                 """, new MapSqlParameterSource(), rs -> {
+                    String currency = rs.getString("currency");
+                    long price = rs.getLong("price");
+                    boolean convertible = !"KRW".equals(currency) && usdKrw != null && usdKrw.base().equals(currency);
                     tiersByService.computeIfAbsent(rs.getLong("service_id"), k -> new ArrayList<>())
-                            .add(new TierView(rs.getLong("id"), rs.getString("name"), rs.getLong("price"),
+                            .add(new TierView(rs.getLong("id"), rs.getString("name"), price, currency,
+                                    convertible ? ExchangeRates.toKrw(price, usdKrw) : null,
+                                    convertible ? usdKrw.rateDate() : null,
                                     rs.getObject("concurrent_streams", Integer.class),
                                     rs.getString("quality"), rs.getString("note")));
                 });
@@ -149,16 +165,56 @@ public class CatalogReader {
         return java.util.Optional.of(new CandidatePlan(plan, (String) p[4]));
     }
 
-    /** 지정한 ID 의 티어들 (계산기 — 특정 조합). 존재하는 것만 반환하므로 호출부가 누락을 검증한다. */
+    /**
+     * 지정한 ID 의 티어들 (계산기 — 특정 조합). 존재하는 것만 반환하므로 호출부가 누락을 검증한다.
+     * **원화 확정 가격만** 반환한다 — 해외 표기 금액을 원으로 섞으면 $20 이 20원이 된다.
+     */
     public List<SubscriptionTier> findTiersByIds(List<Long> tierIds) {
         if (tierIds.isEmpty()) {
             return List.of();
         }
         return jdbc.query("""
-                SELECT id, service_id, name, price FROM subscription_tier WHERE id IN (:ids)
+                SELECT id, service_id, name, price FROM subscription_tier
+                WHERE id IN (:ids) AND currency = 'KRW'
                 """, new MapSqlParameterSource("ids", tierIds),
                 (rs, i) -> new SubscriptionTier(rs.getLong("id"), rs.getLong("service_id"),
                         rs.getString("name"), rs.getLong("price")));
+    }
+
+    /** 요청한 등급 중 해외 결제라 계산에 쓸 수 없는 것 (등급 ID → "서비스명 등급명"). */
+    public Map<Long, String> findForeignPricedTiers(List<Long> tierIds) {
+        if (tierIds.isEmpty()) {
+            return Map.of();
+        }
+        var found = new LinkedHashMap<Long, String>();
+        jdbc.query("""
+                SELECT t.id, s.name AS service_name, t.name AS tier_name
+                FROM subscription_tier t JOIN subscription_service s ON s.id = t.service_id
+                WHERE t.id IN (:ids) AND t.currency <> 'KRW' ORDER BY t.id
+                """, new MapSqlParameterSource("ids", tierIds),
+                rs -> { found.put(rs.getLong("id"), rs.getString("service_name") + " " + rs.getString("tier_name")); });
+        return found;
+    }
+
+    /**
+     * 요청한 서비스 중 **해외 결제라 원화 확정 가격이 없는** 것 (서비스 ID → 이름).
+     * 카탈로그 결손(아직 수집 못 한 것)과 구분하려고 따로 본다 — 이건 결손이 아니라 "사용자 확인이 필요한 금액"이다.
+     */
+    public Map<Long, String> findForeignPricedServices(List<Long> serviceIds) {
+        if (serviceIds.isEmpty()) {
+            return Map.of();
+        }
+        var found = new LinkedHashMap<Long, String>();
+        jdbc.query("""
+                SELECT s.id, s.name FROM subscription_service s
+                WHERE s.active AND s.id IN (:ids)
+                  AND EXISTS (SELECT 1 FROM subscription_tier t WHERE t.service_id = s.id AND t.active)
+                  AND NOT EXISTS (SELECT 1 FROM subscription_tier t
+                                  WHERE t.service_id = s.id AND t.active AND t.currency = 'KRW')
+                ORDER BY s.id
+                """, new MapSqlParameterSource("ids", serviceIds),
+                rs -> { found.put(rs.getLong("id"), rs.getString("name")); });
+        return found;
     }
 
     private Map<Long, List<PlanBenefit>> loadBenefits(List<Long> planIds) {
@@ -188,7 +244,7 @@ public class CatalogReader {
     public List<SubscriptionTier> findRepresentativeTiers(List<Long> serviceIds) {
         var tiers = jdbc.query("""
                 SELECT id, service_id, name, price FROM subscription_tier
-                WHERE active AND service_id IN (:serviceIds)
+                WHERE active AND currency = 'KRW' AND service_id IN (:serviceIds)
                   AND service_id IN (SELECT id FROM subscription_service WHERE active)
                 """, new MapSqlParameterSource("serviceIds", serviceIds),
                 (rs, i) -> new SubscriptionTier(rs.getLong("id"), rs.getLong("service_id"),

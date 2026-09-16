@@ -21,3 +21,11 @@ id,name,category,official_url
 20,교보 sam,EBOOK,https://sam.kyobobook.co.kr/dig/sam/pssbuy
 21,iCloud+,CLOUD,https://support.apple.com/ko-kr/108047
 22,Microsoft 365,CLOUD,https://www.microsoft.com/ko-kr/microsoft-365/basic
+23,ChatGPT,AI,https://openai.com/index/introducing-chatgpt-go/
+24,Claude,AI,https://claude.com/pricing
+25,Perplexity,AI,https://www.perplexity.ai/help-center/en/articles/12167980-using-the-connector-for-slack
+26,Grok,AI,https://x.ai/pricing
+27,Midjourney,AI,https://docs.midjourney.com/hc/en-us/articles/27870484040333-Comparing-Midjourney-Plans
+28,GitHub Copilot,AI,https://github.com/features/copilot
+29,Cursor,AI,https://cursor.com/pricing
+30,Dropbox,CLOUD,https://www.dropbox.com/en_GB/buy

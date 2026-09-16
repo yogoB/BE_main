@@ -51,7 +51,10 @@ public class RecommendationService {
 
         // 카탈로그에 없는 서비스는 막지 않는다(G-12·D-17). 아는 것으로 계산하고 모르는 것은 안내·기록한다.
         List<SubscriptionTier> tiers = catalog.findRepresentativeTiers(required.wantedServiceIds());
-        List<Long> unknownServiceIds = unknown(required.wantedServiceIds(), tiers);
+        List<Long> excluded = unknown(required.wantedServiceIds(), tiers);
+        // 그중 해외 결제 구독은 **결손이 아니다** — 수집할 게 아니라 사용자에게 실제 결제액을 물어야 하는 것이다.
+        Map<Long, String> foreignPriced = catalog.findForeignPricedServices(excluded);
+        List<Long> unknownServiceIds = excluded.stream().filter(id -> !foreignPriced.containsKey(id)).toList();
         unknownServiceIds.forEach(id -> gaps.record(Kind.SUBSCRIPTION_TIER, "serviceId:" + id));
         Set<SubscriptionTier> wanted = new LinkedHashSet<>(tiers);
         Set<Long> wantedTierIds = new LinkedHashSet<>(tiers.stream().map(SubscriptionTier::id).toList());
@@ -66,7 +69,7 @@ public class RecommendationService {
         List<CandidatePlan> candidates = catalog.findCandidatePlans(dataMb, networkType);
         if (candidates.isEmpty()) {
             gaps.record(Kind.MOBILE_PLAN, "dataMb>=" + dataMb + ",network=" + (networkType == null ? "ANY" : networkType));
-            var noPlan = missingInputs(optional, unknownServiceIds);
+            var noPlan = missingInputs(optional, unknownServiceIds, foreignPriced);
             noPlan.add(new MissingInput("monthlyDataGb",
                     "조건을 만족하는 요금제가 아직 카탈로그에 없어요. 확인 중이에요",
                     "데이터 사용량을 낮추거나 망 종류를 바꿔서 다시 찾아보세요"));
@@ -83,7 +86,7 @@ public class RecommendationService {
                 .map(e -> toResult(e.getKey(), e.getValue()))
                 .toList();
 
-        List<MissingInput> missing = missingInputs(optional, unknownServiceIds);
+        List<MissingInput> missing = missingInputs(optional, unknownServiceIds, foreignPriced);
         Accuracy accuracy = missing.isEmpty() ? Accuracy.FULL : Accuracy.PARTIAL;
         return new RecommendationResponse(accuracy, missing, results);
     }
@@ -99,8 +102,13 @@ public class RecommendationService {
         var candidate = catalog.findPlanById(request.planId())
                 .orElseThrow(() -> ApiException.planNotFound("요금제를 찾을 수 없습니다: " + request.planId()));
 
+        // 원화 확정 가격 등급만 계산에 들어간다. 빠진 ID 가 해외 결제 등급이면 잘못된 요청이 아니라
+        // "실제 결제액을 물어야 하는 것"이므로 막지 않고 안내로 돌려준다(원칙 5-①).
         List<SubscriptionTier> tiers = catalog.findTiersByIds(request.tierIds());
-        if (tiers.size() != request.tierIds().stream().distinct().count()) {
+        List<Long> absent = request.tierIds().stream().distinct()
+                .filter(id -> tiers.stream().noneMatch(t -> t.id() == id)).toList();
+        Map<Long, String> foreignPriced = catalog.findForeignPricedTiers(absent);
+        if (absent.size() != foreignPriced.size()) {
             throw ApiException.requiredMissing("tierIds", "존재하지 않는 구독 등급 ID가 포함됐습니다.");
         }
         Set<SubscriptionTier> wanted = new LinkedHashSet<>(tiers);
@@ -113,7 +121,8 @@ public class RecommendationService {
         CostResult result = toResult(candidate, calculator.calculate(candidate.plan(), wanted, ctx));
 
         // 계산기는 사용자가 카탈로그에서 고른 ID를 받는다 — 없는 ID는 결손이 아니라 잘못된 요청이라 400 그대로다.
-        List<MissingInput> missing = missingInputs(optional, List.of());
+        // 다만 해외 결제 등급은 위에서 걸러 안내로 싣는다.
+        List<MissingInput> missing = missingInputs(optional, List.of(), foreignPriced);
         Accuracy accuracy = missing.isEmpty() ? Accuracy.FULL : Accuracy.PARTIAL;
         return new CalculatorResponse(accuracy, missing, result);
     }
@@ -131,8 +140,15 @@ public class RecommendationService {
     }
 
     /** 채워지지 않은 선택 입력과 카탈로그 결손을 안내한다. accuracy 는 이 목록이 비었는지로 정한다. */
-    private static List<MissingInput> missingInputs(RecommendationRequest.Optional o, List<Long> unknownServiceIds) {
+    private static List<MissingInput> missingInputs(RecommendationRequest.Optional o, List<Long> unknownServiceIds,
+            Map<Long, String> foreignPriced) {
         var missing = new ArrayList<MissingInput>();
+        if (!foreignPriced.isEmpty()) {
+            // 해외 결제 구독은 원화 확정 금액이 없다. 환율 환산값은 표시용이라 계산에 넣지 않는다(D-17).
+            missing.add(new MissingInput("wantedServiceIds",
+                    String.join("·", foreignPriced.values()) + "는 해외 결제라 원화 금액이 확정되지 않아 계산에서 뺐어요",
+                    "마이페이지 > 내 구독에 실제 결제액을 넣으면 그 금액으로 반영돼요"));
+        }
         if (!unknownServiceIds.isEmpty()) {
             missing.add(new MissingInput("wantedServiceIds",
                     "아직 카탈로그에 없는 서비스(ID " + join(unknownServiceIds) + ")는 계산에서 뺐어요",

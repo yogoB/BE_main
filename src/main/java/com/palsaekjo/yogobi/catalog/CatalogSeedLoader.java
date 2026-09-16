@@ -73,7 +73,8 @@ public class CatalogSeedLoader implements ApplicationRunner {
                         ON CONFLICT (id) DO UPDATE SET
                             service_id = EXCLUDED.service_id, name = EXCLUDED.name,
                             price = EXCLUDED.price, concurrent_streams = EXCLUDED.concurrent_streams,
-                            quality = EXCLUDED.quality, note = EXCLUDED.note, active = TRUE;
+                            quality = EXCLUDED.quality, note = EXCLUDED.note,
+                            currency = EXCLUDED.currency, active = TRUE;
                         INSERT INTO bundle_product (id, name, price, provider)
                         SELECT id, name, price, provider FROM seed_bundle_product
                         ON CONFLICT (id) DO UPDATE SET
@@ -256,7 +257,7 @@ public class CatalogSeedLoader implements ApplicationRunner {
     private static String copyColumns(String table) {
         return switch (table) {
             case "subscription_service" -> " (id,name,category,official_url)";
-            case "subscription_tier" -> " (id,service_id,name,price,concurrent_streams,quality,note)";
+            case "subscription_tier" -> " (id,service_id,name,price,concurrent_streams,quality,note,currency)";
             case "bundle_product" -> " (id,name,price,provider,tier_ids)";
             default -> "";
         };

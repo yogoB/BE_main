@@ -5,8 +5,11 @@
 **기존 ID 를 절대 바꾸지 않는다** — 회원의 `user_subscription.tier_id` 가 그 값을 참조한다.
 기존 서비스·티어는 이름으로 찾아 ID 를 물려주고, 새 것만 뒤에 이어 붙인다.
 
+통화는 표기 그대로 싣는다(사용자 결정 2026-09-16). 원화 환산은 BE 가 하루 1회 환율로 **표시만** 하고
+계산에는 쓰지 않는다 — 사용자가 실제 결제액을 확인해 넣어야 계산에 들어간다(D-17).
+
 넣지 않는 것(값을 지어내지 않기 위해):
-  - KRW 가 아닌 가격. **환산하지 않는다** — 환율은 우리가 정할 값이 아니다.
+  - KRW·USD 가 아닌 통화. 환산하지 않으므로 표기할 수 없는 통화는 담지 않는다.
   - 가격이 비었거나 0원인 행. 0원은 추천 계산에서 항상 유리해 결과를 왜곡한다.
   - 개인 소비자가 고를 수 없는 유형(team·enterprise·addon·bundle·prepaid·metered 등).
   - 판매 목록에 없는 행(availability != listed).
@@ -33,7 +36,10 @@ SOURCES = [
 PERSONAL = {"individual", "family", "student"}
 
 SERVICE_HEADER = ["id", "name", "category", "official_url"]
-TIER_HEADER = ["id", "service_id", "name", "price", "concurrent_streams", "quality", "note"]
+# currency 는 맨 뒤다 — 기존 열 순서를 바꾸면 COPY(HEADER MATCH)와 합본 CSV 가 함께 깨진다.
+TIER_HEADER = ["id", "service_id", "name", "price", "concurrent_streams", "quality", "note", "currency"]
+# 저장할 수 있는 통화. 그 외는 표기 방법이 없어 담지 않는다(DB CHECK 와 같은 목록).
+CURRENCIES = {"KRW", "USD"}
 
 
 def source_url(text):
@@ -74,6 +80,8 @@ def main():
     services = read_existing(os.path.join(args.seed, "subscription_service.csv"), lambda r: r["name"])
     tiers = read_existing(os.path.join(args.seed, "subscription_tier.csv"),
                           lambda r: (r["service_id"], r["name"]))
+    for row in tiers.values():
+        row.setdefault("currency", "KRW")
     next_service = max((int(r["id"]) for r in services.values()), default=0) + 1
     next_tier = max((int(r["id"]) for r in tiers.values()), default=0) + 1
     kept_services, kept_tiers = len(services), len(tiers)
@@ -86,8 +94,8 @@ def main():
             continue
         with open(path, encoding="utf-8-sig", newline="") as handle:
             for row in csv.DictReader(handle):
-                if row["currency"] != "KRW":
-                    dropped[f"KRW 아님({row['currency']}) — 환산하지 않는다"] += 1
+                if row["currency"] not in CURRENCIES:
+                    dropped[f"지원하지 않는 통화({row['currency']})"] += 1
                     continue
                 if row["availability"] != "listed":
                     dropped["판매 목록에 없음"] += 1
@@ -125,6 +133,7 @@ def main():
                     "concurrent_streams": "" if concurrent is None else str(concurrent),
                     "quality": quality(row["features"]) or "",
                     "note": (row["features"] or "").strip()[:200],
+                    "currency": row["currency"],
                 }
                 next_tier += 1
 
