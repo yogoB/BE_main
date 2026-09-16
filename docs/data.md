@@ -17,7 +17,7 @@ AI 모델의 출력은 이용 조건을 확인한 자료에서 추출한 후보�
 | 통신 요금제 | mobile_plan.csv | **1,706건** (2026-09-16 팀 수집 매트릭스 1,853행 → `catalog_matrix_to_csv.py` 변환·검수 대기) |
 | 제휴 혜택 | plan_benefit.csv | **46건** (FREE 7 · FIXED_DISCOUNT 7 · BUNDLE_INCLUDED 32 — 아래 §1-C) |
 
-### 원천 데이터셋 = 합본 CSV (D-21, 2026-09-16)
+### 원천 데이터셋 = 합본 CSV (D-24, 2026-09-16)
 
 위 5개는 **`db/seed/catalog_combined.csv` 한 파일로 합쳐 원천 데이터셋**이 됐다. 개별 파일은 변환 이력으로 남아 있다.
 
@@ -33,7 +33,8 @@ AI 모델의 출력은 이용 조건을 확인한 자료에서 추출한 후보�
 - **원본은 이 파일, DB는 투영이다.** 쓰기는 파일(원자적 교체) → DB 전체 재적재 순서이며 DB 실패 시 파일을 되돌린다.
 - 활성화: `yogobi.catalog.combined-csv=<경로>`. 설정되면 시작 시 이 파일이 적재되고 개별 시드 적재는 건너뛴다.
   `CATALOG_CSV_DIR`(승인·해시 잠금 모드)가 켜져 있으면 그쪽이 우선이며 합본은 관여하지 않는다.
-- CRUD: `GET/POST/PATCH/DELETE /api/v1/admin/catalog/...` (회원 인증 필수). 키는 데이터셋별 자연키를 `|`로 이은 값
+- CRUD: `GET/POST/PATCH/DELETE /api/v1/admin/catalog/...` — **운영자 전용**. `CATALOG_ADMIN_USER_IDS`에 지정된 회원만
+  `ROLE_ADMIN`을 받고, 비어 있으면 아무도 쓸 수 없다(기본 잠금). 일반 회원은 403. 키는 데이터셋별 자연키를 `|`로 이은 값
   (요금제 `SKT|베스트 Max(T 우주)`, 서비스·티어·번들은 `id`, 혜택은 `통신사|요금제명|service_id|tier_id`).
 - 삭제는 파일에서 행을 지우고 DB에서는 `active=false`로 내린다(회원 참조 보존).
 - 코드: `CombinedCatalogCsv`(파서) · `CombinedCatalogStore`(CRUD·되쓰기) · `CombinedCatalogLoader`(시작 적재) · `CatalogAdminController`.
