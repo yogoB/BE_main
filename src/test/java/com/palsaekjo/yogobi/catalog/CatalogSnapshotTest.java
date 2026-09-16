@@ -43,13 +43,23 @@ class CatalogSnapshotTest {
 
     Map<String, Resource> snapshot(long price) {
         var files = new LinkedHashMap<String, Resource>();
+        var parts = bundled();
         for (String name : new String[]{"subscription_service", "subscription_tier", "bundle_product"})
-            files.put(name, new ClassPathResource("db/seed/" + name + ".csv"));
+            files.put(name, parts.get(name));
         files.put("mobile_plan", csv(MOBILE_HEADER + "SKT,CSV 요금제,5G," + price + ",100000,100,100,,,,https://example.com,2026-09-01\n"));
         files.put("plan_benefit", csv(BENEFIT_HEADER));
         return files;
     }
     static Resource csv(String content) { return new ByteArrayResource(content.getBytes(StandardCharsets.UTF_8)); }
+
+    /** 카탈로그 원본은 합본 한 파일이다. 예외는 테스트 실패로 드러나야 하므로 감싸서 던진다. */
+    static Map<String, Resource> bundled() {
+        try {
+            return CombinedCatalogCsv.bundled();
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException("내장 합본 시드를 읽지 못했습니다", e);
+        }
+    }
 
     @Test void snapshotUpdatesInPlaceAndRetiresWithoutBreakingMemberReference() throws Exception {
         loader.loadSnapshot(snapshot(55000));

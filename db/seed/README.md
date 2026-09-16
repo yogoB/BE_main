@@ -1,60 +1,29 @@
 # 시드 데이터
 
-수집 규칙은 `docs/data.md` §7. **`source_url` 없는 행은 병합하지 않는다.**
+카탈로그 원본은 **`catalog_combined.csv` 한 파일**이다. 데이터셋별 CSV 를 따로 두지 않는다 —
+같은 표를 두 파일로 두면 반드시 어긋난다(실제로 합본이 개별 시드보다 낡은 적이 있다).
 
-| 파일 | 상태 | 출처 |
-|---|---|---|
-| `subscription_service.csv` | ✅ 6건 | 스마트초이스(KTOA) 2026-09-07 |
-| `subscription_tier.csv` | ✅ 17건 | 동일 |
-| `bundle_product.csv` | ✅ 7건 | 동일 |
-| `plan_benefit.csv` | ⬜ | D3 크롤링 |
-| `mobile_plan.csv` | ⬜ | 팀원 수집 — TEMPLATE 참고 |
-| `merchant_alias.csv` | ⬜ | 수기 |
+| 파일 | 무엇 |
+|---|---|
+| `catalog_combined.csv` | 원본. `#@ <dataset>` 섹션 5개 — mobile_plan · subscription_service · subscription_tier · plan_benefit · bundle_product |
+| `mobile_plan_TEMPLATE.csv` · `plan_benefit_TEMPLATE.csv` | 팀원 수집용 양식(수집 규칙은 `docs/data.md` §7) |
+| `dev/` | 로컬 dev 프로파일 전용 더미. 커밋하지 않는다 |
+
+**`source_url` 없는 행은 병합하지 않는다.** 수집 원자료와 변환 명령은 `../../sources/README.md`.
+
+## 형식
+
+`#@ <dataset>` 줄이 섹션 경계, 그 다음 비주석 줄이 CSV 헤더, 이후가 데이터 행이다.
+그 밖의 `#` 줄은 주석이며 왕복(파싱→직렬화) 시 보존하지 않는다. 줄바꿈은 LF.
+파서는 `CombinedCatalogCsv`(자바)와 `scripts/csv_sections.py`(파이썬) 두 곳이며 규칙은 하나다.
 
 ## 로딩
 
-앱 시작 시 `CatalogSeedLoader`가 확보된 CSV 3종을 서비스 → 티어 → 번들 순으로 읽는다.
-PostgreSQL [`COPY ... HEADER MATCH`](https://www.postgresql.org/docs/17/sql-copy.html)를 사용하므로
-UTF-8, 헤더 이름·순서를 유지한다. `tier_ids`의 쉼표 목록은 기존처럼 따옴표로 감싼다.
+앱 시작 시 `CatalogSeedLoader`가 이 파일에서 섹션을 떼어 서비스 → 티어 → 번들 → 요금제 → 혜택 순으로 읽는다
+(혜택은 요금제를, 번들은 티어를 참조하므로 순서를 바꾸지 않는다).
+PostgreSQL [`COPY ... HEADER MATCH`](https://www.postgresql.org/docs/17/sql-copy.html)를 쓰므로
+UTF-8, 헤더 이름·순서를 유지한다. `tier_ids`의 쉼표 목록은 따옴표로 감싼다.
 빈 선택 필드는 `NULL`로 저장하며, 번들 구성은 `bundle_item`으로 나눈다.
 
-하나의 트랜잭션에서 ID 기준으로 추가·갱신하고, 잘못된 헤더·음수 가격·없는 티어 참조는
-전체 로딩을 취소하며 앱 기동도 실패시킨다. 재실행 시 중복되지 않는다.
-파일에서 빠진 기존 마스터 행은 삭제하지 않는다. 번들 구성만 해당 번들의 CSV 내용으로 교체한다.
-
-`mobile_plan_TEMPLATE.csv`는 예시이며 로딩·JAR 패키징 대상에서 제외한다.
-혜택·가맹점 별칭은 실제 CSV 확보 시 로더에 추가한다.
-
-## 통신 요금제 (`mobile_plan.csv`)
-
-`CatalogSeedLoader`가 파일이 있을 때만 별도 트랜잭션으로 적재한다(없으면 조용히 건너뜀).
-CSV는 `mobile_plan_TEMPLATE.csv` 헤더·순서를 그대로 쓴다. 로더가 변환하는 것:
-
-- `carrier`는 **이름**이다. 로더가 `carrier` 테이블에 업서트하고 `carrier_id`로 조인한다.
-  통신사 종류는 이름으로 파생한다: `SKT`/`KT`/`LGU+` → `MNO`, 그 외 → `MVNO`.
-- `network_type` `5G`/`LTE`/`3G` → `FIVE_G`/`LTE`/`THREE_G`로 매핑한다.
-- `source_url`이 빈 행은 병합하지 않는다(건너뜀). 그 외 잘못된 값(음수 가격 등)은 전체 롤백·기동 실패.
-- CSV에 `id`가 없으므로 `(carrier_id, name)` 기준으로 추가·갱신한다(재실행 시 중복 없음).
-
-## 제휴 혜택 (`plan_benefit.csv`)
-
-D3 크롤링 결과를 정리한 CSV. `plan_benefit_TEMPLATE.csv` 헤더를 쓴다. 요금제 다음에 적재한다.
-
-- 요금제는 자연키 `(carrier, plan_name)`로 참조한다(크롤러는 내부 요금제 ID를 모른다).
-  매칭되는 `mobile_plan`이 없는 행이 하나라도 있으면 **전체 실패**한다(혜택 누락은 잘못된 추천).
-  → `mobile_plan.csv`와 통신사·요금제명 표기를 정확히 맞춘다.
-- `service_id`/`tier_id`는 고정 시드 ID(넷플1·디즈니2·티빙3·웨이브4·왓챠5·유튜브6). `tier_id`는 비우면 서비스 전체.
-- `benefit_type`·`discount_value`·`is_exclusive`/`exclusive_group` 정합성은 DB CHECK가 검증한다
-  (FREE/BUNDLE_INCLUDED는 값 없음, FIXED는 정수 원, RATE는 0~1, exclusive면 group 필수).
-- `source_url` 빈 행은 병합하지 않는다. 재실행 시 **CSV가 다루는 요금제의 혜택만 교체**한다(bundle_item과 동일).
-
-## 로컬 개발용 더미 (`db/seed/dev/`)
-
-실제 D3/D4 데이터가 오기 전, 로컬에서 추천/탐지를 눈으로 확인하려면 `db/seed/dev/`에 더미
-`mobile_plan.csv`·`plan_benefit.csv`를 둔다(gitignore, 커밋 안 함). `DevSeedLoader`가 **dev 프로파일에서만** 적재한다.
-
-```bash
-SPRING_PROFILES_ACTIVE=dev ./gradlew bootRun
-```
-
-테스트는 dev 프로파일을 켜지 않으므로 영향 없다. 실제 데이터는 `db/seed/`(prod 경로)로 커밋하면 모든 프로파일에서 적재된다.
+`CATALOG_CSV_DIR`(운영자 검수·해시 잠금 모드)나 `yogobi.catalog.combined-csv`(외부 합본 경로)가
+설정돼 있으면 내장 시드는 적재하지 않는다 — 운영 데이터를 덮어쓰지 않기 위해서다.

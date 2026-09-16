@@ -20,12 +20,15 @@ class CombinedCatalogCsvTest {
         assertThat(sections.keySet()).containsExactlyInAnyOrderElementsOf(CombinedCatalogCsv.DATASETS);
         assertThat(sections.get("mobile_plan").header())
                 .startsWith("carrier,plan_name,network_type,base_price");
-        assertThat(sections.get("mobile_plan").rows()).hasSize(1706);
-        assertThat(sections.get("subscription_service").rows()).hasSize(6);
-        assertThat(sections.get("subscription_tier").rows()).hasSize(17);
-        assertThat(sections.get("plan_benefit").rows()).hasSize(46);
-        assertThat(sections.get("bundle_product").rows()).hasSize(7);
+        // 건수는 박지 않는다(시드가 계속 는다). 개별 시드 파일은 없앴으므로(원본은 이 합본 하나)
+        // 대조 대신 섹션이 비어 있지 않고 헤더에 열이 갖춰졌는지 본다.
+        for (String dataset : CombinedCatalogCsv.DATASETS) {
+            assertThat(sections.get(dataset).rows()).as(dataset).isNotEmpty();
+            assertThat(sections.get(dataset).header()).as(dataset).contains(",");
+        }
+        assertThat(sections.get("subscription_tier").header()).endsWith(",currency");
     }
+
 
     @Test
     void writeThenParseKeepsEveryRow() throws Exception {

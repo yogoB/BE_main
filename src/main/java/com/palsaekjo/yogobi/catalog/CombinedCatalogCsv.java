@@ -18,6 +18,9 @@ import org.springframework.core.io.Resource;
  * COPY는 주석을 모르므로 여기서 섹션을 떼어 순수 CSV로 넘긴다.
  */
 public final class CombinedCatalogCsv {
+    /** 레포에 포함된 합본 시드. 카탈로그 원본은 이 파일 하나이며 데이터셋별 CSV 를 따로 두지 않는다. */
+    public static final String BUNDLED = "db/seed/catalog_combined.csv";
+
     /** 적재 순서. 혜택은 요금제를, 번들은 티어를 참조하므로 순서를 바꾸지 않는다. */
     public static final List<String> DATASETS = List.of(
             "mobile_plan", "subscription_service", "subscription_tier", "plan_benefit", "bundle_product");
@@ -29,6 +32,12 @@ public final class CombinedCatalogCsv {
             """;
 
     private CombinedCatalogCsv() {
+    }
+
+    /** 내장 합본에서 데이터셋 하나를 순수 CSV 리소스로 떼어 낸다(로더·테스트 공용). */
+    public static Map<String, Resource> bundled() throws java.io.IOException {
+        return toResources(new org.springframework.core.io.ClassPathResource(BUNDLED)
+                .getContentAsString(StandardCharsets.UTF_8));
     }
 
     /** 섹션 하나 — 헤더 1줄과 데이터 행들. 행은 CSV 원문 그대로(따옴표·쉼표 보존). */

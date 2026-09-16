@@ -35,19 +35,12 @@ public class CatalogSeedLoader implements ApplicationRunner {
         if (!catalogDirectory.isBlank()) return;
         // 합본 CSV가 원본으로 설정돼 있으면 그쪽이 적재한다(D-21). 개별 시드와 이중 적재하지 않는다.
         if (!combinedCsv.isBlank()) return;
-        load(new ClassPathResource("db/seed/subscription_service.csv"),
-                new ClassPathResource("db/seed/subscription_tier.csv"),
-                new ClassPathResource("db/seed/bundle_product.csv"));
-        // 통신 요금제 CSV(D4, 팀원 수집)는 확보되면 적재한다. 아직 없으면 조용히 건너뛴다.
-        var mobilePlans = new ClassPathResource("db/seed/mobile_plan.csv");
-        if (mobilePlans.exists()) {
-            loadMobilePlans(mobilePlans);
-        }
-        // 제휴 혜택 CSV(D3, 크롤링)는 요금제 다음에 적재한다(요금제를 참조하므로).
-        var planBenefits = new ClassPathResource("db/seed/plan_benefit.csv");
-        if (planBenefits.exists()) {
-            loadPlanBenefits(planBenefits);
-        }
+        // 내장 시드도 합본 한 파일이 원본이다 — 같은 표를 두 파일로 두면 반드시 어긋난다.
+        var parts = CombinedCatalogCsv.bundled();
+        load(parts.get("subscription_service"), parts.get("subscription_tier"), parts.get("bundle_product"));
+        // 혜택은 요금제를 참조하므로 순서를 지킨다.
+        loadMobilePlans(parts.get("mobile_plan"));
+        loadPlanBenefits(parts.get("plan_benefit"));
     }
 
     void load(Resource services, Resource tiers, Resource bundles) throws SQLException, IOException {

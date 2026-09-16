@@ -46,11 +46,15 @@ class CatalogSeedLoaderTest {
                 .containsExactly(8L, 12L);
         assertThat(jdbc.queryForObject("SELECT concurrent_streams FROM subscription_tier WHERE id = 16", Integer.class))
                 .isNull();
-        assertThat(jdbc.queryForObject("SELECT nextval('subscription_tier_id_seq')", Long.class)).isEqualTo(18L);
+        // 시퀀스는 최대 id 다음 값이다. 건수를 박지 않고 시드 행수에서 유도한다(id 는 1..N 연속).
+        long tierCount = seedRowCount("subscription_tier");
+        assertThat(jdbc.queryForObject("SELECT nextval('subscription_tier_id_seq')", Long.class))
+                .isEqualTo(tierCount + 1);
 
-        var services = new ClassPathResource("db/seed/subscription_service.csv");
-        var tiers = new ClassPathResource("db/seed/subscription_tier.csv");
-        var bundles = new ClassPathResource("db/seed/bundle_product.csv");
+        var parts = CombinedCatalogCsv.bundled();
+        var services = parts.get("subscription_service");
+        var tiers = parts.get("subscription_tier");
+        var bundles = parts.get("bundle_product");
         var changedServices = csv(services.getContentAsString(StandardCharsets.UTF_8)
                 .replace("넷플릭스", "변경된 넷플릭스"));
         var invalidBundles = csv(bundles.getContentAsString(StandardCharsets.UTF_8)
@@ -77,18 +81,23 @@ class CatalogSeedLoaderTest {
                 .containsExactly(4L, 8L);
         loader.run(null);
         assertSnapshot();
-        assertThat(jdbc.queryForObject("SELECT nextval('subscription_tier_id_seq')", Long.class)).isEqualTo(19L);
+        assertThat(jdbc.queryForObject("SELECT nextval('subscription_tier_id_seq')", Long.class))
+                .isEqualTo(tierCount + 2);   // 위에서 한 번 당겼으므로 그다음 값
     }
 
     private void assertSnapshot() throws IOException {
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM subscription_service", Integer.class)).isEqualTo(6);
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM subscription_tier", Integer.class)).isEqualTo(17);
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM bundle_product", Integer.class)).isEqualTo(7);
+        // 건수를 박아두면 시드가 늘 때마다 깨진다(2026-09-16 서비스 6→22·등급 17→89). 파일 행수와 맞춘다.
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM subscription_service", Integer.class))
+                .isEqualTo(seedRowCount("subscription_service"));
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM subscription_tier", Integer.class))
+                .isEqualTo(seedRowCount("subscription_tier"));
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM bundle_product", Integer.class))
+                .isEqualTo(seedRowCount("bundle_product"));
         assertThat(jdbc.queryForObject("SELECT count(*) FROM bundle_item", Integer.class)).isEqualTo(15);
         assertThat(jdbc.queryForObject("SELECT price FROM subscription_tier WHERE id = 2", Long.class)).isEqualTo(13500L);
         // 실제 요금제 CSV(D4)가 들어왔다. 건수를 박아두면 CSV 갱신마다 깨지므로 파일 행수와 맞춘다.
         assertThat(jdbc.queryForObject("SELECT count(*) FROM mobile_plan", Integer.class))
-                .isEqualTo(seedRowCount("db/seed/mobile_plan.csv"));
+                .isEqualTo(seedRowCount("mobile_plan"));
     }
 
     /** db/migration 의 V*.sql 개수. Flyway 가 적용한 수와 같아야 한다. */
@@ -99,11 +108,9 @@ class CatalogSeedLoaderTest {
     }
 
     /** 시드 CSV 의 데이터 행수(헤더 제외). 없으면 0. */
-    private static int seedRowCount(String path) throws IOException {
-        var resource = new ClassPathResource(path);
-        if (!resource.exists()) {
-            return 0;
-        }
+    /** 내장 합본의 데이터셋 행수(헤더 제외). 카탈로그 원본은 합본 한 파일이다. */
+    private static int seedRowCount(String dataset) throws IOException {
+        var resource = CombinedCatalogCsv.bundled().get(dataset);
         try (var lines = resource.getContentAsString(StandardCharsets.UTF_8).lines()) {
             return (int) lines.filter(line -> !line.isBlank()).count() - 1;
         }

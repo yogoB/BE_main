@@ -41,7 +41,7 @@ class CatalogApiTest {
     void servicesReturnSeededServicesWithTiers() throws Exception {
         mvc.perform(get("/api/v1/catalog/services"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.length()").value(6))
+                .andExpect(jsonPath("$.data.length()").value(seedRowCount("subscription_service")))
                 .andExpect(jsonPath("$.data[0].name").value("넷플릭스"))
                 .andExpect(jsonPath("$.data[0].tiers[?(@.name=='스탠다드')].price").value(
                         org.hamcrest.Matchers.hasItem(13500)));
@@ -87,5 +87,13 @@ class CatalogApiTest {
                 .andExpect(jsonPath("$.data.length()").value(1))
                 .andExpect(jsonPath("$.data[0].serviceName").value("넷플릭스"))
                 .andExpect(jsonPath("$.data[0].benefitType").value("FREE"));
+    }
+
+    /** 내장 합본 시드의 데이터셋 행수(헤더 제외). 건수를 박으면 시드가 늘 때마다 깨진다. */
+    private static int seedRowCount(String dataset) throws java.io.IOException {
+        var lines = CombinedCatalogCsv.bundled().get(dataset)
+                .getContentAsString(java.nio.charset.StandardCharsets.UTF_8).lines()
+                .filter(line -> !line.isBlank()).count();
+        return (int) lines - 1;
     }
 }

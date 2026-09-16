@@ -9,8 +9,10 @@
     python3 scripts/catalog_matrix_to_csv.py <매트릭스.csv> <출력.csv> [--include-conditional]
 """
 import argparse
+import io
 import collections
 import csv
+import csv_sections
 import re
 import sys
 from urllib.parse import urlsplit, urlunsplit
@@ -139,16 +141,25 @@ def convert(source, include_conditional):
     return [value for _, value in best.values()], dropped
 
 
+def open_source(path, section):
+    """단일 CSV 파일도, 합본(#@ 섹션) 파일도 받는다 — 원자료가 한 파일로 모였기 때문이다."""
+    text = open(path, encoding="utf-8-sig", newline="").read()
+    if not text.lstrip().startswith(("#@", "#")):
+        return io.StringIO(text)
+    return io.StringIO(csv_sections.split(text)[section])
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("source")
+    parser.add_argument("source", help="수집 원자료. 합본(#@ 섹션) 파일이면 --section 을 읽는다")
     parser.add_argument("target")
+    parser.add_argument("--section", default="mobile_plan_matrix",
+                        help="합본 원자료에서 읽을 섹션 이름 (단일 CSV 를 주면 무시된다)")
     parser.add_argument("--include-conditional", action="store_true",
                         help='추천판정이 "조건부 추천"인 행도 포함한다')
     args = parser.parse_args()
 
-    with open(args.source, encoding="utf-8-sig", newline="") as source:
-        rows, dropped = convert(source, args.include_conditional)
+    rows, dropped = convert(open_source(args.source, args.section), args.include_conditional)
     with open(args.target, "w", encoding="utf-8", newline="") as target:
         writer = csv.DictWriter(target, fieldnames=HEADER)
         writer.writeheader()

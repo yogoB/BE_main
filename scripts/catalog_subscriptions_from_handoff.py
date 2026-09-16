@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""수집한 구독 정규화 CSV(5개 카테고리) → 요고비 subscription_service·subscription_tier.
+"""수집 원자료의 구독 표 → 요고비 subscription_service·subscription_tier.
 
-입력은 팀이 공식 페이지에서 확인해 정규화한 `normalized_*.csv` 다(OTT·음악·AI·전자책·클라우드).
+입력은 합본 원자료(`sources/catalog_sources.csv`)의 `subscription_plans` 섹션이다 —
+팀이 공식 페이지에서 확인해 정규화한 5개 카테고리(OTT·음악·AI·전자책·클라우드)가 `구분` 열로 들어 있다.
 **기존 ID 를 절대 바꾸지 않는다** — 회원의 `user_subscription.tier_id` 가 그 값을 참조한다.
 기존 서비스·티어는 이름으로 찾아 ID 를 물려주고, 새 것만 뒤에 이어 붙인다.
 
@@ -15,23 +16,19 @@
   - 판매 목록에 없는 행(availability != listed).
 
 사용:
-    python3 scripts/catalog_subscriptions_from_handoff.py <handoff 디렉터리> <출력 디렉터리>
+    python3 scripts/catalog_subscriptions_from_handoff.py <합본 원자료 CSV> <출력 디렉터리>
 """
 import argparse
 import collections
 import csv
+import csv_sections
 import os
 import re
 import sys
 from urllib.parse import urlsplit, urlunsplit
 
-SOURCES = [
-    ("normalized_ott.csv", "OTT"),
-    ("normalized_music.csv", "MUSIC"),
-    ("normalized_ai.csv", "AI"),
-    ("normalized_ebook.csv", "EBOOK"),
-    ("normalized_cloud.csv", "CLOUD"),
-]
+# 원자료의 `구분` → 우리 카테고리. **순서가 곧 ID 부여 순서**라 바꾸면 기존 등급 ID 가 밀린다.
+CATEGORIES = [("OTT", "OTT"), ("음악", "MUSIC"), ("AI", "AI"), ("전자책", "EBOOK"), ("클라우드", "CLOUD")]
 # 개인이 직접 고를 수 있는 유형만. 나머지는 화면에 올려도 선택할 수 없다.
 PERSONAL = {"individual", "family", "student"}
 
@@ -72,7 +69,7 @@ def quality(features):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("handoff")
+    parser.add_argument("source", help="합본 원자료 CSV (#@ subscription_plans 섹션)")
     parser.add_argument("target")
     parser.add_argument("--seed", default="db/seed", help="기존 시드 위치(ID 를 물려받는다)")
     args = parser.parse_args()
@@ -87,55 +84,57 @@ def main():
     kept_services, kept_tiers = len(services), len(tiers)
 
     dropped = collections.Counter()
-    for filename, category in SOURCES:
-        path = os.path.join(args.handoff, filename)
-        if not os.path.exists(path):
-            dropped[f"파일 없음: {filename}"] += 1
+    by_category = collections.defaultdict(list)
+    for row in csv_sections.read(args.source, "subscription_plans"):
+        by_category[row["구분"]].append(row)
+    for source_category, category in CATEGORIES:
+        rows = by_category.get(source_category)
+        if not rows:
+            dropped[f"원자료에 '{source_category}' 행 없음"] += 1
             continue
-        with open(path, encoding="utf-8-sig", newline="") as handle:
-            for row in csv.DictReader(handle):
-                if row["currency"] not in CURRENCIES:
-                    dropped[f"지원하지 않는 통화({row['currency']})"] += 1
-                    continue
-                if row["availability"] != "listed":
-                    dropped["판매 목록에 없음"] += 1
-                    continue
-                if row["plan_type"] not in PERSONAL:
-                    dropped[f"개인이 고를 수 없는 유형({row['plan_type']})"] += 1
-                    continue
-                price = row["regular_price"].strip()
-                if not price or float(price) <= 0:
-                    dropped["가격 없음 또는 0원"] += 1
-                    continue
-                url = source_url(row["source_url"])
-                if url is None:
-                    dropped["출처 URL 없음/비HTTPS"] += 1
-                    continue
+        for row in rows:
+            if row["currency"] not in CURRENCIES:
+                dropped[f"지원하지 않는 통화({row['currency']})"] += 1
+                continue
+            if row["availability"] != "listed":
+                dropped["판매 목록에 없음"] += 1
+                continue
+            if row["plan_type"] not in PERSONAL:
+                dropped[f"개인이 고를 수 없는 유형({row['plan_type']})"] += 1
+                continue
+            price = row["regular_price"].strip()
+            if not price or float(price) <= 0:
+                dropped["가격 없음 또는 0원"] += 1
+                continue
+            url = source_url(row["source_url"])
+            if url is None:
+                dropped["출처 URL 없음/비HTTPS"] += 1
+                continue
 
-                name = row["service"].strip()
-                service = services.get(name)
-                if service is None:
-                    # 기존에 없던 서비스만 새 ID 를 받는다.
-                    service = {"id": str(next_service), "name": name,
-                               "category": category, "official_url": url}
-                    services[name] = service
-                    next_service += 1
+            name = row["service"].strip()
+            service = services.get(name)
+            if service is None:
+                # 기존에 없던 서비스만 새 ID 를 받는다.
+                service = {"id": str(next_service), "name": name,
+                           "category": category, "official_url": url}
+                services[name] = service
+                next_service += 1
 
-                tier_name = row["plan_name"].strip()
-                key = (service["id"], tier_name)
-                if key in tiers:
-                    dropped["이미 있는 등급(기존 ID 유지)"] += 1
-                    continue
-                concurrent = streams(row["features"])
-                tiers[key] = {
-                    "id": str(next_tier), "service_id": service["id"], "name": tier_name,
-                    "price": str(int(float(price))),
-                    "concurrent_streams": "" if concurrent is None else str(concurrent),
-                    "quality": quality(row["features"]) or "",
-                    "note": (row["features"] or "").strip()[:200],
-                    "currency": row["currency"],
-                }
-                next_tier += 1
+            tier_name = row["plan_name"].strip()
+            key = (service["id"], tier_name)
+            if key in tiers:
+                dropped["이미 있는 등급(기존 ID 유지)"] += 1
+                continue
+            concurrent = streams(row["features"])
+            tiers[key] = {
+                "id": str(next_tier), "service_id": service["id"], "name": tier_name,
+                "price": str(int(float(price))),
+                "concurrent_streams": "" if concurrent is None else str(concurrent),
+                "quality": quality(row["features"]) or "",
+                "note": (row["features"] or "").strip()[:200],
+                "currency": row["currency"],
+            }
+            next_tier += 1
 
     os.makedirs(args.target, exist_ok=True)
     with open(os.path.join(args.target, "subscription_service.csv"), "w", encoding="utf-8", newline="") as out:

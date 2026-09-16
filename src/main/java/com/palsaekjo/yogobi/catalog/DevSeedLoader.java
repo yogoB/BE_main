@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
 /**
  * 로컬 개발용 더미 요금제·혜택 시드. dev 프로파일에서만 동작한다
  * (`SPRING_PROFILES_ACTIVE=dev ./gradlew bootRun`). 테스트는 dev 프로파일을 켜지 않으므로 무영향.
- * 실제 D3/D4 데이터가 확보되면 `db/seed/mobile_plan.csv`·`plan_benefit.csv`(prod 경로)로 적재되고
+ * 실제 D3/D4 데이터는 합본 `db/seed/catalog_combined.csv`(prod 경로)로 적재되고
  * 이 더미는 더 이상 필요 없다. CatalogSeedLoader(@Order 1) 다음에 돈다.
  */
 @Component
