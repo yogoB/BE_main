@@ -31,6 +31,10 @@ JWT·비밀번호·Google 토큰은 응답 JSON이나 URL에 넣지 않는다.
 현재 회원: `{id,email,localLogin,googleLogin,currentPlanId,emailVerified}`. 요청에서 userId나 역할을 받지 않는다.
 `signup/login`도 CSRF가 필요하다. 입력은 표에 적힌 문자열 필드만 허용한다.
 
+> **2026-09-16 (D-21): 메일 발송은 쓰지 않는다.** 배포에서 SMTP·메일 secret 8개를 제거했고
+> 비밀번호 재설정 화면도 없앴다. 아래 메일 토큰 흐름은 **코드에 남아 있으며**
+> `AUTH_EMAIL_ENABLED=true` + SMTP 설정으로 되살릴 수 있다. 현재 운영 경로는 직접 가입뿐이다.
+
 ### 가입은 두 형태다 (D-20)
 
 `token` 필드가 있으면 **메일 토큰 가입**, 없으면 **직접 가입**으로 처리한다.
