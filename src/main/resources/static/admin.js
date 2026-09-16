@@ -44,42 +44,112 @@ async function showSession() {
   }
 }
 
-const CARDS = [
-  ['members.total', '전체 회원'],
-  ['members.signedUp24h', '24시간 가입'],
+/* 주요 사용자 지표. 화면 맨 위 띠에 크게 올린다 — 운영자가 제일 먼저 읽는 줄이다.
+   delta 는 **우리가 실제로 가진 값**만 붙인다. 지난주 대비 %% 같은 건 과거 총계를 저장하지
+   않아 만들 수 없으므로 지어내지 않는다. */
+const KPI = [
+  ['members.total', '전체 회원', 'members.signedUp24h', '24시간'],
   ['members.signedUp7d', '7일 가입'],
-  ['members.withSubscription', '구독 등록 회원'],
   ['members.activeSessions', '활성 세션'],
-  ['catalog.mobilePlans', '요금제'],
-  ['catalog.subscriptionServices', '구독 서비스'],
-  ['catalog.subscriptionTiers', '구독 등급'],
-  ['catalog.planBenefits', '제휴 혜택'],
-  ['review.pendingRequests', '검수 대기'],
-  ['review.mismatched', '불일치(차단)'],
-  ['review.unverified', '미확인'],
-  ['review.appliedToday', '24시간 반영'],   // 지표는 24시간 롤링이다 — '오늘'이 아니다
-  ['reports.pending', '제보 대기'],
-  ['gaps', '카탈로그 결손'],
+  ['members.withSubscription', '구독 등록 회원'],
 ];
+
+/* 나머지는 묶음별 카드로. 묶음이 늘면 여기에 줄을 더한다. */
+const CARDS = {
+  'panel-catalog': [
+    ['catalog.mobilePlans', '요금제'],
+    ['catalog.subscriptionServices', '구독 서비스'],
+    ['catalog.subscriptionTiers', '구독 등급'],
+    ['catalog.planBenefits', '제휴 혜택'],
+  ],
+  'panel-review': [
+    ['review.pendingRequests', '검수 대기'],
+    ['review.mismatched', '불일치(차단)'],
+    ['review.unverified', '미확인'],
+    ['review.appliedToday', '24시간 반영'],
+  ],
+  'panel-reports': [
+    ['reports.pending', '제보 대기'],
+    ['reports.total', '제보 전체'],
+    ['gaps', '카탈로그 결손'],
+  ],
+};
 
 const pick = (data, path) => path.split('.').reduce((value, key) => (value ?? {})[key], data);
 
 async function loadDashboard() {
   const data = await call('/api/v1/admin/dashboard');
-  // -1 은 서버가 "알 수 없음"으로 표시한 값이다. 0 으로 보여주면 거짓말이 된다.
-  $('cards').replaceChildren(...CARDS.map(([path, label]) => {
-    const value = pick(data, path);
+
+  $('kpi').replaceChildren(...KPI.map(([path, label, deltaPath, deltaLabel]) => {
     const item = document.createElement('li');
-    const number = document.createElement('b');
-    number.textContent = value === -1 || value === undefined ? '—' : Number(value).toLocaleString('ko-KR');
-    const caption = document.createElement('span');
-    caption.textContent = label;
-    item.append(number, caption);
+    const cap = document.createElement('span'); cap.className = 'kpi-label'; cap.textContent = label;
+    const value = document.createElement('b'); value.textContent = show(pick(data, path));
+    item.append(cap, value);
+    const delta = deltaPath === undefined ? null : pick(data, deltaPath);
+    if (typeof delta === 'number' && delta >= 0) {
+      const badge = document.createElement('span');
+      badge.className = delta > 0 ? 'kpi-delta up' : 'kpi-delta';
+      badge.textContent = `${deltaLabel} ${delta > 0 ? '+' : ''}${delta}`;
+      item.append(badge);
+    }
     return item;
   }));
-  $('trend').replaceChildren(...(data.signupTrend || []).map(row => tr([row.date, row.count])));
+
+  for (const [panelId, rows] of Object.entries(CARDS)) {
+    const list = $(panelId).querySelector('.stat-list');
+    list.replaceChildren(...rows.flatMap(([path, label]) => {
+      const dt = document.createElement('dt'); dt.textContent = label;
+      const dd = document.createElement('dd'); dd.textContent = show(pick(data, path));
+      return [dt, dd];
+    }));
+  }
+
+  drawTrend(data.signupTrend || []);
   $('endpoints').replaceChildren(...(data.endpoints || []).map(row =>
-    tr([row.uri, row.method, row.status, row.count, row.avgMs])));
+    tr([row.uri, row.method, row.status, show(row.count), row.avgMs])));
+}
+
+/** -1 은 "알 수 없음"이다(표가 없거나 조회 실패). 0 으로 적으면 거짓말이 된다. */
+function show(value) {
+  return typeof value === 'number' && value >= 0 ? value.toLocaleString('ko-KR') : '—';
+}
+
+const SVG = 'http://www.w3.org/2000/svg';
+const svgEl = (name, attrs) => {
+  const node = document.createElementNS(SVG, name);
+  for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+  return node;
+};
+
+/* 7일 가입 막대그래프. 외부 차트 라이브러리를 쓸 수 없다(CSP default-src 'none') —
+   인라인 SVG 로 직접 그린다. 값이 전부 0 이어도 축과 날짜는 보여준다. */
+function drawTrend(rows) {
+  const box = $('trend-chart');
+  if (!rows.length) { box.replaceChildren(document.createTextNode('아직 가입 기록이 없어요.')); return; }
+  const W = 320, H = 110, PAD = 14, gap = 8;
+  const max = Math.max(1, ...rows.map(r => Number(r.count) || 0));
+  const bar = (W - PAD * 2 - gap * (rows.length - 1)) / rows.length;
+  const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img',
+    'aria-label': `최근 ${rows.length}일 가입 추이, 최대 ${max}명` });
+
+  rows.forEach((row, i) => {
+    const n = Number(row.count) || 0;
+    const h = Math.round((H - PAD - 20) * (n / max));
+    const x = PAD + i * (bar + gap);
+    svg.append(svgEl('rect', { x, y: H - 18 - h, width: bar, height: Math.max(h, 1),
+      rx: 2, fill: n ? '#22c55e' : '#e3e7ec' }));
+    const day = svgEl('text', { x: x + bar / 2, y: H - 4, 'text-anchor': 'middle',
+      'font-size': 9, fill: '#8a8b9e' });
+    day.textContent = row.date.slice(5).replace('-', '/');
+    svg.append(day);
+    if (n) {
+      const label = svgEl('text', { x: x + bar / 2, y: H - 22 - h, 'text-anchor': 'middle',
+        'font-size': 10, 'font-weight': 700, fill: '#16a34a' });
+      label.textContent = n;
+      svg.append(label);
+    }
+  });
+  box.replaceChildren(svg);
 }
 
 function tr(cells) {

@@ -10,7 +10,8 @@
 | 축 | 하는 일 | 화면 |
 |---|---|---|
 | ① 사용 지표 | 회원·세션·카탈로그·검수·제보 현황을 한 화면에서 본다 | `/admin.html` 상단 |
-| ② 수집 데이터 검수 | 매일 09:00(KST) 모은 변경 후보를 승인·거절한다 | `/admin.html` 하단 |
+| ② 수집 데이터 검수 | 매일 09:00(KST) 모은 변경 후보를 승인·거절한다 | `/admin.html` 중단 |
+| ③ 변경 이력 | 누가 언제 무엇을 바꿨는지 본다(D-26·D-27). 되돌린 변경(`FAILED`)도 남는다 | `/admin.html` 하단 |
 
 **아닌 것** — 아래는 의도적으로 넣지 않았다.
 - **별도 서버·레포가 아니다.** 사용자 결정이다. 관리 화면은 BE가 내려주는 정적 페이지(`admin.html`·`admin.js`)이고
@@ -54,6 +55,8 @@ ADMIN_ID / ADMIN_PASSWORD  →  app_user 행(부트스트랩)  →  ROLE_ADMIN  
 | `gaps` | 카탈로그 결손(`catalog_candidate` REQUESTED) |
 | `endpoints` | 요청 상위 8개 경로의 요청수·평균 지연 |
 
+- 지표는 상단 KPI 4줄(`KPI`)과 묶음별 카드 11개(`CARDS`) 합쳐 **15개**다. `members.signedUp24h`는
+  전체 회원 옆 증감 배지로 붙는다. 늘어나면 `admin.js`의 `KPI`·`CARDS`에 줄을 더한다.
 - 값이 `-1`이면 **"알 수 없음"** 이다(표가 없거나 조회 실패). 화면은 `—`로 보여준다 — 0으로 표시하면 거짓말이 된다.
 - `endpoints`는 micrometer 레지스트리에서 읽으므로 **프로세스 재시작 시 0부터** 다시 센다. 화면에 그렇게 적는다.
 
@@ -82,7 +85,13 @@ ADMIN_ID / ADMIN_PASSWORD  →  app_user 행(부트스트랩)  →  ROLE_ADMIN  
 - **`MISMATCH`는 승인할 수 없다**(서버 409, 화면에서도 버튼 비활성). `UNVERIFIED`는 승인할 수 있다 —
   두 소스가 확인하지 못한 것뿐이며, 틀렸다는 뜻이 아니다. 놓친 오류는 사용자 제보로 잡는다(D-18).
 - 수집 실패는 카탈로그를 건드리지 않는다. 다음 날 다시 돈다.
-- 급할 때는 화면의 **"지금 수집 실행"**(`POST /api/v1/admin/harvest/run`)으로 즉시 한 번 돌린다.
+- 급할 때는 화면의 **"② 지금 수집 실행"**(`POST /api/v1/admin/harvest/run`)으로 즉시 한 번 돌린다.
+- **스냅샷이 비어 있으면 요금제 제안이 안 나온다.** 먼저 **"① 시세 스냅샷 수집"**
+  (`POST /api/v1/admin/smartchoice/sweep`)을 돌린다. 결과는 셋으로 갈린다 —
+  키 없음(`enabled:false`) / 서버에 못 닿음(`reachable:false`, 등록 IP·접속 국가 제한 가능) / 정상.
+- ⚠️ **배포 머신이 유휴 시 정지(`auto_stop_machines`)라 예약 시각에 잠들어 있으면 스케줄이 발화하지 않는다.**
+  스마트초이스 스윕·일일 수집·환율 갱신·개인정보 파기가 모두 해당한다. 그래서 이 수동 경로가 실질적인 실행 수단이다.
+  상시 가동이 필요하면 `min_machines_running = 1` 로 바꿔야 한다(비용 발생, 별도 결정).
 
 ### 외부 호출 경계
 
@@ -97,6 +106,7 @@ ADMIN_ID / ADMIN_PASSWORD  →  app_user 행(부트스트랩)  →  ROLE_ADMIN  
 | GET | `/api/v1/admin/session` | 관리자인지 확인 |
 | GET | `/api/v1/admin/dashboard` | 축 ① 지표 |
 | POST | `/api/v1/admin/harvest/run` | 축 ② 수집 즉시 실행 |
+| POST | `/api/v1/admin/smartchoice/sweep` | 시세 스냅샷 즉시 수집. 수집(②)보다 **먼저** 돌려야 한다 |
 | GET | `/api/v1/admin/catalog/requests` | 검수 목록(`?status=PENDING` 등) |
 | POST | `/api/v1/admin/catalog/requests/{id}/approve` `/reject` | 승인 · 거절 |
 | GET | `/api/v1/admin/catalog/audit` | 변경 이력(D-27) |

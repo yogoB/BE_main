@@ -46,6 +46,30 @@ button.danger:hover{background:var(--danger-tint)}
 :focus-visible{outline:2px solid var(--brand-strong);outline-offset:2px;border-radius:6px}
 #message{min-height:2em;white-space:pre-wrap;color:var(--ink-soft);font-weight:600}
 
+/* 주요 사용자 지표 띠. 구분선으로 나눠 한 줄로 읽는다(레퍼런스: Semrush 개요 상단). */
+.kpi{display:flex;flex-wrap:wrap;gap:0;margin:16px 0 20px;padding:20px 0;list-style:none;
+  border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.kpi li{flex:1 1 150px;padding:0 20px;border-left:1px solid var(--line)}
+.kpi li:first-child{border-left:0;padding-left:0}
+.kpi-label{display:block;font-size:13px;color:var(--muted);font-weight:600}
+.kpi b{display:block;font-size:32px;font-weight:800;letter-spacing:-.02em;line-height:1.2;
+  font-variant-numeric:tabular-nums}
+.kpi-delta{display:inline-block;margin-top:2px;font-size:12px;font-weight:700;color:var(--muted)}
+.kpi-delta.up{color:var(--brand-ink)}
+
+/* 묶음별 패널. 지표가 15개 나열되면 무엇이 무엇인지 안 읽힌다. */
+.panel-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+/* 추이는 막대 7개와 날짜 라벨이 들어가야 해서 숫자 목록보다 넓은 자리가 필요하다. */
+.panel-grid .panel:first-child{grid-column:span 2}
+@media (max-width:760px){.panel-grid .panel:first-child{grid-column:auto}}
+.panel{border:1px solid var(--line);border-radius:var(--radius-sm);padding:16px}
+.panel h3{margin:0 0 10px;font-size:14px;font-weight:800}
+.stat-list{display:grid;grid-template-columns:1fr auto;gap:6px 12px;margin:0;font-size:14px}
+.stat-list dt{color:var(--ink-soft)}
+.stat-list dd{margin:0;font-weight:700;font-variant-numeric:tabular-nums;text-align:right}
+.chart svg{width:100%;height:auto;display:block}
+.chart{color:var(--muted);font-size:13px}
+
 /* 지표 카드 — 숫자가 주인공이다. 자릿수가 흔들리지 않게 tabular-nums. */
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;
   margin:0;padding:0;list-style:none}
@@ -107,10 +131,21 @@ summary{cursor:pointer;color:var(--brand-ink);font-size:13px;font-weight:600}
 <section id="dashboard-section" hidden>
   <h2>사용 지표</h2>
   <p id="who"></p>
-  <ul class="cards" id="cards"></ul>
-  <h2 style="margin-top:24px">최근 7일 가입</h2>
-  <table><thead><tr><th>날짜</th><th>가입</th></tr></thead><tbody id="trend"></tbody></table>
-  <h2 style="margin-top:24px">요청이 많은 엔드포인트</h2>
+
+  <!-- 주요 사용자 지표. 운영자가 화면을 열자마자 읽는 줄이라 맨 위에 크게 둔다. -->
+  <ul class="kpi" id="kpi"></ul>
+
+  <div class="panel-grid">
+    <div class="panel">
+      <h3>최근 7일 가입</h3>
+      <div id="trend-chart" class="chart"></div>
+    </div>
+    <div class="panel" id="panel-catalog"><h3>카탈로그</h3><dl class="stat-list"></dl></div>
+    <div class="panel" id="panel-review"><h3>검수</h3><dl class="stat-list"></dl></div>
+    <div class="panel" id="panel-reports"><h3>제보 · 결손</h3><dl class="stat-list"></dl></div>
+  </div>
+
+  <h3 style="margin-top:24px">요청이 많은 엔드포인트</h3>
   <p>서버가 켜진 뒤 누적값이에요. 재시작하면 0부터 다시 셉니다.</p>
   <table><thead><tr><th>경로</th><th>메서드</th><th>상태</th><th>요청</th><th>평균(ms)</th></tr></thead>
     <tbody id="endpoints"></tbody></table>
