@@ -82,10 +82,18 @@ class ChatControllerTest {
         assertEquals(List.of("/parse", "/narrate"), paths);
         assertEquals(List.of("Bearer test-backend-only-token", "Bearer test-backend-only-token"), authorizations);
         assertEquals(json.readTree("{\"text\":\"데이터 20기가 넷플릭스\"}"), bodies.getFirst());
-        var expected = json.valueToTree(cost).deepCopy();
-        ((com.fasterxml.jackson.databind.node.ObjectNode) expected)
-                .set("missingInputs", json.valueToTree(recommendation.missingInputs()));
-        assertEquals(json.readTree(json.writeValueAsString(expected)), bodies.get(1));
+        // 계약(architecture.md §3)이 정의한 필드만 나간다. 코드와 같은 방식으로 기대값을 만들면
+        // CostResult 에 필드가 늘 때 테스트도 같이 따라가 표류를 못 잡는다 — 그래서 여기 직접 적는다.
+        assertEquals(json.readTree("""
+                {"planId":42,"planName":"넷플플랜","carrier":"SKT",
+                 "monthlyTotal":55000,"baseline":68500,"monthlySavings":13500,"annualSavings":162000,
+                 "breakdown":[{"label":"기본료","amount":55000,"provenance":"OFFICIAL","note":null}],
+                 "missingInputs":[{"field":"hasFamilyBundle","impact":"확인 필요",
+                                   "howToFind":"통신사 마이페이지"}]}
+                """), bodies.get(1));
+        // AI 는 계약 밖 필드를 422 로 거부하고 BE 는 그것을 장애로 삼킨다.
+        // 하나라도 새면 사유가 화면에서 조용히 사라진다. 이 한 줄이 그 재발을 막는다.
+        assertFalse(bodies.get(1).has("priceCrossCheck"), "AI 가 쓰지 않는 BE 내부 필드가 새면 안 된다");
     }
 
     @ParameterizedTest

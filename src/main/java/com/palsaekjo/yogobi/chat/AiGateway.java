@@ -26,6 +26,18 @@ import org.springframework.web.client.RestClientException;
 /** AI 서버 호출과 응답 검증. 금액은 CostResult를 그대로 전달한다. */
 @Component
 public class AiGateway implements Narrator, CatalogVerifier {
+    /**
+     * `/narrate` 요청에 실어 보내는 계약 필드(architecture.md §3). <b>이 목록이 곧 계약이다.</b>
+     *
+     * <p>`CostResult` 를 통째로 직렬화하면 AI 가 쓰지 않는 내부 필드까지 나간다
+     * (`priceCrossCheck` 가 실제로 그랬다). AI 는 계약 밖 필드를 422 로 거부하고 BE 는 그것을
+     * {@link Unavailable} 로 삼키므로, <b>사유가 화면에서 조용히 사라지고 아무도 모른다.</b>
+     * 레코드에 필드가 늘어도 여기 적지 않으면 새지 않는다.
+     */
+    private static final Set<String> NARRATE_FIELDS = Set.of(
+            "planId", "planName", "carrier", "monthlyTotal", "baseline",
+            "monthlySavings", "annualSavings", "breakdown", "missingInputs");
+
     private final RestClient client;
     private final ObjectMapper json;
     private final String internalToken;
@@ -98,6 +110,7 @@ public class AiGateway implements Narrator, CatalogVerifier {
     public Narration narrate(CostResult cost, List<MissingInput> missingInputs) {
         ObjectNode request = json.valueToTree(cost);
         request.set("missingInputs", json.valueToTree(missingInputs));
+        request.retain(NARRATE_FIELDS);
         JsonNode result = post("/narrate", request);
         requireObject(result, "message", "reasons");
         JsonNode message = result.path("message");

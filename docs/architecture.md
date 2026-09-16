@@ -210,7 +210,7 @@ Google 전용 계정은 동일 Google `sub` 재인증으로 자체 비밀번호�
       "checkedAt": "2026-09-16T03:40:00Z"               // 스냅샷을 모은 시각
     }
   }],
-  "reasons": [                                            // 1순위 조합에 대한 AI 큐레이션 사유, 0~3개
+  "reasons": [                                            // 1순위 조합에 대한 사유, 0~3개
     "따로 내시던 넷플릭스 스탠다드 13,500원이 요금제에 포함돼 있어요.",
     "선택약정 25% 할인으로 월 13,750원이 빠져요."
   ]
@@ -232,23 +232,31 @@ D-18에서 우체국·스마트초이스 연동과 `priceCrossCheck` 응답 필�
 `SMARTCHOICE_API_KEY`가 없으면 스윕이 돌지 않아 전 결과가 `UNVERIFIED`다(fail-soft).
 D-26에서 AI `/narrate` **응답**에 `reasons`를 더했다. 요청 필드는 그대로다.
 D-26 후속(2026-09-16): BE가 `/narrate`를 호출해 `reasons`를 `/recommendations` 응답 최상위에 싣는다.
-필터·챗봇 두 경로 모두 1순위 결과(`results[0]`)에 대한 사유를 담으며, AI 장애 시 **빈 배열**이고 `results`는 정상이다.
+필터·챗봇 두 경로 모두 1순위 결과(`results[0]`)에 대한 사유를 담으며, AI 장애 시에도 `results`는 정상이다.
 narrate 오케스트레이션은 컨트롤러가 한다(`RecommendationController`·`ChatController`) — `RecommendationService`는 AI를 모른다.
 `recommend`가 `chat`의 `AiGateway`에 직접 의존하면 순환이 되므로 포트 `recommend.Narrator`(구현: `AiGateway`)로 역전한다.
+
+**`/narrate` 요청에 싣는 필드는 아래 9개뿐이다**(`AiGateway.NARRATE_FIELDS`):
+`planId`·`planName`·`carrier`·`monthlyTotal`·`baseline`·`monthlySavings`·`annualSavings`·`breakdown`·`missingInputs`.
+`CostResult`를 통째로 직렬화하면 AI가 쓰지 않는 필드까지 나간다 — 복구된 `priceCrossCheck`가 실제로 그랬다.
+AI는 계약 밖 필드를 **422로 거부**하고 BE는 그것을 장애로 삼키므로, 사유가 화면에서 조용히 사라진다.
+레코드에 필드를 더하면 이 목록에 적을지 먼저 정한다. 적지 않으면 AI로 가지 않는다.
 
 ```jsonc
 // AI: POST /narrate 200
 {
   "message": "“SKT 5G 슬림+”의 실제 내시는 금액은 월 71,300원이에요. ...",  // 고정 템플릿
-  "reasons": [                                                            // LLM 큐레이션, 0~3개
+  "reasons": [                                                            // 0~3개. 모델 또는 규칙
     "따로 내시던 넷플릭스 스탠다드 13,500원이 요금제에 포함돼 있어요.",
     "선택약정 25% 할인으로 월 13,750원이 빠져요."
   ]
 }
 ```
 
-`reasons`는 화면의 "왜 나에게 이 상품이 추천됐나요?" 목록을 채운다. 보조 정보이므로 **비어 있을 수 있고**,
-모델 장애 시 빈 배열로 내려간다. `message`와 추천 결과는 그 경우에도 정상이다.
+`reasons`는 화면의 "왜 나에게 이 상품이 추천됐나요?" 목록을 채운다. 보조 정보이므로 **비어 있을 수 있다.**
+**모델 장애 시에는 AI 서버가 규칙으로 만든 사유가 내려간다**(D-38, 사용자 승인 2026-09-17).
+요청의 `breakdown`만 읽어 만들며 모델 문장과 **같은 금액 가드**를 통과하므로 나가는 규칙은 하나다.
+근거가 없으면 빈 배열도 여전히 가능하다. `message`와 추천 결과는 그 경우에도 정상이다.
 AI는 요청의 `breakdown`·`missingInputs`에 **실제로 있는 금액만** 인용하며, 그 밖의 금액이 섞인 줄은 AI 서버가 폐기한다.
 `breakdown`에 없는 항목은 근거로 쓰지 않으므로 **미사용 혜택은 사유 문장에도 등장하지 않는다**(절대 원칙 1).
 카탈로그 원본은 검수·승인된 CSV이며 PostgreSQL에 반영된 값으로 계산한다. 발행·복구 절차는 `docs/catalog-data.md`,
