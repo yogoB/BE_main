@@ -55,7 +55,7 @@ const CARDS = [
   ['review.pendingRequests', '검수 대기'],
   ['review.mismatched', '불일치(차단)'],
   ['review.unverified', '미확인'],
-  ['review.appliedToday', '오늘 반영'],
+  ['review.appliedToday', '24시간 반영'],   // 지표는 24시간 롤링이다 — '오늘'이 아니다
   ['reports.pending', '제보 대기'],
   ['gaps', '카탈로그 결손'],
 ];
