@@ -52,7 +52,8 @@ public class SecurityConfig {
     @Bean
     @org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication(type = org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication.Type.SERVLET)
     SecurityFilterChain security(HttpSecurity http, AuthTokens tokens, AuthRateLimit limits, GoogleLogin google,
-                                 ObjectMapper json, ObjectProvider<ClientRegistrationRepository> registrations) throws Exception {
+                                 ObjectMapper json, ObjectProvider<ClientRegistrationRepository> registrations,
+                                 CatalogOperators operators) throws Exception {
         http.cors(Customizer.withDefaults())
                 // OAuth/CSRF may use an HTTP session; that session must never authenticate a member API.
                 .securityContext(c -> c.securityContextRepository(new RequestAttributeSecurityContextRepository()))
@@ -63,10 +64,14 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/v1/recommendations", "/api/v1/calculator", "/api/v1/chat/messages",
                                 "/api/v1/catalog/reports",
                                 "/api/v1/auth/signup", "/api/v1/auth/login", "/api/v1/auth/email/verification",
-                                "/api/v1/auth/password/reset-request", "/api/v1/auth/password/reset").permitAll()
+                                "/api/v1/auth/password/reset-request", "/api/v1/auth/password/reset",
+                                "/api/v1/auth/password/recover").permitAll()
                         .requestMatchers("/oauth2/authorization/google", "/login/oauth2/code/google").permitAll()
                         .requestMatchers("/api/v1/me", "/api/v1/me/**", "/api/v1/auth/logout", "/api/v1/auth/logout-all",
                                 "/api/v1/auth/google/link", "/api/v1/auth/password").hasRole("MEMBER")
+                        // 카탈로그 원본(합본 CSV) CRUD — 공개 읽기 경로와 분리하고 **운영자만** 허용한다(D-24).
+                        // CSRF 보호는 기본값 그대로 적용된다. 운영자 지정은 CATALOG_ADMIN_USER_IDS(비면 아무도 못 쓴다).
+                        .requestMatchers("/api/v1/admin/catalog", "/api/v1/admin/catalog/**").hasRole("ADMIN")
                         .anyRequest().denyAll())
                 .exceptionHandling(e -> e
                         .authenticationEntryPoint((req, res, ex) -> error(json, res, AuthService.unauthorized()))
@@ -76,9 +81,13 @@ public class SecurityConfig {
                     @Override protected void doFilterInternal(HttpServletRequest req, HttpServletResponse res, FilterChain chain)
                             throws ServletException, IOException {
                         Long id = tokens.authenticate(req);
+                        // 운영자로 지정된 회원만 ROLE_ADMIN을 더 받는다(D-24). 그 외에는 기존과 동일하게 MEMBER뿐이다.
                         if (id != null) SecurityContextHolder.getContext().setAuthentication(
                                 UsernamePasswordAuthenticationToken.authenticated(id.toString(), null,
-                                        List.of(new SimpleGrantedAuthority("ROLE_MEMBER"))));
+                                        operators.contains(id)
+                                                ? List.of(new SimpleGrantedAuthority("ROLE_MEMBER"),
+                                                        new SimpleGrantedAuthority("ROLE_ADMIN"))
+                                                : List.of(new SimpleGrantedAuthority("ROLE_MEMBER"))));
                         try {
                             String path = req.getRequestURI();
                             if ((path.startsWith("/api/v1/auth/") && "POST".equals(req.getMethod()))

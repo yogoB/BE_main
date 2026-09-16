@@ -111,6 +111,11 @@ AI의 `/parse`·`/narrate`·`/ocr`는 토큰 누락·불일치 시 401, 서버 �
 | GET | `/api/v1/catalog/services` | 구독 서비스·티어 |
 | GET | `/api/v1/catalog/plans/{id}/benefits` | 요금제별 혜택 |
 | POST | `/api/v1/catalog/reports` | 정보 오류 제보(비회원 허용·CSRF 필수), 접수만 수행 — D-18 사용자 요청 |
+| GET | `/api/v1/admin/catalog` | 카탈로그 원본(합본 CSV) 데이터셋 목록·행 수 — **회원 인증 필수**, D-21 |
+| GET | `/api/v1/admin/catalog/{dataset}` | 데이터셋 전체 행 |
+| POST | `/api/v1/admin/catalog/{dataset}` | 행 추가. 키 중복은 409 |
+| PATCH | `/api/v1/admin/catalog/{dataset}/{key}` | 행 부분 수정. 키 필드 변경은 409 |
+| DELETE | `/api/v1/admin/catalog/{dataset}/{key}` | 행 삭제(DB에서는 `active=false`) |
 
 ### Phase 1
 | Method | Path | 설명 |
@@ -123,6 +128,8 @@ AI의 `/parse`·`/narrate`·`/ocr`는 토큰 누락·불일치 시 401, 서버 �
 | GET | `/oauth2/authorization/google` → `/login/oauth2/code/google` | Google OIDC 로그인·콜백 |
 | POST | `/api/v1/auth/google/link` | 자체 계정 비밀번호 재확인 후 Google 연결 시작 |
 | POST | `/api/v1/auth/password` | Google 전용 회원의 자체 비밀번호 등록 시작; Google 재인증 필요 |
+| POST | `/api/v1/auth/password/recover` | 복구 코드로 비밀번호 재설정 — `{email,recoveryCode,newPassword}`, 새 코드 발급 (D-22) |
+| POST | `/api/v1/me/nickname` | 닉네임 변경 — `{nickname}` (D-22) |
 | POST | `/api/v1/auth/logout-all` | 현재 회원의 모든 로그인 무효화 |
 | GET | `/api/v1/me` | 인증된 현재 회원 조회 |
 | GET/DELETE | `/api/v1/me/sessions` `/{id}` | 로그인 세션 목록 · 개별 세션 폐기 |
@@ -329,7 +336,8 @@ Flyway `db/migration/V{n}__{설명}.sql`.
 | 코드 | 의미 | HTTP |
 |---|---|---|
 | `YGB-REQ-001` | 필수 입력 누락 | 400 |
-| `YGB-CAT-001` | 요금제 없음 | 404 |
+| `YGB-CAT-001` | 요금제 없음 · 카탈로그 원본의 행/데이터셋 없음(D-21) | 404 |
+| `YGB-CAT-002` | 카탈로그 원본 행 충돌 — 키 중복·키 필드 변경 시도(D-21) | 409 |
 | `YGB-CAL-001` | 계산 가능한 조합 없음 (D-17 이후 미사용 — 추천의 후보 0건은 200+`missingInputs`) | 422 |
 | `YGB-IMP-001` | 결제내역 파일 형식 오류 | 400 |
 | `YGB-IMP-002` | 인식 불가 가맹점 포함 | 200 + 경고 |

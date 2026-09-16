@@ -25,6 +25,11 @@ public class ApiException extends RuntimeException {
         return new ApiException("YGB-CAT-001", 404, message, null);
     }
 
+    /** 카탈로그 원본(합본 CSV)의 행 충돌 — 같은 키가 이미 있거나 키를 바꾸려 할 때. D-21. */
+    public static ApiException conflict(String message) {
+        return new ApiException("YGB-CAT-002", 409, message, null);
+    }
+
     public String code() {
         return code;
     }

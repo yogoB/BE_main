@@ -127,6 +127,103 @@ class DirectSignupTest {
         browser.me().andExpect(status().isOk());
     }
 
+    // ── G-14 닉네임 자동 발급·변경 ──────────────────────────────────────────
+
+    @Test void g14a_generatesNicknameFromNameWhenOmitted() throws Exception {
+        var browser = new Browser();
+        var result = browser.post("/api/v1/auth/signup",
+                        Map.of("name", "이승훈", "email", "a@example.com", "password", PASSWORD))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.nickname").value(org.hamcrest.Matchers.matchesPattern("이승훈\\d{5}")))
+                .andReturn();
+        browser.accept(result);
+    }
+
+    @Test void g14d_changesNicknameAndKeepsOwnValue() throws Exception {
+        var browser = new Browser();
+        browser.accept(browser.post("/api/v1/auth/signup", signup("이승훈", "a@example.com", "훈이"))
+                .andExpect(status().isOk()).andReturn());
+
+        browser.post("/api/v1/me/nickname", Map.of("nickname", "새닉네임"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.nickname").value("새닉네임"));
+        browser.me().andExpect(jsonPath("$.data.nickname").value("새닉네임"));
+
+        // 자기 닉네임을 대소문자만 바꿔 다시 넣는 것은 충돌이 아니다(G-14 f).
+        browser.post("/api/v1/me/nickname", Map.of("nickname", " 새닉네임 "))
+                .andExpect(status().isOk());
+    }
+
+    @Test void g14e_rejectsNicknameTakenByAnother() throws Exception {
+        new Browser().post("/api/v1/auth/signup", signup("남", "other@example.com", "선점닉"))
+                .andExpect(status().isOk());
+        var browser = new Browser();
+        browser.accept(browser.post("/api/v1/auth/signup", signup("이승훈", "a@example.com", "내닉"))
+                .andExpect(status().isOk()).andReturn());
+
+        browser.post("/api/v1/me/nickname", Map.of("nickname", "선점닉"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("YGB-AUTH-DUP-NICK"));
+    }
+
+    // ── G-15 복구 코드 ──────────────────────────────────────────────────────
+
+    @Test void g15a_issuesRecoveryCodeOnceAndStoresOnlyHash() throws Exception {
+        var result = new Browser().post("/api/v1/auth/signup", signup("이승훈", "a@example.com", "훈이"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.recoveryCode").isNotEmpty())
+                .andReturn();
+        String code = JSON.readTree(result.getResponse().getContentAsString())
+                .path("data").path("recoveryCode").asText();
+        // 평문은 DB 에 없다 — 해시만 저장한다.
+        String stored = jdbc.queryForObject(
+                "SELECT recovery_code_hash FROM app_user WHERE email='a@example.com'", String.class);
+        assertThat(stored).isNotNull().isNotEqualTo(code);
+        // 조회 경로는 복구 코드를 돌려주지 않는다.
+        var browser = new Browser();
+        browser.accept(browser.post("/api/v1/auth/login", Map.of("email", "a@example.com", "password", PASSWORD))
+                .andReturn());
+        browser.me().andExpect(jsonPath("$.data.recoveryCode").doesNotExist());
+    }
+
+    @Test void g15bcef_recoversPasswordOnceAndRotatesCode() throws Exception {
+        var signupResult = new Browser().post("/api/v1/auth/signup", signup("이승훈", "a@example.com", "훈이"))
+                .andExpect(status().isOk()).andReturn();
+        String code = JSON.readTree(signupResult.getResponse().getContentAsString())
+                .path("data").path("recoveryCode").asText();
+        String newPassword = "brand new password 2026!";
+
+        var recovered = new Browser().post("/api/v1/auth/password/recover",
+                        Map.of("email", "a@example.com", "recoveryCode", code, "newPassword", newPassword))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.recoveryCode").isNotEmpty())    // 새 코드가 나온다(b)
+                .andReturn();
+        assertThat(JSON.readTree(recovered.getResponse().getContentAsString())
+                .path("data").path("recoveryCode").asText()).isNotEqualTo(code);
+
+        // 같은 코드는 다시 쓸 수 없다(c)
+        new Browser().post("/api/v1/auth/password/recover",
+                        Map.of("email", "a@example.com", "recoveryCode", code, "newPassword", newPassword))
+                .andExpect(status().isUnauthorized());
+        // 새 비밀번호로는 로그인되고(e), 옛 비밀번호로는 안 된다(f)
+        new Browser().post("/api/v1/auth/login", Map.of("email", "a@example.com", "password", newPassword))
+                .andExpect(status().isOk());
+        new Browser().post("/api/v1/auth/login", Map.of("email", "a@example.com", "password", PASSWORD))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test void g15d_wrongCodeAndUnknownEmailLookTheSame() throws Exception {
+        new Browser().post("/api/v1/auth/signup", signup("이승훈", "a@example.com", "훈이"))
+                .andExpect(status().isOk());
+        new Browser().post("/api/v1/auth/password/recover",
+                        Map.of("email", "a@example.com", "recoveryCode", "WRON-GCOD-EWRO-NGCO",
+                                "newPassword", "brand new password 2026!"))
+                .andExpect(status().isUnauthorized());
+        new Browser().post("/api/v1/auth/password/recover",
+                        Map.of("email", "nobody@example.com", "recoveryCode", "WRON-GCOD-EWRO-NGCO",
+                                "newPassword", "brand new password 2026!"))
+                .andExpect(status().isUnauthorized());
+    }
+
     @Test void g13e_shortPasswordAndBlankFieldsAreRejected() throws Exception {
         new Browser().post("/api/v1/auth/signup",
                         Map.of("name", "이승훈", "email", "a@example.com", "password", "short", "nickname", "훈이"))

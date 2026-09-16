@@ -36,8 +36,9 @@ class CatalogSeedLoaderTest {
 
     @Test
     void restoresSnapshotReloadsWithoutDuplicatesAndRollsBackInvalidCsv() throws Exception {
+        // 개수를 박아두면 마이그레이션을 더할 때마다 깨진다. 실제 파일 수와 맞춘다.
         assertThat(jdbc.queryForObject("SELECT count(*) FROM flyway_schema_history WHERE success", Integer.class))
-                .isEqualTo(12);   // V1~V12
+                .isEqualTo(migrationFileCount());
         assertSnapshot();
         loader.run(null);
         assertSnapshot();
@@ -88,6 +89,13 @@ class CatalogSeedLoaderTest {
         // 실제 요금제 CSV(D4)가 들어왔다. 건수를 박아두면 CSV 갱신마다 깨지므로 파일 행수와 맞춘다.
         assertThat(jdbc.queryForObject("SELECT count(*) FROM mobile_plan", Integer.class))
                 .isEqualTo(seedRowCount("db/seed/mobile_plan.csv"));
+    }
+
+    /** db/migration 의 V*.sql 개수. Flyway 가 적용한 수와 같아야 한다. */
+    private static int migrationFileCount() throws IOException {
+        var directory = new ClassPathResource("db/migration").getFile();
+        var files = directory.list((dir, name) -> name.startsWith("V") && name.endsWith(".sql"));
+        return files == null ? 0 : files.length;
     }
 
     /** 시드 CSV 의 데이터 행수(헤더 제외). 없으면 0. */

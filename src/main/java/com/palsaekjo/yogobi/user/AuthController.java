@@ -35,13 +35,15 @@ public class AuthController {
         boolean signup = request.getRequestURI().endsWith("/signup");
         // 가입은 두 형태다: 메일 토큰 {token,password} 또는 직접 가입 {name,email,password,nickname}(D-19).
         boolean direct = signup && !body.path("token").isTextual();
-        if (direct) fields(body, "name", "email", "password", "nickname");
+        // 닉네임은 선택이다 — 비우면 서버가 만들어 준다(D-22).
+        if (direct && body.path("nickname").isTextual()) fields(body, "name", "email", "password", "nickname");
+        else if (direct) fields(body, "name", "email", "password");
         else fields(body, signup ? "token" : "email", "password");
         tokens.requireConfigured();
         String password = body.get("password").textValue();
         var member = direct
                 ? members.signupDirect(body.get("name").textValue(), body.get("email").textValue(),
-                        password, body.get("nickname").textValue())
+                        password, body.path("nickname").textValue())
                 : signup ? members.signup(body.get("token").textValue(), password)
                         : members.login(body.get("email").textValue(), password);
         tokens.issue(member.id(), member.credentialVersion(), request, response);
@@ -109,6 +111,27 @@ public class AuthController {
         String url = google.begin(Long.parseLong(principal.getName()), body.get("password").textValue(),
                 request.getRequestURI().endsWith("/password"), request);
         return ApiResponse.ok(Map.of("authorizationUrl", url));
+    }
+
+    /** 복구 코드로 비밀번호 재설정(D-22). 비회원 경로 — 메일이 없으므로 이것이 유일한 자기복구 수단이다. */
+    @PostMapping("/auth/password/recover")
+    public ApiResponse<AuthService.Member> recover(@RequestBody JsonNode body, HttpServletRequest request,
+                                                  HttpServletResponse response) {
+        fields(body, "email", "recoveryCode", "newPassword");
+        tokens.requireConfigured();
+        var member = members.recoverPassword(body.get("email").textValue(),
+                body.get("recoveryCode").textValue(), body.get("newPassword").textValue());
+        tokens.issue(member.id(), member.credentialVersion(), request, response);
+        GoogleLogin.invalidate(request);
+        return ApiResponse.ok(member);
+    }
+
+    /** 닉네임 변경(D-22). 회원 본인만. */
+    @PostMapping("/me/nickname")
+    public ApiResponse<AuthService.Member> nickname(@RequestBody JsonNode body, java.security.Principal principal) {
+        fields(body, "nickname");
+        return ApiResponse.ok(members.changeNickname(Long.parseLong(principal.getName()),
+                body.get("nickname").textValue()));
     }
 
     private static void fields(JsonNode body, String... fields) {

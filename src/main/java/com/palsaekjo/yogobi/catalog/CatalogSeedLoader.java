@@ -22,6 +22,8 @@ public class CatalogSeedLoader implements ApplicationRunner {
     private final DataSource dataSource;
     @Value("${CATALOG_CSV_DIR:}")
     private String catalogDirectory = "";
+    @Value("${yogobi.catalog.combined-csv:}")
+    private String combinedCsv = "";
 
     public CatalogSeedLoader(DataSource dataSource) {
         this.dataSource = dataSource;
@@ -31,6 +33,8 @@ public class CatalogSeedLoader implements ApplicationRunner {
     public void run(ApplicationArguments args) throws SQLException, IOException {
         // 외부 관리 모드에서는 내장 시드가 운영 CSV나 마지막 정상 DB를 덮어쓰면 안 된다.
         if (!catalogDirectory.isBlank()) return;
+        // 합본 CSV가 원본으로 설정돼 있으면 그쪽이 적재한다(D-21). 개별 시드와 이중 적재하지 않는다.
+        if (!combinedCsv.isBlank()) return;
         load(new ClassPathResource("db/seed/subscription_service.csv"),
                 new ClassPathResource("db/seed/subscription_tier.csv"),
                 new ClassPathResource("db/seed/bundle_product.csv"));

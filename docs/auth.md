@@ -23,6 +23,8 @@ JWT·비밀번호·Google 토큰은 응답 JSON이나 URL에 넣지 않는다.
 | `GET /api/v1/me` | 인증 쿠키 | 현재 회원 |
 | `GET /api/v1/me/sessions` | 인증 쿠키 | 로그인 세션 목록(`current` 표시, 15분 만료·5분 유휴 제외) |
 | `DELETE /api/v1/me/sessions/{id}` | 인증 쿠키·CSRF | `{revoked:true}`, 해당 세션 폐기. 현재 세션이면 쿠키 삭제 |
+| `POST /api/v1/auth/password/recover` | `{email,recoveryCode,newPassword}`, CSRF | 현재 회원 + 인증 쿠키 + **새 복구 코드**. 기존 세션 전부 폐기 |
+| `POST /api/v1/me/nickname` | `{nickname}`, 인증 쿠키, CSRF | 변경된 회원 |
 | `POST /api/v1/auth/logout` | 인증 쿠키·CSRF | `{loggedOut:true}`, 현재 토큰 무효화·쿠키 삭제 |
 | `POST /api/v1/auth/logout-all` | 인증 쿠키·CSRF | `{loggedOut:true}`, 이 회원의 모든 토큰 무효화 |
 | `POST /api/v1/auth/google/link` | `{password}`, 인증 쿠키·CSRF | `{authorizationUrl:"/oauth2/authorization/google"}` |
@@ -34,6 +36,17 @@ JWT·비밀번호·Google 토큰은 응답 JSON이나 URL에 넣지 않는다.
 > **2026-09-16 (D-21): 메일 발송은 쓰지 않는다.** 배포에서 SMTP·메일 secret 8개를 제거했고
 > 비밀번호 재설정 화면도 없앴다. 아래 메일 토큰 흐름은 **코드에 남아 있으며**
 > `AUTH_EMAIL_ENABLED=true` + SMTP 설정으로 되살릴 수 있다. 현재 운영 경로는 직접 가입뿐이다.
+
+### 닉네임과 복구 코드 (D-22)
+
+**닉네임은 선택이다.** 비우면 서버가 `이름(없으면 이메일 앞부분) + 숫자 5자`로 만든다. Google 로그인도 같다.
+겹치면 숫자를 다시 뽑고, 그래도 안 되면 자릿수를 늘려 반드시 성공시킨다 — 가입이 닉네임 때문에 막히면 안 된다.
+`POST /me/nickname` 으로 바꾼다. 남이 쓰는 값이면 409 `YGB-AUTH-DUP-NICK`, 자기 값 유지는 충돌이 아니다.
+
+**복구 코드는 메일이 없는 지금 유일한 자기복구 수단이다.** 가입·재설정 응답의 `recoveryCode` 에 **한 번만**
+실리고 서버는 SHA-256 해시만 보관한다. `GET /me` 는 **절대 돌려주지 않는다.**
+`POST /auth/password/recover` 가 성공하면 코드는 소진되고 **새 코드를 발급**한다(안 그러면 다음 복구 수단이 없다).
+존재하지 않는 이메일·틀린 코드는 같은 401이고, 같은 이메일로 10회를 넘기면 429다.
 
 ### 가입은 두 형태다 (D-20)
 
