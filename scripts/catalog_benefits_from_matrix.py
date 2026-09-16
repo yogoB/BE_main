@@ -57,11 +57,17 @@ def tier_of(service_id, label):
 
 
 def benefits_in(label):
-    """괄호 안 표기 → [(service_id, tier_id)]. '티빙&웨이브'처럼 여러 개면 모두 돌려준다."""
+    """표기 → [(service_id, tier_id)]. '티빙&웨이브'처럼 여러 개면 모두 돌려준다.
+
+    **등급은 그 서비스 이름 뒤 구간에서만 찾는다.** 이름 전체를 훑으면 옆 서비스의 등급 단어를
+    끌어온다 — "초이스 더블 유튜브 프리미엄+넷플릭스" 에서 '프리미엄'은 유튜브의 것이지
+    넷플릭스의 것이 아니다. 이걸 놓치면 넷플릭스 프리미엄이 공짜로 계산된다.
+    """
+    hits = sorted((label.index(name), service_id) for name, service_id in SERVICES.items() if name in label)
     found = []
-    for name, service_id in SERVICES.items():
-        if name in label:
-            found.append((service_id, tier_of(service_id, label)))
+    for index, (start, service_id) in enumerate(hits):
+        end = hits[index + 1][0] if index + 1 < len(hits) else len(label)
+        found.append((service_id, tier_of(service_id, label[start:end])))
     return found
 
 
@@ -110,8 +116,11 @@ def convert(source, details=None):
         collected = row["확인일"].strip()
         if not (carrier and plan_name and url and collected):
             continue
-        for match in BRACKET.finditer(plan_name):
-            for service_id, tier_id in benefits_in(match.group(1)):
+        # 공식 표기는 통신사마다 다르다: SKT 는 괄호("베스트 Max(넷플릭스)"),
+        # KT 는 공백 뒤("초이스130 넷플릭스"). 괄호가 있으면 그 안만, 없으면 이름 전체를 본다.
+        brackets = [m.group(1) for m in BRACKET.finditer(plan_name)]
+        for label in brackets or [plan_name]:
+            for service_id, tier_id in benefits_in(label):
                 # plan_benefit 은 (요금제, 서비스) 단위로 하나만 둔다. 같은 요금제명이 여러 행이면 첫 건만.
                 key = (carrier, plan_name, service_id)
                 if key in seen:
