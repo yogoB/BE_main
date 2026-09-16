@@ -33,11 +33,13 @@ public class RecommendationService {
 
     private final CatalogReader catalog;
     private final CatalogCandidateRecorder gaps;
+    private final PriceCrossCheck crossCheck;
     private final CostCalculator calculator = new CostCalculator();
 
-    public RecommendationService(CatalogReader catalog, CatalogCandidateRecorder gaps) {
+    public RecommendationService(CatalogReader catalog, CatalogCandidateRecorder gaps, PriceCrossCheck crossCheck) {
         this.catalog = catalog;
         this.gaps = gaps;
+        this.crossCheck = crossCheck;
     }
 
     public RecommendationResponse recommend(RecommendationRequest request) {
@@ -83,7 +85,8 @@ public class RecommendationService {
                 .map(c -> Map.entry(c, calculator.calculate(c.plan(), wanted, ctx)))
                 .sorted(Comparator.comparingLong(e -> e.getValue().effectiveMonthlyCost()))
                 .limit(TOP_N)
-                .map(e -> toResult(e.getKey(), e.getValue()))
+                // 대조는 정렬이 끝난 뒤에 붙인다 — 검증값이 순위·금액에 끼어들 여지를 없앤다(D-03·D-20).
+                .map(e -> toResult(e.getKey(), e.getValue()).withPriceCrossCheck(crossCheck.check(e.getKey())))
                 .toList();
 
         List<MissingInput> missing = missingInputs(optional, unknownServiceIds, foreignPriced);
@@ -118,7 +121,8 @@ public class RecommendationService {
         var optional = request.optional();
         var ctx = new PricingContext(parseContract(optional),
                 optional == null ? null : optional.hasFamilyBundle(), 0, bundles);
-        CostResult result = toResult(candidate, calculator.calculate(candidate.plan(), wanted, ctx));
+        CostResult result = toResult(candidate, calculator.calculate(candidate.plan(), wanted, ctx))
+                .withPriceCrossCheck(crossCheck.check(candidate));
 
         // 계산기는 사용자가 카탈로그에서 고른 ID를 받는다 — 없는 ID는 결손이 아니라 잘못된 요청이라 400 그대로다.
         // 다만 해외 결제 등급은 위에서 걸러 안내로 싣는다.
