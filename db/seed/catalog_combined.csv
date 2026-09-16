@@ -1832,10 +1832,10 @@ id,service_id,name,price,concurrent_streams,quality,note,currency,tax_included
 87,21,6TB,44000,,,6TB; HomeKit 카메라 수 무제한,KRW,true
 88,21,12TB,88000,,,12TB; HomeKit 카메라 수 무제한,KRW,true
 89,22,Basic,2900,,,1인 100GB; 웹·모바일 앱; Outlook 광고 제거,KRW,true
-90,23,Go,8,,,Free보다 확대된 사용량,USD,false
-91,23,Plus,20,,,확대된 AI·도구 사용량,USD,false
+90,23,Go,13000,,,Free보다 확대된 사용량,KRW,true
+91,23,Plus,29000,,,확대된 AI·도구 사용량,KRW,true
 92,23,Pro 5x,100,,,Plus 대비 5배 사용량,USD,false
-93,23,Pro 20x,200,,,Plus 대비 20배 사용량,USD,false
+93,23,Pro 20x,159000,,,Plus 대비 20배 사용량,KRW,true
 94,24,Pro,20,,,확장 사용량; Claude Code 포함,USD,false
 95,24,Max 5x,100,,,Pro 대비 5배 사용량,USD,false
 96,24,Max 20x,200,,,Pro 대비 20배 사용량,USD,false

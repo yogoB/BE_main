@@ -89,6 +89,7 @@ def main():
     kept_services, kept_tiers = len(services), len(tiers)
 
     dropped = collections.Counter()
+    written = set()                     # 이번 실행에서 이미 채운 (서비스, 등급명)
     by_category = collections.defaultdict(list)
     for row in csv_sections.read(args.source, "subscription_plans"):
         by_category[row["구분"]].append(row)
@@ -127,19 +128,36 @@ def main():
 
             tier_name = row["plan_name"].strip()
             key = (service["id"], tier_name)
-            if key in tiers:
-                dropped["이미 있는 등급(기존 ID 유지)"] += 1
+            # 같은 이름이 여러 번 나온다(월간·연간). **첫 행만 쓴다** — 우리 price 는 월 요금이고
+            # 원자료가 월간을 먼저 싣는다. 이 규칙을 빼면 연간 금액이 월 요금 자리에 들어간다(실제로 그랬다).
+            if key in written:
+                dropped["같은 이름의 다른 청구주기(첫 행만 채택)"] += 1
                 continue
+            written.add(key)
+            # 이미 있는 등급은 **ID 만 물려받고 값은 원자료로 갱신한다**.
+            # 건너뛰기만 하면 원자료의 가격·통화 수정이 영영 반영되지 않는다(실제로 그랬다).
+            existing = tiers.get(key)
+            if existing is not None:
+                dropped["기존 등급 갱신(ID 유지)"] += 1
             concurrent = streams(row["features"])
+            # 기존 등급은 **금액·통화·세금만** 원자료로 갱신한다. 설명·화질·동시접속은 손으로 다듬은 값이
+            # 있을 수 있어 그대로 둔다 — 가격 수정 한 번에 화면 문구가 통째로 흔들리지 않게 한다.
             tiers[key] = {
-                "id": str(next_tier), "service_id": service["id"], "name": tier_name,
+                "id": existing["id"] if existing else str(next_tier),
+                "service_id": service["id"], "name": tier_name,
                 "price": str(int(float(price))),
-                "concurrent_streams": "" if concurrent is None else str(concurrent),
-                "quality": quality(row["features"]) or "",
-                "note": (row["features"] or "").strip()[:200],
+                "concurrent_streams": existing["concurrent_streams"] if existing
+                    else ("" if concurrent is None else str(concurrent)),
+                "quality": existing["quality"] if existing else (quality(row["features"]) or ""),
+                "note": existing["note"] if existing else (row["features"] or "").strip()[:200],
                 "currency": row["currency"],
+                # 표기가에 세금이 포함됐는지. 국내 표시가는 총액(부가세 포함)이 관행이고,
+                # 해외 사업자의 외화 표기가는 세금 별도라 한국 이용자에겐 결제 시 10%가 더 붙는다.
+                # 원자료에 세금 칸이 없어 통화로 가른다 — 틀린 행은 이 열만 고치면 된다(가격은 출처 그대로다).
+                "tax_included": "true" if row["currency"] == "KRW" else "false",
             }
-            next_tier += 1
+            if existing is None:
+                next_tier += 1
 
     os.makedirs(args.target, exist_ok=True)
     with open(os.path.join(args.target, "subscription_service.csv"), "w", encoding="utf-8", newline="") as out:
