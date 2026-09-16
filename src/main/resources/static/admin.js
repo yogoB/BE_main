@@ -29,13 +29,15 @@ async function showSession() {
     $('login-section').hidden = true;
     $('dashboard-section').hidden = false;
     $('review-section').hidden = false;
+    $('audit-section').hidden = false;
     $('who').textContent = `${session.loginId} (회원번호 ${session.userId})로 로그인했어요.`;
-    await Promise.all([loadDashboard(), loadRequests()]);
+    await Promise.all([loadDashboard(), loadRequests(), loadAudit()]);
     return true;
   } catch {
     $('login-section').hidden = false;
     $('dashboard-section').hidden = true;
     $('review-section').hidden = true;
+    $('audit-section').hidden = true;
     return false;
   }
 }
@@ -47,10 +49,12 @@ const CARDS = [
   ['members.withSubscription', '구독 등록 회원'],
   ['members.activeSessions', '활성 세션'],
   ['catalog.mobilePlans', '요금제'],
+  ['catalog.subscriptionServices', '구독 서비스'],
   ['catalog.subscriptionTiers', '구독 등급'],
   ['catalog.planBenefits', '제휴 혜택'],
   ['review.pendingRequests', '검수 대기'],
   ['review.mismatched', '불일치(차단)'],
+  ['review.unverified', '미확인'],
   ['review.appliedToday', '오늘 반영'],
   ['reports.pending', '제보 대기'],
   ['gaps', '카탈로그 결손'],
@@ -132,6 +136,78 @@ function cell(text) {
   return td;
 }
 
+/* 카탈로그 변경 이력(D-26·D-27). 원본이 파일이라 git 이력이 없어 이 목록이 유일한 감사 자료다.
+   되돌린 변경(FAILED)도 시도 자체가 감사 대상이므로 숨기지 않는다. */
+async function loadAudit() {
+  const rows = await call(`/api/v1/admin/catalog/audit?limit=${$('audit-limit').value}`);
+  $('audit').replaceChildren(...rows.map(auditRow));
+  if (!rows.length) $('audit').append(tr(['', '아직 변경 이력이 없어요.', '', '', '']));
+}
+
+function auditRow(entry) {
+  const row = document.createElement('tr');
+
+  const when = document.createElement('td');
+  when.className = 'when';
+  // 서버가 준 시각을 그대로 보여준다. 파싱에 실패하면 원문을 남긴다 — 감사 기록은 지어내지 않는다.
+  const at = new Date(entry.created_at);
+  when.textContent = Number.isNaN(at.getTime()) ? String(entry.created_at ?? '')
+    : at.toLocaleString('ko-KR', { dateStyle: 'short', timeStyle: 'medium' });
+  row.append(when, cell(`회원번호 ${entry.actor_id}`), tagCell(entry.action));
+
+  const target = document.createElement('td');
+  target.append(cellText(`${entry.dataset}\n${entry.row_key ?? ''}`));
+  const diff = changes(entry.before_row, entry.after_row);
+  if (diff) target.append(diff);
+  row.append(target);
+
+  const outcome = document.createElement('td');
+  outcome.append(tag(entry.outcome));
+  if (entry.detail) {
+    const detail = document.createElement('div');
+    detail.textContent = entry.detail;
+    outcome.append(detail);
+  }
+  row.append(outcome);
+  return row;
+}
+
+/** 변경 전후는 CSV 한 줄이 최대 4,000자다. 기본은 접어두고 펼쳐서 본다. */
+function changes(before, after) {
+  if (!before && !after) return null;
+  const box = document.createElement('details');
+  const summary = document.createElement('summary');
+  summary.textContent = '변경 전후 보기';
+  box.append(summary);
+  for (const [label, value] of [['변경 전', before], ['변경 후', after]]) {
+    if (!value) continue;
+    const line = document.createElement('p');
+    line.className = 'diff';
+    const name = document.createElement('b');
+    name.textContent = label;
+    line.append(name, document.createTextNode(value));
+    box.append(line);
+  }
+  return box;
+}
+
+function tag(value) {
+  const span = document.createElement('span');
+  span.className = `tag ${value || 'SKIPPED'}`;
+  span.textContent = value || '—';
+  return span;
+}
+
+function tagCell(value) {
+  const td = document.createElement('td');
+  td.append(tag(value));
+  return td;
+}
+
+function cellText(text) {
+  return document.createTextNode(text);
+}
+
 async function decide(id, action) {
   const reason = action === 'reject' ? window.prompt('거절 사유를 적어주세요.') : null;
   if (action === 'reject' && reason === null) return;
@@ -140,7 +216,7 @@ async function decide(id, action) {
       method: 'POST', body: action === 'reject' ? { reason } : {},
     });
     say(`#${id} ${action === 'approve' ? '승인했어요. 카탈로그에 반영됐습니다.' : '거절했어요.'}`);
-    await Promise.all([loadRequests(), loadDashboard()]);
+    await Promise.all([loadRequests(), loadDashboard(), loadAudit()]);
   } catch (error) {
     say(error.message);
   }
@@ -165,8 +241,10 @@ $('logout').addEventListener('click', async () => {
   await showSession();
 });
 
-$('refresh').addEventListener('click', () => loadDashboard().catch(error => say(error.message)));
+$('refresh').addEventListener('click', () =>
+  Promise.all([loadDashboard(), loadAudit()]).catch(error => say(error.message)));
 $('status-filter').addEventListener('change', () => loadRequests().catch(error => say(error.message)));
+$('audit-limit').addEventListener('change', () => loadAudit().catch(error => say(error.message)));
 
 $('harvest').addEventListener('click', async () => {
   say('수집하는 중이에요…');
@@ -174,7 +252,7 @@ $('harvest').addEventListener('click', async () => {
     const result = await call('/api/v1/admin/harvest/run', { method: 'POST', body: {} });
     say(`수집 완료 — 요금제 ${result.proposedMobilePlans}건 · 구독 ${result.proposedSubscriptionTiers}건 제안,`
       + ` 검수 대기 ${result.pending}건`);
-    await Promise.all([loadRequests(), loadDashboard()]);
+    await Promise.all([loadRequests(), loadDashboard(), loadAudit()]);
   } catch (error) {
     say(error.message);
   }
