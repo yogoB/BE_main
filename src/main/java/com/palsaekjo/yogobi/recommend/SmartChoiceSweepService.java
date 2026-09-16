@@ -25,6 +25,8 @@ public class SmartChoiceSweepService {
     private static final int AGE = 20;               // 성인 기준
     private static final int CONTRACT_MONTHS = 0;    // 무약정 정가 — 카탈로그 base_price 와 같은 기준
     private static final String SOURCE_URL = "https://www.smartchoice.or.kr/";
+    /** 결손 후보 상한. 닿으면 기록만 멈추고 스윕은 끝까지 간다 — CatalogCandidateRecorder 와 같은 값. */
+    private static final int MAX_CANDIDATES = 10_000;
 
     private final SmartChoiceClient client;
     private final JdbcTemplate jdbc;
@@ -66,6 +68,38 @@ public class SmartChoiceSweepService {
             }
         }
         log.info("스마트초이스 스윕 완료: 조건 {}건, 스냅샷 {}행 갱신", conditions.size(), stored);
+        recordMissingPlans();
+    }
+
+    /**
+     * 스냅샷에 있는데 카탈로그에 없는 요금제를 결손으로 남긴다(G-19 · D-31).
+     *
+     * <p>스윕은 {@link #AGE} = 20 으로 돌기 때문에 청년 요금제(KT Y덤·SKT 라이트(청년)·LGU+ 유쓰)를
+     * 이미 받아오고 있었다. 그 결과가 스냅샷에만 쌓이고 아무도 보지 않아 Y덤 11종이 통째로 빠져 있었다.
+     * <p><b>카탈로그로 승격하지 않는다</b> — 스냅샷은 여전히 원본이 아니다(D-20). 여기 쌓인 행은
+     * 사람이 CSV 에 반영해야 카탈로그가 된다(D-18). 계산에는 어느 단계에서도 쓰이지 않는다.
+     * <p>fail-soft: 기록이 실패해도 이미 저장한 스냅샷은 유지한다.
+     */
+    private void recordMissingPlans() {
+        try {
+            // requested_cnt 는 건드리지 않는다 — 그 값은 "사용자가 몇 번 찾았나"이고 곧 수집 우선순위다.
+            // 하루 3회 배치가 올리면 아무도 찾지 않은 요금제가 우선순위 1위가 된다(G-19-d).
+            int recorded = jdbc.update("""
+                    INSERT INTO catalog_candidate (kind, query_text, status)
+                    SELECT 'MOBILE_PLAN', btrim(s.carrier) || ' ' || btrim(s.plan_name), 'REQUESTED'
+                      FROM smartchoice_plan_snapshot s
+                     WHERE length(btrim(s.carrier) || ' ' || btrim(s.plan_name)) <= 200
+                       AND NOT EXISTS (
+                           SELECT 1 FROM mobile_plan p JOIN carrier c ON c.id = p.carrier_id
+                            WHERE replace(lower(btrim(c.name)), ' ', '') = replace(lower(btrim(s.carrier)), ' ', '')
+                              AND replace(lower(btrim(p.name)), ' ', '') = replace(lower(btrim(s.plan_name)), ' ', ''))
+                       AND (SELECT count(*) FROM catalog_candidate) < ?
+                    ON CONFLICT (kind, query_text) DO UPDATE SET last_requested_at = now()
+                    """, MAX_CANDIDATES);
+            log.info("카탈로그 결손 후보 {}행 기록 (사람이 CSV 에 반영해야 카탈로그가 된다)", recorded);
+        } catch (RuntimeException e) {
+            log.warn("결손 후보 기록 실패 — 스냅샷은 유지합니다 (fail-soft): {}", e.toString());
+        }
     }
 
     /** 이름·통신사가 비면 대조 키가 없으므로 버린다. 같은 키는 최신 값으로 덮는다(V7 의 dedup 키). */

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -83,7 +84,7 @@ class SmartChoiceSweepServiceTest {
         when(jdbc.update(anyString(), any(Object[].class))).thenReturn(1);
         new SmartChoiceSweepService(client, jdbc, 60).sweep();
         assertThat(client.calls).isEqualTo(2);
-        verify(jdbc, org.mockito.Mockito.times(2)).update(anyString(), any(Object[].class));
+        verify(jdbc, org.mockito.Mockito.times(2)).update(contains("INSERT INTO smartchoice_plan_snapshot"), any(Object[].class));
     }
 
     @Test
@@ -92,6 +93,6 @@ class SmartChoiceSweepServiceTest {
                 List.of(new SmartChoiceRecommendation(1, "  ", "5G 시그니처", 89_000L, 0, "30GB")));
         var jdbc = jdbcWith(1);
         new SmartChoiceSweepService(client, jdbc, 60).sweep();
-        verify(jdbc, never()).update(anyString(), any(Object[].class));
+        verify(jdbc, never()).update(contains("INSERT INTO smartchoice_plan_snapshot"), any(Object[].class));
     }
 }

@@ -116,6 +116,15 @@ public class CatalogReader {
                 rs.getBoolean("is_exclusive"), rs.getString("exclusive_group"))));
     }
 
+    /**
+     * 누구나 가입할 수 있는 {@code age_limit} 값. 이 둘과 NULL 만 후보가 된다(G-18).
+     * <p>{@code 다이렉트} 는 자격 제한이 아니라 <b>온라인 가입 채널</b>이다 — 빼면 요고 계열 44종이 통째로 사라진다.
+     * 나머지(키즈·청년·시니어·복지·외국인·군인·태블릿)는 자격이 없으면 가입 자체가 안 되므로
+     * 1등으로 보여줘도 사용자는 가입에 실패한다. 절대 원칙 1 과 같은 논리로 후보에서 뺀다.
+     * <p>자유 텍스트라 목록을 코드가 들고 있을 수밖에 없다. 시드에 새 값이 생기면 여기 추가한다.
+     */
+    private static final String OPEN_TO_ALL = "p.age_limit IS NULL OR p.age_limit IN ('ALL', '다이렉트')";
+
     /** 데이터 요구량을 만족하는 후보 요금제. networkType 은 있으면 필터, 없으면 전체. */
     public List<CandidatePlan> findCandidatePlans(long dataMb, String networkType) {
         var params = new MapSqlParameterSource()
@@ -126,7 +135,8 @@ public class CatalogReader {
                 FROM mobile_plan p JOIN carrier c ON c.id = p.carrier_id
                 WHERE p.active AND p.data_mb >= :dataMb
                   AND (:networkType::text IS NULL OR p.network_type = :networkType)
-                """, params, (rs, i) -> new Object[]{
+                  AND (%s)
+                """.formatted(OPEN_TO_ALL), params, (rs, i) -> new Object[]{
                     rs.getLong("id"), rs.getString("name"), rs.getLong("base_price"),
                     contractDiscount(rs.getObject("contract_discount_24m", Long.class),
                             rs.getObject("contract_discount_12m", Long.class)),
@@ -144,6 +154,21 @@ public class CatalogReader {
             result.add(new CandidatePlan(plan, (String) p[4]));
         }
         return result;
+    }
+
+    /**
+     * 같은 조건에서 <b>자격 제한 때문에</b> 후보에서 빠진 요금제 수(G-18-g).
+     * 안내 문구에 실제 숫자를 넣기 위한 것이므로 0 이면 호출부가 안내를 생략한다.
+     */
+    public int countAgeRestricted(long dataMb, String networkType) {
+        Integer found = jdbc.queryForObject("""
+                SELECT count(*) FROM mobile_plan p
+                WHERE p.active AND p.data_mb >= :dataMb
+                  AND (:networkType::text IS NULL OR p.network_type = :networkType)
+                  AND NOT (%s)
+                """.formatted(OPEN_TO_ALL), new MapSqlParameterSource()
+                .addValue("dataMb", dataMb).addValue("networkType", networkType), Integer.class);
+        return found == null ? 0 : found;
     }
 
     /** 계산기용 단건 조회. 없으면 빈 Optional (호출부가 404 로 변환). */

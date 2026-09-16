@@ -72,6 +72,7 @@ public class RecommendationService {
         if (candidates.isEmpty()) {
             gaps.record(Kind.MOBILE_PLAN, "dataMb>=" + dataMb + ",network=" + (networkType == null ? "ANY" : networkType));
             var noPlan = missingInputs(optional, unknownServiceIds, foreignPriced);
+            addAgeRestrictionNotice(noPlan, dataMb, networkType);
             noPlan.add(new MissingInput("monthlyDataGb",
                     "조건을 만족하는 요금제가 아직 카탈로그에 없어요. 확인 중이에요",
                     "데이터 사용량을 낮추거나 망 종류를 바꿔서 다시 찾아보세요"));
@@ -90,6 +91,7 @@ public class RecommendationService {
                 .toList();
 
         List<MissingInput> missing = missingInputs(optional, unknownServiceIds, foreignPriced);
+        addAgeRestrictionNotice(missing, dataMb, networkType);
         Accuracy accuracy = missing.isEmpty() ? Accuracy.FULL : Accuracy.PARTIAL;
         return new RecommendationResponse(accuracy, missing, results);
     }
@@ -141,6 +143,20 @@ public class RecommendationService {
     private static BreakdownLine toLine(CostLine line) {
         return new BreakdownLine(line.label(), line.amount(),
                 line.value().provenance().name(), line.note());
+    }
+
+    /**
+     * 가입 자격이 없어 후보에서 뺀 요금제를 안내한다(G-18-g). 0 건이면 넣지 않는다 — 없는 선택지를 안내하면 소음이다(G-18-h).
+     * <p>계산기 경로에는 붙이지 않는다. 사용자가 이미 고른 요금제 하나를 계산하는 것이라 후보 탐색이 없다.
+     */
+    private void addAgeRestrictionNotice(List<MissingInput> missing, long dataMb, String networkType) {
+        int restricted = catalog.countAgeRestricted(dataMb, networkType);
+        if (restricted == 0) {
+            return;
+        }
+        missing.add(new MissingInput("ageLimit",
+                "청년·키즈·시니어처럼 가입 자격이 필요한 요금제 " + restricted + "건은 뺐어요",
+                "해당 자격이 있다면 통신사에서 더 싼 요금제를 찾을 수 있어요"));
     }
 
     /** 채워지지 않은 선택 입력과 카탈로그 결손을 안내한다. accuracy 는 이 목록이 비었는지로 정한다. */
