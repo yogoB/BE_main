@@ -271,11 +271,11 @@ CSV에 없는 것을 물어도 **200으로 답한다.** 아는 것으로 계산�
       "id": 1, "name": "넷플릭스", "category": "OTT",
       "officialUrl": "https://www.netflix.com/signup/planform",
       "tiers": [
-        { "id": 2, "name": "스탠다드", "price": 13500, "currency": "KRW",
+        { "id": 2, "name": "스탠다드", "price": 13500, "currency": "KRW", "taxIncluded": true,
           "krwEstimate": null, "krwRateDate": null,
           "concurrentStreams": 2, "quality": "FHD", "note": null },
-        { "id": 94, "name": "Pro", "price": 20, "currency": "USD",
-          "krwEstimate": 27183, "krwRateDate": "2026-09-15",
+        { "id": 94, "name": "Pro", "price": 20, "currency": "USD", "taxIncluded": false,
+          "krwEstimate": 29901, "krwRateDate": "2026-09-15",
           "concurrentStreams": null, "quality": null, "note": "확장 사용량" }
       ]
     }
@@ -286,7 +286,9 @@ CSV에 없는 것을 물어도 **200으로 답한다.** 아는 것으로 계산�
 
 `price` 는 **`currency` 단위의 공식 표기 금액**이다(`KRW` | `USD`).
 해외 결제 등급은 원화 확정 금액이 없어 `krwEstimate`(환율 환산, **ESTIMATED**)와 기준일 `krwRateDate` 를 함께 준다.
-환율은 하루 1회 배치로만 갱신하며(요청 경로에서 외부 호출 없음) 값이 없으면 두 필드는 `null` 이다 — 0원으로 적지 않는다.
+`taxIncluded=false` 는 **표기가가 세금 별도**라는 뜻이다(해외 사업자 관행). 이때 `krwEstimate` 에는 부가세 10%가 들어 있다
+— `$20 × 1.1 × 1359.15 = 29,901원`. 표기가(`price`)에는 세금을 섞지 않는다. 공식 표기가가 출처이기 때문이다.
+환율은 하루 1회 배치로만 갱신하며(요청 경로에서 외부 호출 없음) 값이 없으면 두 환산 필드는 `null` 이다 — 0원으로 적지 않는다.
 **환산값은 표시 전용이다.** 추천·계산기는 원화 확정 등급만 계산에 넣고, 빠진 것은 `missingInputs` 로 알린다(G-17).
 
 ### 3-2. 통신 요금제 — `GET /api/v1/catalog/plans`

@@ -26,7 +26,7 @@ class CombinedCatalogCsvTest {
             assertThat(sections.get(dataset).rows()).as(dataset).isNotEmpty();
             assertThat(sections.get(dataset).header()).as(dataset).contains(",");
         }
-        assertThat(sections.get("subscription_tier").header()).endsWith(",currency");
+        assertThat(sections.get("subscription_tier").header()).endsWith(",currency,tax_included");
     }
 
 

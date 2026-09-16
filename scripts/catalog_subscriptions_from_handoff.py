@@ -33,8 +33,9 @@ CATEGORIES = [("OTT", "OTT"), ("음악", "MUSIC"), ("AI", "AI"), ("전자책", "
 PERSONAL = {"individual", "family", "student"}
 
 SERVICE_HEADER = ["id", "name", "category", "official_url"]
-# currency 는 맨 뒤다 — 기존 열 순서를 바꾸면 COPY(HEADER MATCH)와 합본 CSV 가 함께 깨진다.
-TIER_HEADER = ["id", "service_id", "name", "price", "concurrent_streams", "quality", "note", "currency"]
+# 새 열은 맨 뒤에 붙인다 — 기존 열 순서를 바꾸면 COPY(HEADER MATCH)와 합본 CSV 가 함께 깨진다.
+TIER_HEADER = ["id", "service_id", "name", "price", "concurrent_streams", "quality", "note",
+               "currency", "tax_included"]
 # 저장할 수 있는 통화. 그 외는 표기 방법이 없어 담지 않는다(DB CHECK 와 같은 목록).
 CURRENCIES = {"KRW", "USD"}
 
@@ -47,12 +48,15 @@ def source_url(text):
     return urlunsplit(("https", parts.netloc, parts.path, "", ""))
 
 
-def read_existing(path, key):
-    """현재 시드를 {키: 행} 으로 읽는다. 없으면 빈 dict."""
+def read_existing(path, dataset, key):
+    """현재 시드(합본 CSV의 한 섹션)를 {키: 행} 으로 읽는다. 없으면 빈 dict.
+
+    **비어 있으면 ID 를 새로 매긴다** — 회원의 user_subscription.tier_id 가 깨지므로
+    합본 경로가 틀렸는데 조용히 넘어가지 않게 호출부가 결과 건수를 보고한다.
+    """
     if not os.path.exists(path):
         return {}
-    with open(path, encoding="utf-8", newline="") as handle:
-        return {key(row): row for row in csv.DictReader(handle)}
+    return {key(row): row for row in csv_sections.read(path, dataset)}
 
 
 def streams(features):
@@ -71,14 +75,15 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("source", help="합본 원자료 CSV (#@ subscription_plans 섹션)")
     parser.add_argument("target")
-    parser.add_argument("--seed", default="db/seed", help="기존 시드 위치(ID 를 물려받는다)")
+    parser.add_argument("--seed", default="db/seed/catalog_combined.csv",
+                        help="기존 시드 합본(ID 를 물려받는다). 카탈로그 원본은 이 파일 하나다")
     args = parser.parse_args()
 
-    services = read_existing(os.path.join(args.seed, "subscription_service.csv"), lambda r: r["name"])
-    tiers = read_existing(os.path.join(args.seed, "subscription_tier.csv"),
-                          lambda r: (r["service_id"], r["name"]))
+    services = read_existing(args.seed, "subscription_service", lambda r: r["name"])
+    tiers = read_existing(args.seed, "subscription_tier", lambda r: (r["service_id"], r["name"]))
     for row in tiers.values():
         row.setdefault("currency", "KRW")
+        row.setdefault("tax_included", "true" if row.get("currency", "KRW") == "KRW" else "false")
     next_service = max((int(r["id"]) for r in services.values()), default=0) + 1
     next_tier = max((int(r["id"]) for r in tiers.values()), default=0) + 1
     kept_services, kept_tiers = len(services), len(tiers)

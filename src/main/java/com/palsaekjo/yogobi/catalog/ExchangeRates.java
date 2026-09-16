@@ -55,9 +55,22 @@ public class ExchangeRates {
                 base, quote).stream().findFirst();
     }
 
-    /** 표시용 원화 환산. 원 단위 내림 — 실제보다 크게 보이지 않게 한다. */
-    public static long toKrw(long amount, Rate rate) {
-        return BigDecimal.valueOf(amount).multiply(rate.rate()).setScale(0, RoundingMode.FLOOR).longValue();
+    /**
+     * 한국 부가세. 해외 사업자의 표기가는 세금 별도라 결제 때 10%가 더 붙는다(전자적 용역 공급).
+     * 표기가에 미리 곱해 저장하지 않고 **표시 환산에서만** 더한다 — 공식 표기가가 출처이기 때문이다.
+     */
+    static final BigDecimal KOREAN_VAT = new BigDecimal("1.10");
+
+    /**
+     * 표시용 원화 환산. 원 단위 내림 — 실제보다 크게 보이지 않게 한다.
+     * {@code taxIncluded} 가 false 면 부가세 10%를 더한 실제 결제액 기준으로 환산한다.
+     */
+    public static long toKrw(long amount, Rate rate, boolean taxIncluded) {
+        BigDecimal price = BigDecimal.valueOf(amount);
+        if (!taxIncluded) {
+            price = price.multiply(KOREAN_VAT);
+        }
+        return price.multiply(rate.rate()).setScale(0, RoundingMode.FLOOR).longValue();
     }
 
     /**

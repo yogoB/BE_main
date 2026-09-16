@@ -108,7 +108,7 @@ AI의 `/parse`·`/narrate`·`/ocr`는 토큰 누락·불일치 시 401, 서버 �
 | POST | `/api/v1/recommendations` | 무상태 추천 — 필터·챗봇 공용 |
 | POST | `/api/v1/calculator` | 특정 조합 총비용 |
 | GET | `/api/v1/catalog/plans` | 요금제 카탈로그 |
-| GET | `/api/v1/catalog/services` | 구독 서비스·티어. 등급에 `currency`(KRW\|USD)·`krwEstimate`·`krwRateDate` — 해외 결제는 환산 **표시만** (아래) |
+| GET | `/api/v1/catalog/services` | 구독 서비스·티어. 등급에 `currency`(KRW\|USD)·`taxIncluded`·`krwEstimate`·`krwRateDate` — 해외 결제는 환산 **표시만** (아래) |
 | GET | `/api/v1/catalog/plans/{id}/benefits` | 요금제별 혜택 |
 | POST | `/api/v1/catalog/reports` | 정보 오류 제보(비회원 허용·CSRF 필수), 접수만 수행 — D-18 사용자 요청 |
 | GET | `/api/v1/admin/catalog` | 카탈로그 원본(합본 CSV) 데이터셋 목록·행 수 — **운영자 전용**, D-24 |
@@ -231,13 +231,15 @@ AI는 요청의 `breakdown`·`missingInputs`에 **실제로 있는 금액만** �
 
 ```jsonc
 // GET /api/v1/catalog/services 200 — 등급(tier) 스키마 (사용자 결정 2026-09-16)
-{ "id": 2,  "name": "스탠다드", "price": 13500, "currency": "KRW",
+{ "id": 2,  "name": "스탠다드", "price": 13500, "currency": "KRW", "taxIncluded": true,
   "krwEstimate": null,  "krwRateDate": null },
-{ "id": 94, "name": "Pro",      "price": 20,    "currency": "USD",
-  "krwEstimate": 27183, "krwRateDate": "2026-09-15" }   // 환율 환산 — ESTIMATED
+{ "id": 94, "name": "Pro",      "price": 20,    "currency": "USD", "taxIncluded": false,
+  "krwEstimate": 29901, "krwRateDate": "2026-09-15" }   // 환율 환산 + 부가세 10% — ESTIMATED
 ```
 
-`price`는 **`currency` 단위의 공식 표기 금액**이다. 해외 결제 등급은 원화 확정 금액이 없으므로
+`price`는 **`currency` 단위의 공식 표기 금액**이다. `taxIncluded=false` 면 표기가가 세금 별도라는 뜻이고
+(해외 사업자 관행 — 한국 이용자는 결제 시 부가세 10%가 더 붙는다) `krwEstimate` 에 그 10%가 반영돼 있다.
+**표기가에 세금을 섞어 저장하지 않는다** — 공식 표기가가 출처다. 해외 결제 등급은 원화 확정 금액이 없으므로
 `krwEstimate`(환산)와 기준일 `krwRateDate`를 함께 주고, 원화 등급은 두 필드가 `null`이다.
 환율은 **하루 1회 배치**로만 갱신하며(요청 경로에서 외부 호출 없음 — D-05) 값이 없으면 환산도 `null`이다. 0원으로 적지 않는다.
 **환산값은 표시 전용이다**(D-17): `/recommendations`·`/calculator`는 원화 확정 등급만 계산에 넣고,

@@ -83,8 +83,8 @@ class ForeignCurrencyCatalogTest {
                 """, Long.class);
         jdbc.update("DELETE FROM subscription_tier WHERE service_id = ?", usdServiceId);
         usdTierId = jdbc.queryForObject("""
-                INSERT INTO subscription_tier (service_id, name, price, currency)
-                VALUES (?, 'Plus', 20, 'USD') RETURNING id
+                INSERT INTO subscription_tier (service_id, name, price, currency, tax_included)
+                VALUES (?, 'Plus', 20, 'USD', TRUE) RETURNING id
                 """, Long.class, usdServiceId);
     }
 
@@ -100,6 +100,20 @@ class ForeignCurrencyCatalogTest {
                 .flatMap(s -> s.tiers().stream()).filter(t -> "KRW".equals(t.currency())).findFirst().orElseThrow();
         assertThat(krwTier.krwEstimate()).isNull();
         assertThat(krwTier.krwRateDate()).isNull();
+    }
+
+    /** j·k: 표기가가 세금 별도면 환산에 부가세 10%가 들어간다. 원화 등급은 그대로다. */
+    @Test void taxExcludedTierIncludesVatInTheEstimate() {
+        jdbc.update("UPDATE subscription_tier SET tax_included = FALSE WHERE id = ?", usdTierId);
+
+        var tier = tier();
+        assertThat(tier.taxIncluded()).isFalse();
+        assertThat(tier.price()).isEqualTo(20);                      // 표기가는 출처 그대로
+        assertThat(tier.krwEstimate()).isEqualTo(29901);             // 20 × 1.1 × 1359.15 내림
+
+        var krwTier = reader.listServices().stream().flatMap(s -> s.tiers().stream())
+                .filter(t -> "KRW".equals(t.currency())).findFirst().orElseThrow();
+        assertThat(krwTier.taxIncluded()).isTrue();
     }
 
     /** c: 환율이 없으면 환산을 만들지 않는다 — 0원으로 적으면 실제보다 싸 보인다. */

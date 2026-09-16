@@ -41,9 +41,10 @@ public class CatalogReader {
     /**
      * 구독 등급 표시용. {@code price}는 {@code currency} 단위의 공식 표기 금액이다.
      * 해외 결제 등급은 {@code krwEstimate}(환율 환산·ESTIMATED)와 기준일을 함께 주고, 원화 등급은 둘 다 null 이다.
+     * {@code taxIncluded} 가 false 면 표기가가 세금 별도라는 뜻이고, {@code krwEstimate} 는 부가세 10%를 더한 값이다.
      * 환산값은 표시 전용 — 계산에는 쓰지 않는다(D-17).
      */
-    public record TierView(long id, String name, long price, String currency,
+    public record TierView(long id, String name, long price, String currency, boolean taxIncluded,
                            Long krwEstimate, java.time.LocalDate krwRateDate,
                            Integer concurrentStreams, String quality, String note) {
     }
@@ -63,15 +64,16 @@ public class CatalogReader {
         var usdKrw = exchangeRates.rate("USD", "KRW").orElse(null);
         var tiersByService = new LinkedHashMap<Long, List<TierView>>();
         jdbc.query("""
-                SELECT service_id, id, name, price, currency, concurrent_streams, quality, note
+                SELECT service_id, id, name, price, currency, tax_included, concurrent_streams, quality, note
                 FROM subscription_tier WHERE active AND service_id IN (SELECT id FROM subscription_service WHERE active) ORDER BY service_id, price
                 """, new MapSqlParameterSource(), rs -> {
                     String currency = rs.getString("currency");
                     long price = rs.getLong("price");
+                    boolean taxIncluded = rs.getBoolean("tax_included");
                     boolean convertible = !"KRW".equals(currency) && usdKrw != null && usdKrw.base().equals(currency);
                     tiersByService.computeIfAbsent(rs.getLong("service_id"), k -> new ArrayList<>())
-                            .add(new TierView(rs.getLong("id"), rs.getString("name"), price, currency,
-                                    convertible ? ExchangeRates.toKrw(price, usdKrw) : null,
+                            .add(new TierView(rs.getLong("id"), rs.getString("name"), price, currency, taxIncluded,
+                                    convertible ? ExchangeRates.toKrw(price, usdKrw, taxIncluded) : null,
                                     convertible ? usdKrw.rateDate() : null,
                                     rs.getObject("concurrent_streams", Integer.class),
                                     rs.getString("quality"), rs.getString("note")));
