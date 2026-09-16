@@ -1,6 +1,7 @@
 package com.palsaekjo.yogobi.user;
 
 import com.palsaekjo.yogobi.common.ApiException;
+import com.palsaekjo.yogobi.common.FunnelCounter;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -15,13 +16,14 @@ import org.springframework.stereotype.Component;
 public class GoogleLogin {
     private final AuthService members;
     private final AuthTokens tokens;
+    private final FunnelCounter funnel;
     private final boolean enabled;
     private final String returnUrl;
 
-    public GoogleLogin(AuthService members, AuthTokens tokens,
+    public GoogleLogin(AuthService members, AuthTokens tokens, FunnelCounter funnel,
                        @Value("${yogobi.auth.google-enabled:false}") boolean enabled,
                        @Value("${yogobi.auth.return-url:http://localhost:5173/}") String returnUrl) {
-        this.members = members; this.tokens = tokens; this.enabled = enabled;
+        this.members = members; this.tokens = tokens; this.funnel = funnel; this.enabled = enabled;
         var uri = java.net.URI.create(returnUrl);
         if (uri.getHost() == null || uri.getRawFragment() != null || uri.getUserInfo() != null
                 || !("https".equals(uri.getScheme()) || ("http".equals(uri.getScheme())
@@ -41,6 +43,7 @@ public class GoogleLogin {
             // Google sub 가 있으면 로그인, 없으면 가입이다 — 사용자에게는 같은 버튼 하나다(D-34).
             var member = members.googleLogin(google);
             tokens.issue(member.id(), member.credentialVersion(), request, response);
+            funnel.record(FunnelCounter.MEMBER_LOGIN);   // 가입·로그인이 같은 경로다(D-34)
             invalidate(request);
             response.sendRedirect(returnUrl + "#auth=success");
         } catch (ApiException e) {

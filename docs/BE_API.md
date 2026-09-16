@@ -551,7 +551,7 @@ JWT 절대 수명 15분·유휴 제한 5분(refresh 없음). 상태를 바꾸는
 |---|---|---|
 | POST | `/api/v1/admin/login` | 운영자 로그인 `{id,password}`. 실패는 401 하나로만 답한다 (D-32) |
 | GET | `/api/v1/admin/session` | 관리자 여부 확인 |
-| GET | `/api/v1/admin/dashboard` | 사용 지표 — 회원·카탈로그·검수·제보·엔드포인트 |
+| GET | `/api/v1/admin/dashboard` | 사용 지표 — 회원·카탈로그·검수·제보·엔드포인트 + `funnel`(D-36 게이트 퍼널 14일: `gateShown`·`reportShown`·`memberLogin` 실측, `gateDropEstimate` 는 뺄셈) |
 | POST | `/api/v1/admin/harvest/run` | 일일 수집 즉시 실행 (정기: 매일 09:00 KST) |
 | POST | `/api/v1/admin/smartchoice/sweep` | 스마트초이스 스냅샷 스윕 즉시 실행 |
 | POST | `/api/v1/admin/fx/refresh` | 환율 즉시 갱신(정기: 09:15 KST). 실패해도 이전 값 유지 — 응답 `updated` 로 구분 |

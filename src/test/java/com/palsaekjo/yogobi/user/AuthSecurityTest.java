@@ -104,7 +104,10 @@ class AuthSecurityTest {
     @Autowired AuthTokens tokens;
     @Autowired AuthService members;
 
-    @BeforeEach void clear() { jdbc.execute("TRUNCATE app_user, auth_rate_limit CASCADE"); GRANTS.clear(); }
+    @BeforeEach void clear() {
+        jdbc.execute("TRUNCATE app_user, auth_rate_limit CASCADE"); GRANTS.clear();
+        jdbc.update("DELETE FROM funnel_daily");   // D-36 퍼널은 테스트마다 0 에서 센다
+    }
     @AfterAll static void stop() { PROVIDER.stop(0); }
 
     class Browser {
@@ -264,6 +267,9 @@ class AuthSecurityTest {
 
     @Test void googleSignupAndLoginUseSubjectAndDoNotAutoMergeEmail() throws Exception {
         Browser first = google("google-1", "alice@example.com");
+        // D-36 퍼널: 로그인 성공은 실제 OIDC 왕복을 통과한 이 지점에서만 센다.
+        assertEquals(1L, jdbc.queryForObject(
+                "SELECT count FROM funnel_daily WHERE kind='MEMBER_LOGIN'", Long.class));
         first.me().andExpect(jsonPath("$.data.googleLogin").value(true)).andExpect(jsonPath("$.data.localLogin").value(false));
         google("google-1", "changed@example.com").me().andExpect(jsonPath("$.data.email").value("alice@example.com"));
         Flow conflict = start(new Browser());

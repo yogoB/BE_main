@@ -371,6 +371,7 @@ fix(detection): 번들 중복 판정에서 비활성 구독 제외
 
 ### 마이그레이션
 Flyway `db/migration/V{n}__{설명}.sql`.
+`funnel_daily(day, kind, count)` — D-36 로그인 게이트 퍼널 일별 집계(V20). 개인 식별값이 없어 보유기간 판단 대상이 아니다. micrometer 는 인메모리라 Fly auto_stop 에 리셋돼 쓸 수 없다.
 **적용된 파일을 수정하지 않는다.** 새 파일을 추가한다.
 시드는 마이그레이션이 아니라 `db/seed/*.csv` + 로더로 넣는다.
 
