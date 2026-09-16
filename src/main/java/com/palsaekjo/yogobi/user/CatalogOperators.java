@@ -18,15 +18,18 @@ import org.springframework.stereotype.Component;
 public class CatalogOperators {
     private static final Logger log = LoggerFactory.getLogger(CatalogOperators.class);
     private final Set<Long> userIds;
+    private final AdminAccount admin;
 
-    public CatalogOperators(@Value("${CATALOG_ADMIN_USER_IDS:}") String configured) {
+    public CatalogOperators(@Value("${CATALOG_ADMIN_USER_IDS:}") String configured, AdminAccount admin) {
         this.userIds = parse(configured);
-        if (userIds.isEmpty()) log.info("카탈로그 운영자 미지정 — 원본 CRUD API는 잠겨 있다(CATALOG_ADMIN_USER_IDS)");
+        this.admin = admin;
+        if (userIds.isEmpty()) log.info("카탈로그 운영자 목록 비어 있음 — 백오피스 관리자 계정만 운영자다(D-32)");
         else log.info("카탈로그 운영자 {}명 지정됨", userIds.size());
     }
 
+    /** 백오피스 관리자 계정(D-32)은 목록에 없어도 운영자다 — 그 계정의 존재 이유가 운영이다. */
     public boolean contains(long userId) {
-        return userIds.contains(userId);
+        return userIds.contains(userId) || (admin.id() != 0 && admin.id() == userId);
     }
 
     /** 쉼표 구분 양의 정수만 받는다. 공백·빈 항목은 무시하고, 숫자가 아니면 설정 오류로 기동을 막는다. */

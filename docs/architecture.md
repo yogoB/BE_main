@@ -125,6 +125,10 @@ AI의 `/parse`·`/narrate`·`/ocr`는 토큰 누락·불일치 시 401, 서버 �
 | POST | `/api/v1/admin/catalog/requests/{id}/approve` | 승인 — **이때 파일·DB에 반영**. 재승인·검토 불일치는 409 (D-29) |
 | POST | `/api/v1/admin/catalog/requests/{id}/reject` | 거절 — `{reason}`, 영영 반영하지 않음 |
 | GET | `/api/v1/admin/catalog/audit` | 원본 변경 이력(최신순, `?limit=1~500`) — 행위자·시각·전/후 행·결과, D-27 |
+| POST | `/api/v1/admin/login` | 백오피스 운영자 로그인 `{id,password}` — 공개, 실패는 401 하나 (D-32) |
+| GET | `/api/v1/admin/session` | 관리자 여부 확인 |
+| GET | `/api/v1/admin/dashboard` | 사용 지표(회원·카탈로그·검수·제보·엔드포인트) |
+| POST | `/api/v1/admin/harvest/run` | 일일 수집 즉시 실행(정기: 매일 09:00 KST) |
 
 ### Phase 1
 | Method | Path | 설명 |

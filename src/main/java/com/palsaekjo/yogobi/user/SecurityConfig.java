@@ -76,9 +76,11 @@ public class SecurityConfig {
                 .requestCache(c -> c.disable()).formLogin(c -> c.disable()).httpBasic(c -> c.disable()).logout(c -> c.disable())
                 .csrf(c -> c.ignoringRequestMatchers("/api/v1/recommendations", "/api/v1/calculator", "/api/v1/chat/messages"))
                 .authorizeHttpRequests(a -> a
-                        .requestMatchers(HttpMethod.GET, "/", "/index.html", "/account.html", "/account.js", "/catalog-report.js", "/favicon.ico", "/api/v1/catalog/**", "/api/v1/auth/csrf", "/api/v1/privacy-policy").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/", "/index.html", "/account.html", "/account.js", "/catalog-report.js", "/admin.html", "/admin.js", "/favicon.ico", "/api/v1/catalog/**", "/api/v1/auth/csrf", "/api/v1/privacy-policy").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/recommendations", "/api/v1/calculator", "/api/v1/chat/messages",
                                 "/api/v1/catalog/reports",
+                                // 백오피스 로그인만 공개다(D-32). 나머지 /admin/** 은 아래에서 ADMIN 전용.
+                                "/api/v1/admin/login",
                                 "/api/v1/auth/signup", "/api/v1/auth/login", "/api/v1/auth/email/verification",
                                 "/api/v1/auth/password/reset-request", "/api/v1/auth/password/reset",
                                 "/api/v1/auth/password/recover").permitAll()
@@ -87,7 +89,7 @@ public class SecurityConfig {
                                 "/api/v1/auth/google/link", "/api/v1/auth/password").hasRole("MEMBER")
                         // 카탈로그 원본(합본 CSV) CRUD — 공개 읽기 경로와 분리하고 **운영자만** 허용한다(D-24).
                         // CSRF 보호는 기본값 그대로 적용된다. 운영자 지정은 CATALOG_ADMIN_USER_IDS(비면 아무도 못 쓴다).
-                        .requestMatchers("/api/v1/admin/catalog", "/api/v1/admin/catalog/**").hasRole("ADMIN")
+                        .requestMatchers("/api/v1/admin", "/api/v1/admin/**").hasRole("ADMIN")
                         .anyRequest().denyAll())
                 .exceptionHandling(e -> e
                         .authenticationEntryPoint((req, res, ex) -> error(json, res, AuthService.unauthorized()))
