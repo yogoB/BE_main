@@ -12,13 +12,14 @@ import org.springframework.stereotype.Component;
 /**
  * 변경 제안 내용의 자동 검토(D-29). 사람이 눈으로 확인하는 대신 두 소스로 대조한다.
  *
- * <p>① **스마트초이스** 공식 시세(D-23의 1차 교차검증) ② **AI 서버 LLM 조회**(2차 더블체크).
+ * <p>① **공식 시세**(스마트초이스, 통신사 공식 목록 — {@link PriceOracle} 구현 전부)
+ * ② **AI 서버 LLM 조회**(더블체크).
  * 판정 규칙은 BE 가 갖는다 — AI 는 출처를 찾아 보고할 뿐 숫자를 확정하지 않는다(절대 원칙 2·D-03).
  *
  * <ul>
  *   <li>{@code VERIFIED} — 한 곳 이상이 같은 금액을 확인했고, 다른 금액을 말한 곳이 없다.</li>
  *   <li>{@code MISMATCH} — 어느 한 곳이라도 **다른 금액**을 보고했다. 승인을 막는다.</li>
- *   <li>{@code UNVERIFIED} — 둘 다 확인하지 못했다. **막지 않는다** — 이후 사용자 제보로 잡는다(D-18).</li>
+ *   <li>{@code UNVERIFIED} — 어느 소스도 확인하지 못했다. **막지 않는다** — 이후 사용자 제보로 잡는다(D-18).</li>
  *   <li>{@code SKIPPED} — 대조할 금액이 없는 변경(삭제 등).</li>
  * </ul>
  *
@@ -57,14 +58,16 @@ public class CatalogProposalReview {
         boolean confirmed = false;
         boolean mismatched = false;
 
-        Optional<Long> official = smartChoice(dataset, values);
-        if (official.isPresent()) {
-            boolean same = Math.abs(official.get() - claimed) <= TOLERANCE_WON;
-            notes.add("스마트초이스 " + official.get() + "원 — " + (same ? "일치" : "불일치"));
-            confirmed |= same;
-            mismatched |= !same;
-        } else {
-            notes.add("스마트초이스: 확인 못 함");
+        for (PriceOracle port : oracle.orderedStream().toList()) {
+            Optional<Long> official = officialPrice(port, dataset, values);
+            if (official.isPresent()) {
+                boolean same = Math.abs(official.get() - claimed) <= TOLERANCE_WON;
+                notes.add(port.sourceName() + " " + official.get() + "원 — " + (same ? "일치" : "불일치"));
+                confirmed |= same;
+                mismatched |= !same;
+            } else {
+                notes.add(port.sourceName() + ": 확인 못 함");
+            }
         }
 
         Optional<CatalogVerifier.Finding> found = ai(dataset, values);
@@ -82,7 +85,7 @@ public class CatalogProposalReview {
         String detail = "제안 " + claimed + "원 · " + String.join(" / ", notes);
         if (mismatched) return new Result("MISMATCH", detail);
         if (confirmed) return new Result("VERIFIED", detail);
-        return new Result("UNVERIFIED", detail + " — 두 소스 모두 확인하지 못해 그대로 둡니다. 오류는 사용자 제보로 접수됩니다.");
+        return new Result("UNVERIFIED", detail + " — 어느 소스도 확인하지 못해 그대로 둡니다. 오류는 사용자 제보로 접수됩니다.");
     }
 
     /** 대조 기준 금액. 요금제는 기본료, 구독 티어는 가격. 그 밖의 데이터셋은 대조하지 않는다. */
@@ -100,9 +103,8 @@ public class CatalogProposalReview {
         }
     }
 
-    private Optional<Long> smartChoice(String dataset, Map<String, String> values) {
-        PriceOracle port = oracle.getIfAvailable();
-        if (port == null || !"mobile_plan".equals(dataset)) return Optional.empty();
+    private Optional<Long> officialPrice(PriceOracle port, String dataset, Map<String, String> values) {
+        if (!"mobile_plan".equals(dataset)) return Optional.empty();
         String carrier = values.get("carrier");
         String planName = values.get("plan_name");
         String data = values.get("data_mb");
@@ -111,7 +113,7 @@ public class CatalogProposalReview {
             return port.officialPrice(carrier.strip(), planName.strip(),
                     Long.parseLong(data.strip()), values.getOrDefault("network_type", ""));
         } catch (RuntimeException e) {
-            log.warn("스마트초이스 대조 실패 — 확인 못 함으로 처리 ({})", e.getClass().getSimpleName());
+            log.warn("{} 대조 실패 — 확인 못 함으로 처리 ({})", port.sourceName(), e.getClass().getSimpleName());
             return Optional.empty();
         }
     }

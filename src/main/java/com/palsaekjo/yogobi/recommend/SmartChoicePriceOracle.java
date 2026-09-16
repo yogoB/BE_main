@@ -23,6 +23,11 @@ public class SmartChoicePriceOracle implements PriceOracle {
     }
 
     @Override
+    public String sourceName() {
+        return "스마트초이스";
+    }
+
+    @Override
     public Optional<Long> officialPrice(String carrier, String planName, long dataMb, String networkType) {
         if (!client.enabled()) return Optional.empty();
         int data = (int) Math.min(Math.max(dataMb, 0), SmartChoiceClient.UNLIMITED);
