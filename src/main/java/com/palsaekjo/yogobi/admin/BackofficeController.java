@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 백오피스(D-32). **별도 서버를 두지 않는다** — 관리 화면은 이 서버가 내려주는 정적 페이지(`/admin.html`)고,
+ * 백오피스(D-32). **별도 서버를 두지 않는다** — 관리 화면은 프론트 앱의 `/admin` 라우트(D-39)고,
  * 기능은 전부 여기 API 다. 두 축뿐이다: ① 사용 지표 대시보드 ② 매일 09시 수집분 검수.
  *
  * <p>검수 기능은 새로 만들지 않고 기존 카탈로그 변경 제안·승인(D-28)·자동검토(D-29)를 그대로 쓴다
