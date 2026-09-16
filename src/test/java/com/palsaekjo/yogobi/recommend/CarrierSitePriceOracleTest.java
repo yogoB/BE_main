@@ -34,14 +34,15 @@ class CarrierSitePriceOracleTest {
     @Test
     void 어댑터가_없는_사업자는_묻지_않는다() {
         var oracle = new CarrierSitePriceOracle(RestClient.builder());
-        assertThat(oracle.officialPrice("KT엠모바일", "데이터 11G+", 11_264, "LTE")).isEqualTo(Optional.empty());
+        assertThat(oracle.officialPrice("KT스카이라이프", "요금제", 11_264, "LTE")).isEqualTo(Optional.empty());
         assertThat(oracle.officialPrice(null, "x", 0, "LTE")).isEqualTo(Optional.empty());
         assertThat(oracle.officialPrice("SK세븐모바일", null, 0, "LTE")).isEqualTo(Optional.empty());
     }
 
     @Test
     void 지원_사업자_목록이_노출된다() {
-        assertThat(CarrierSitePriceOracle.supportedCarriers()).containsExactly("SK세븐모바일");
+        assertThat(new CarrierSitePriceOracle(RestClient.builder()).supportedCarriers())
+                .containsExactly("KT엠모바일", "LG헬로모바일", "SK세븐모바일");
     }
 
     @Test
