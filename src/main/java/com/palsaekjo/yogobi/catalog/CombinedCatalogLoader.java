@@ -28,6 +28,10 @@ public class CombinedCatalogLoader implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) throws Exception {
         if (!store.enabled() || !catalogDirectory.isBlank()) return;
+        if (store.diverged())
+            // 조용히 지나가면 "레포 CSV 를 고쳤는데 왜 안 바뀌지"를 아무도 설명하지 못한다.
+            log.warn("카탈로그 원본이 갈라졌습니다 — 외부 파일이 이기고 레포 CSV(jar 내장)는 무시됩니다."
+                    + " 운영자 편집이 반영된 상태라면 정상이고, 레포 CSV 변경을 배포했다면 그 변경은 적용되지 않습니다.");
         store.reload();
         log.info("합본 CSV 카탈로그 반영 완료");
     }

@@ -66,6 +66,24 @@ public class CombinedCatalogStore {
                 "카탈로그 원본 파일 경로가 설정되지 않아 지금은 편집할 수 없어요. 조회는 그대로 됩니다.", null);
     }
 
+    /**
+     * 외부 원본(볼륨 파일)과 내장 원본(레포 CSV)이 갈라졌는가.
+     *
+     * <p><b>갈라지면 외부 파일이 이긴다</b>({@link #read()}). 관리자가 한 번이라도 승인하면 외부 파일이
+     * 생기고, 그 뒤로는 레포 CSV 를 고쳐 배포해도 조용히 무시된다 — D-24 는 "CSV 가 단일 원본"이라고
+     * 선언했는데 원본이 둘이 되는 것이다. 어느 쪽이 이겨야 하는지는 제품 결정이므로 여기서 고르지 않는다.
+     * 대신 <b>갈라졌다는 사실을 보이게</b> 만든다 — 조용한 분기가 가장 나쁘다.
+     */
+    public synchronized boolean diverged() {
+        if (!enabled() || !Files.exists(file)) return false;
+        try {
+            return !java.util.Arrays.equals(Files.readAllBytes(file),
+                    new ClassPathResource("db/seed/catalog_combined.csv").getContentAsByteArray());
+        } catch (IOException e) {
+            return false;   // 읽지 못하면 read() 가 같은 오류로 제대로 실패한다. 여기서 두 번 말하지 않는다.
+        }
+    }
+
     public synchronized Map<String, Section> read() {
         try {
             byte[] bytes = enabled() && Files.exists(file)

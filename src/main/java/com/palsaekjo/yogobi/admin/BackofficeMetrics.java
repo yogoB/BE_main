@@ -49,6 +49,7 @@ public class BackofficeMetrics {
                 "activeSessions", count("SELECT count(*) FROM auth_session WHERE expires_at > now()")));
         out.put("weeklyActivity", activity());
         out.put("catalog", Map.of(
+                "sourceDiverged", store.diverged(),   // 외부 원본이 레포 CSV 를 덮고 있는가(D-24 단일 원본 위반)
                 "mobilePlans", count("SELECT count(*) FROM mobile_plan WHERE active"),
                 "subscriptionServices", count("SELECT count(*) FROM subscription_service WHERE active"),
                 "subscriptionTiers", count("SELECT count(*) FROM subscription_tier WHERE active"),
@@ -68,12 +69,11 @@ public class BackofficeMetrics {
                 "pending", count("SELECT count(*) FROM catalog_report WHERE status = 'PENDING'"),
                 "total", count("SELECT count(*) FROM catalog_report")));
         out.put("gaps", count("SELECT count(*) FROM catalog_candidate WHERE status = 'REQUESTED'"));
-        out.put("endpoints", endpoints());
         out.put("funnel", funnel());
+        out.put("endpoints", endpoints());
         return out;
     }
 
-    /** 최근 7일 일별 가입 수. 가입이 없는 날도 0으로 채워 그래프가 끊기지 않게 한다. */
     /**
      * D-36 로그인 게이트 퍼널. "이탈율이 높으면 비회원에게 연다"는 기준은 숫자가 있어야 작동한다.
      *
@@ -116,6 +116,7 @@ public class BackofficeMetrics {
         }
     }
 
+    /** 최근 7일 일별 가입 수. 가입이 없는 날도 0으로 채워 그래프가 끊기지 않게 한다. */
     /**
      * 최근 7일 활동. 가입만으로는 대부분 0 이라 화면이 비어 보인다 —
      * 실제로 움직이는 운영 활동(제보·수집 제안·카탈로그 반영)을 같이 낸다.

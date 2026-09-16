@@ -227,4 +227,17 @@ class CombinedCatalogStoreTest {
     private long planPrice(String name) {
         return jdbc.queryForObject("SELECT base_price FROM mobile_plan WHERE name = ?", Long.class, name);
     }
+
+    /**
+     * D-24 는 "CSV 가 단일 원본"이라고 선언했는데, 외부 경로를 쓰면 원본이 둘이 된다.
+     * 갈라진 뒤에는 **외부 파일이 이기고 레포 CSV(jar 내장)는 조용히 무시된다.**
+     * 어느 쪽이 이겨야 하는지는 제품 결정이라 코드가 고르지 않는다 — 대신 갈라졌다는 사실을 드러낸다.
+     */
+    @org.junit.jupiter.api.Test
+    void divergenceBetweenTheExternalAndBundledSourceIsVisible() throws Exception {
+        assertThat(store.diverged()).isFalse();   // restoreSource() 가 둘을 같게 맞춰 둔다
+
+        Files.writeString(csv, Files.readString(csv) + "\n");   // 한 글자만 달라져도 갈라진 것이다
+        assertThat(store.diverged()).isTrue();
+    }
 }
