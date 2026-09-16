@@ -63,6 +63,7 @@ public class SmartChoiceSweepService {
             out.put("conditions", 0);
             out.put("stored", 0);
             out.put("reachable", true);
+            out.put("recordedGaps", -1);
             out.put("snapshotRows", snapshotRows());
             return out;
         }
@@ -94,8 +95,44 @@ public class SmartChoiceSweepService {
         out.put("conditions", conditions.size());
         out.put("stored", stored);
         out.put("reachable", reachable);
+        // 닿지 못한 스윕은 스냅샷을 갱신하지 못했다. 낡은 스냅샷으로 결손을 새로 적지 않는다 —
+        // -1 은 "확인 못 함"이며 0("없음")과 구분한다.
+        out.put("recordedGaps", reachable ? recordMissingPlans() : -1);
         out.put("snapshotRows", snapshotRows());
         return out;
+    }
+
+    /**
+     * 스냅샷에 있는데 카탈로그에 없는 요금제를 결손으로 남긴다(G-19 · D-31).
+     *
+     * <p>스윕은 {@link #AGE} = 20 으로 돌기 때문에 청년 요금제(KT Y덤·SKT 라이트(청년)·LGU+ 유쓰)를
+     * 이미 받아오고 있었다. 그 결과가 스냅샷에만 쌓이고 아무도 보지 않아 Y덤 11종이 통째로 빠져 있었다.
+     * <p><b>카탈로그로 승격하지 않는다</b> — 스냅샷은 여전히 원본이 아니다(D-20). 여기 쌓인 행은
+     * 사람이 CSV 에 반영해야 카탈로그가 된다(D-18). 계산에는 어느 단계에서도 쓰이지 않는다.
+     * <p>fail-soft: 기록이 실패해도 이미 저장한 스냅샷은 유지한다. 그래서 실패는 -1(알 수 없음)로 돌려준다.
+     */
+    private int recordMissingPlans() {
+        try {
+            // requested_cnt 는 건드리지 않는다 — 그 값은 "사용자가 몇 번 찾았나"이고 곧 수집 우선순위다.
+            // 하루 3회 배치가 올리면 아무도 찾지 않은 요금제가 우선순위 1위가 된다(G-19-d).
+            int recorded = jdbc.update("""
+                    INSERT INTO catalog_candidate (kind, query_text, status)
+                    SELECT 'MOBILE_PLAN', btrim(s.carrier) || ' ' || btrim(s.plan_name), 'REQUESTED'
+                      FROM smartchoice_plan_snapshot s
+                     WHERE length(btrim(s.carrier) || ' ' || btrim(s.plan_name)) <= 200
+                       AND NOT EXISTS (
+                           SELECT 1 FROM mobile_plan p JOIN carrier c ON c.id = p.carrier_id
+                            WHERE replace(lower(btrim(c.name)), ' ', '') = replace(lower(btrim(s.carrier)), ' ', '')
+                              AND replace(lower(btrim(p.name)), ' ', '') = replace(lower(btrim(s.plan_name)), ' ', ''))
+                       AND (SELECT count(*) FROM catalog_candidate) < ?
+                    ON CONFLICT (kind, query_text) DO UPDATE SET last_requested_at = now()
+                    """, MAX_CANDIDATES);
+            log.info("카탈로그 결손 후보 {}행 기록 (사람이 CSV 에 반영해야 카탈로그가 된다)", recorded);
+            return recorded;
+        } catch (RuntimeException e) {
+            log.warn("결손 후보 기록 실패 — 스냅샷은 유지합니다 (fail-soft): {}", e.toString());
+            return -1;
+        }
     }
 
     /** 대조에 실제로 쓸 수 있는 행이 몇 개인지. 0 이면 결과 화면은 전부 "확인 못 했다"로 나온다. */
