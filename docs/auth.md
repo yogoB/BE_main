@@ -14,7 +14,7 @@ JWT·비밀번호·Google 토큰은 응답 JSON이나 URL에 넣지 않는다.
 |---|---|---|
 | `GET /api/v1/auth/csrf` | 없음 | `{headerName:"X-CSRF-TOKEN",token:"..."}` |
 | `POST /api/v1/auth/email/verification` | `{email}`, CSRF | `{message}`, 가입 본인 확인 메일 발송(존재/미존재 동일 응답) |
-| `POST /api/v1/auth/signup` | `{token,password}`, CSRF | 현재 회원 + 인증 쿠키. token은 위 메일의 10분·단일 사용 값 |
+| `POST /api/v1/auth/signup` | `{token,password}` **또는** `{name,email,password,nickname}`, CSRF | 현재 회원 + 인증 쿠키. token은 위 메일의 10분·단일 사용 값 |
 | `POST /api/v1/auth/login` | `{email,password}`, CSRF | 현재 회원 + 인증 쿠키 |
 | `POST /api/v1/auth/password/reset-request` | `{email}`, CSRF | `{message}`, 재설정 안내 발송(자체 계정에만 사용 가능한 토큰) |
 | `POST /api/v1/auth/password/reset` | `{token,password}`, CSRF | `{passwordReset:true}`, 비밀번호 변경·모든 세션 폐기·쿠키 삭제 |
@@ -30,6 +30,27 @@ JWT·비밀번호·Google 토큰은 응답 JSON이나 URL에 넣지 않는다.
 
 현재 회원: `{id,email,localLogin,googleLogin,currentPlanId,emailVerified}`. 요청에서 userId나 역할을 받지 않는다.
 `signup/login`도 CSRF가 필요하다. 입력은 표에 적힌 문자열 필드만 허용한다.
+
+### 가입은 두 형태다 (D-20)
+
+`token` 필드가 있으면 **메일 토큰 가입**, 없으면 **직접 가입**으로 처리한다.
+
+| | 조건 | `email_verified` | 비고 |
+|---|---|---|---|
+| 메일 토큰 | `AUTH_EMAIL_ENABLED=true` | `TRUE` | 기존 흐름. 이메일 소유를 확인한다 |
+| 직접 가입 | `AUTH_EMAIL_ENABLED=false` **일 때만** | `FALSE` | 메일이 켜져 있으면 400으로 거부한다 |
+
+직접 가입은 `name`(1~50자)·`nickname`(1~30자)을 함께 받는다. 비밀번호 규칙은 같다(15자 이상, 72바이트 이하).
+중복은 **어느 쪽이 겹쳤는지 구분**해 돌려준다 — 사용자가 할 일이 다르기 때문이다.
+
+| 코드 | HTTP | 의미 |
+|---|---|---|
+| `YGB-AUTH-DUP-EMAIL` | 409 | 이미 가입된 이메일. `field: "email"` |
+| `YGB-AUTH-DUP-NICK` | 409 | 이미 사용 중인 닉네임(대소문자·앞뒤 공백 무시). `field: "nickname"` |
+
+**이메일 소유를 확인하지 않는다는 뜻이다.** 타인의 주소로 가입할 수 있으므로, 메일 설정이 준비되면
+`AUTH_EMAIL_ENABLED=true`로 되돌린다. 그 순간부터 미확인 계정은 로그인할 수 없고(`AuthService.login`),
+토큰도 발급되지 않는다(`AuthTokens.issue`) — 두 곳이 같은 규칙을 공유한다.
 이메일은 trim/lowercase 후 저장, 비밀번호는 15자 이상·UTF-8 72바이트 이하이며 BCrypt cost 12로 저장한다.
 자체 가입은 `/auth/email/verification`으로 발송한 본인 확인 메일의 10분·단일 사용 토큰으로만 완료된다.
 완료된 계정만 `email_verified`로 저장하며 로그인은 검증 완료 계정에 한한다. 이메일만으로 계정을 자동 병합하지 않는다.

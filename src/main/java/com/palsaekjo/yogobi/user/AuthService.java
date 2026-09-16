@@ -17,13 +17,18 @@ public class AuthService {
     private final AuthRateLimit limits;
     private final AuthEmail emailProofs;
     private final String dummyHash;
+    /** 메일 기능이 켜져 있으면 이메일 소유 확인이 필수다. 꺼져 있으면 확인할 방법이 없어 직접 가입을 연다(D-20). */
+    private final boolean emailEnabled;
 
-    public AuthService(JdbcTemplate jdbc, PasswordEncoder passwords, AuthRateLimit limits, AuthEmail emailProofs) {
+    public AuthService(JdbcTemplate jdbc, PasswordEncoder passwords, AuthRateLimit limits, AuthEmail emailProofs,
+                       @org.springframework.beans.factory.annotation.Value("${yogobi.auth.email-enabled:false}") boolean emailEnabled) {
         this.jdbc = jdbc; this.passwords = passwords; this.limits = limits; this.emailProofs = emailProofs;
+        this.emailEnabled = emailEnabled;
         dummyHash = passwords.encode(java.util.UUID.randomUUID().toString());
     }
 
-    public record Member(long id, String email, boolean localLogin, boolean googleLogin, Long currentPlanId,
+    public record Member(long id, String email, String name, String nickname,
+                         boolean localLogin, boolean googleLogin, Long currentPlanId,
                          @com.fasterxml.jackson.annotation.JsonIgnore long credentialVersion, boolean emailVerified) { }
     private record Credentials(long id, String passwordHash, long version) { }
 
@@ -38,6 +43,56 @@ public class AuthService {
             recordEssentialConsent(id);
             return member(id);
         } catch (DuplicateKeyException e) { throw conflict(); }
+    }
+
+    /**
+     * 메일 없이 바로 가입한다(D-20). **이메일 소유는 확인하지 않는다** — email_verified 는 FALSE 로 남고,
+     * 로그인 게이트는 메일 기능이 켜졌을 때만 적용된다(login). SMTP 를 켜면 토큰 흐름을 써야 한다.
+     * 이메일·닉네임 중복은 서로 다른 코드로 구분해 돌려준다 — 사용자가 할 일이 다르다.
+     */
+    @Transactional
+    public Member signupDirect(String name, String rawEmail, String password, String nickname) {
+        if (emailEnabled)
+            throw ApiException.requiredMissing("token",
+                    "본인 확인 메일로 가입해 주세요. 메일의 링크에서 이어서 진행할 수 있어요.");
+        String normalized = email(rawEmail);
+        String trimmedName = text(name, "name", 50);
+        String trimmedNickname = text(nickname, "nickname", 30);
+        String hash = encodePassword(password);
+        if (exists("lower(btrim(email)) = ?", normalized)) throw duplicateEmail();
+        if (exists("lower(btrim(nickname)) = ?", trimmedNickname.toLowerCase(java.util.Locale.ROOT)))
+            throw duplicateNickname();
+        try {
+            long id = jdbc.queryForObject(
+                    "INSERT INTO app_user(email, password_hash, email_verified, name, nickname)"
+                            + " VALUES (?, ?, FALSE, ?, ?) RETURNING id",
+                    Long.class, normalized, hash, trimmedName, trimmedNickname);
+            recordEssentialConsent(id);
+            return member(id);
+        } catch (DuplicateKeyException e) {
+            // 동시에 같은 값이 들어온 경우. 어느 쪽이 겹쳤는지 다시 확인해 알려준다.
+            throw exists("lower(btrim(email)) = ?", normalized) ? duplicateEmail() : duplicateNickname();
+        }
+    }
+
+    private boolean exists(String where, Object value) {
+        return jdbc.queryForObject("SELECT count(*) FROM app_user WHERE " + where, Integer.class, value) > 0;
+    }
+
+    /** 공백만 있거나 길이를 넘으면 400. 앞뒤 공백은 잘라 저장한다. */
+    private static String text(String value, String field, int max) {
+        String trimmed = value == null ? "" : value.trim();
+        if (trimmed.isEmpty() || trimmed.codePointCount(0, trimmed.length()) > max)
+            throw ApiException.requiredMissing(field, "1자 이상 " + max + "자 이하로 입력해 주세요.");
+        return trimmed;
+    }
+
+    static ApiException duplicateEmail() {
+        return new ApiException("YGB-AUTH-DUP-EMAIL", 409, "이미 가입된 이메일이에요. 로그인하거나 다른 이메일을 써 주세요.", "email");
+    }
+
+    static ApiException duplicateNickname() {
+        return new ApiException("YGB-AUTH-DUP-NICK", 409, "이미 사용 중인 닉네임이에요. 다른 닉네임을 써 주세요.", "nickname");
     }
 
     /** 회원 탈퇴 — 이용 데이터는 파기하며 별도 법정 보존 사본에는 회원 FK가 없어 삭제가 전파되지 않는다. */
@@ -60,7 +115,9 @@ public class AuthService {
         Credentials found = credentials.isEmpty() ? new Credentials(0, null, -1) : credentials.getFirst();
         if (!matches(password, found.passwordHash())) throw unauthorized();
         var member = member(found.id());
-        if (!member.emailVerified() || member.credentialVersion() != found.version()) throw unauthorized();
+        // 메일이 꺼져 있으면 소유를 확인할 방법 자체가 없다. 켜면 기존대로 확인을 요구한다(D-20).
+        if ((emailEnabled && !member.emailVerified()) || member.credentialVersion() != found.version())
+            throw unauthorized();
         return member;
     }
 
@@ -79,9 +136,10 @@ public class AuthService {
     }
 
     public Member member(long id) {
-        return jdbc.query("SELECT id,email,password_hash IS NOT NULL,google_sub IS NOT NULL,current_plan_id,credential_version,email_verified FROM app_user WHERE id=?",
-                (rs, i) -> new Member(rs.getLong(1), rs.getString(2), rs.getBoolean(3), rs.getBoolean(4),
-                        rs.getObject(5, Long.class), rs.getLong(6), rs.getBoolean(7)), id).stream().findFirst().orElseThrow(AuthService::unauthorized);
+        return jdbc.query("SELECT id,email,name,nickname,password_hash IS NOT NULL,google_sub IS NOT NULL,current_plan_id,credential_version,email_verified FROM app_user WHERE id=?",
+                (rs, i) -> new Member(rs.getLong(1), rs.getString(2), rs.getString(3), rs.getString(4),
+                        rs.getBoolean(5), rs.getBoolean(6), rs.getObject(7, Long.class), rs.getLong(8), rs.getBoolean(9)),
+                id).stream().findFirst().orElseThrow(AuthService::unauthorized);
     }
 
     @Transactional

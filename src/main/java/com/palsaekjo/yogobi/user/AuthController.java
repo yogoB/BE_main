@@ -33,10 +33,17 @@ public class AuthController {
     public ApiResponse<AuthService.Member> local(@RequestBody JsonNode body, HttpServletRequest request,
                                                HttpServletResponse response) {
         boolean signup = request.getRequestURI().endsWith("/signup");
-        fields(body, signup ? "token" : "email", "password");
+        // 가입은 두 형태다: 메일 토큰 {token,password} 또는 직접 가입 {name,email,password,nickname}(D-19).
+        boolean direct = signup && !body.path("token").isTextual();
+        if (direct) fields(body, "name", "email", "password", "nickname");
+        else fields(body, signup ? "token" : "email", "password");
         tokens.requireConfigured();
         String password = body.get("password").textValue();
-        var member = signup ? members.signup(body.get("token").textValue(), password) : members.login(body.get("email").textValue(), password);
+        var member = direct
+                ? members.signupDirect(body.get("name").textValue(), body.get("email").textValue(),
+                        password, body.get("nickname").textValue())
+                : signup ? members.signup(body.get("token").textValue(), password)
+                        : members.login(body.get("email").textValue(), password);
         tokens.issue(member.id(), member.credentialVersion(), request, response);
         GoogleLogin.invalidate(request);
         return ApiResponse.ok(member);

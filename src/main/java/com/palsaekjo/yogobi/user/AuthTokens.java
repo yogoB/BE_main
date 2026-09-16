@@ -34,11 +34,15 @@ public class AuthTokens {
     private final NimbusJwtEncoder encoder;
     private final NimbusJwtDecoder decoder;
     private final boolean secure;
+    /** 메일 기능이 켜져 있으면 이메일 확인을 마친 계정에만 토큰을 발급한다(D-20). */
+    private final boolean emailEnabled;
     private final SecureRandom random = new SecureRandom();
 
     public AuthTokens(JdbcTemplate jdbc, @Value("${JWT_SECRET:}") String secret,
                       @Value("${AI_INTERNAL_TOKEN:}") String aiToken,
-                      @Value("${yogobi.auth.secure-cookies:true}") boolean secure) {
+                      @Value("${yogobi.auth.secure-cookies:true}") boolean secure,
+                      @Value("${yogobi.auth.email-enabled:false}") boolean emailEnabled) {
+        this.emailEnabled = emailEnabled;
         this.jdbc = jdbc;
         this.secure = secure;
         if (secret.isBlank()) { encoder = null; decoder = null; return; }
@@ -60,7 +64,10 @@ public class AuthTokens {
     @org.springframework.transaction.annotation.Transactional
     public void issue(long userId, long expectedVersion, HttpServletRequest request, HttpServletResponse response) {
         requireConfigured();
-        var versions = jdbc.query("SELECT credential_version FROM app_user WHERE id=? AND email_verified FOR UPDATE",
+        // 메일이 켜져 있을 때만 이메일 확인을 요구한다(D-20). 꺼져 있으면 확인할 방법 자체가 없다.
+        // 같은 규칙이 AuthService.login 에도 있다 — 둘 다 통과해야 로그인이 된다.
+        var versions = jdbc.query("SELECT credential_version FROM app_user WHERE id=?"
+                        + (emailEnabled ? " AND email_verified" : "") + " FOR UPDATE",
                 (rs, i) -> rs.getLong(1), userId);
         if (versions.isEmpty() || versions.getFirst() != expectedVersion) throw AuthService.unauthorized();
         revokeCurrent(request);

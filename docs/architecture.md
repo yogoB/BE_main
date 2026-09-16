@@ -85,7 +85,7 @@ AI의 `/parse`·`/narrate`·`/ocr`는 토큰 누락·불일치 시 401, 서버 �
 - 금액·조합은 `pricing`(순수 Java, 골든케이스·분기 100%)이 독점한다. **AI는 숫자를 만들지 않는다**
   (절대 원칙 2, D-03). AI가 하는 건 둘뿐: `/parse`(자연어→파라미터), `/narrate`(BE가 계산한 숫자를 문장으로 포장).
 - 경계는 코드로 강제된다: `/narrate`의 **금액 문장(`message`)은 LLM을 쓰지 않는 결정론적 템플릿**이고,
-  **추천 사유(`reasons`)만 LLM이 만들되 BE가 보낸 금액 외의 금액이 섞이면 그 줄을 버린다**(D-19).
+  **추천 사유(`reasons`)만 LLM이 만들되 BE가 보낸 금액 외의 금액이 섞이면 그 줄을 버린다**(D-20).
   BE `AiGateway`가 AI 응답(confidence·정수 GB·서비스 ID·enum)을 **전부 재검증**해 어긋나면 폐기,
   필터·챗봇이 **같은 recommend 엔진**을 탄다(원칙 3).
 
@@ -115,7 +115,7 @@ AI의 `/parse`·`/narrate`·`/ocr`는 토큰 누락·불일치 시 401, 서버 �
 ### Phase 1
 | Method | Path | 설명 |
 |---|---|---|
-| POST | `/api/v1/auth/signup` | 자체 가입 — `{token,password}`, 이메일 검증 토큰 필수 |
+| POST | `/api/v1/auth/signup` | 자체 가입 — `{token,password}`(메일 활성) 또는 `{name,email,password,nickname}`(메일 비활성, D-20) |
 | POST | `/api/v1/auth/login` `/logout` | 로그인 `{email,password}` · 로그아웃 |
 | POST | `/api/v1/auth/email/verification` | 가입용 본인 확인 메일 발송 — `{email}` |
 | POST | `/api/v1/auth/password/reset-request` `/reset` | 재설정 메일 발송 · 토큰으로 재설정 `{token,password}` |
@@ -198,8 +198,8 @@ Google 전용 계정은 동일 Google `sub` 재인증으로 자체 비밀번호�
 
 `baseline`은 아무 할인 없이 정가로만 냈을 때다. 절감액 표시의 기준선.
 D-18에서 우체국·스마트초이스 연동과 `priceCrossCheck` 응답 필드를 제거했다.
-D-19에서 AI `/narrate` **응답**에 `reasons`를 더했다. 요청 필드는 그대로다.
-D-19 후속(2026-09-16): BE가 `/narrate`를 호출해 `reasons`를 `/recommendations` 응답 최상위에 싣는다.
+D-20에서 AI `/narrate` **응답**에 `reasons`를 더했다. 요청 필드는 그대로다.
+D-20 후속(2026-09-16): BE가 `/narrate`를 호출해 `reasons`를 `/recommendations` 응답 최상위에 싣는다.
 필터·챗봇 두 경로 모두 1순위 결과(`results[0]`)에 대한 사유를 담으며, AI 장애 시 **빈 배열**이고 `results`는 정상이다.
 narrate 오케스트레이션은 컨트롤러가 한다(`RecommendationController`·`ChatController`) — `RecommendationService`는 AI를 모른다.
 `recommend`가 `chat`의 `AiGateway`에 직접 의존하면 순환이 되므로 포트 `recommend.Narrator`(구현: `AiGateway`)로 역전한다.

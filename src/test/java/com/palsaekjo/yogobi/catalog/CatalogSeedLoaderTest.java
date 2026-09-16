@@ -37,7 +37,7 @@ class CatalogSeedLoaderTest {
     @Test
     void restoresSnapshotReloadsWithoutDuplicatesAndRollsBackInvalidCsv() throws Exception {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM flyway_schema_history WHERE success", Integer.class))
-                .isEqualTo(11);   // V1~V11
+                .isEqualTo(12);   // V1~V12
         assertSnapshot();
         loader.run(null);
         assertSnapshot();

@@ -401,14 +401,14 @@ class AuthSecurityTest {
     }
 
     @Test void weakOrReusedKeyFailsConfigurationAndRotationInvalidatesOldTokens() throws Exception {
-        assertThrows(IllegalStateException.class, () -> new AuthTokens(jdbc, "short", "", true));
-        assertThrows(IllegalStateException.class, () -> new AuthTokens(jdbc, SECRET, SECRET, true));
+        assertThrows(IllegalStateException.class, () -> new AuthTokens(jdbc, "short", "", true, true));
+        assertThrows(IllegalStateException.class, () -> new AuthTokens(jdbc, SECRET, SECRET, true, true));
         Browser b = signup("alice@example.com");
         var request = new org.springframework.mock.web.MockHttpServletRequest(); request.setCookies(b.cookies);
         assertNotNull(tokens.authenticate(request));
-        var rotated = new AuthTokens(jdbc, Base64.getEncoder().encodeToString(new byte[32]), "", true);
+        var rotated = new AuthTokens(jdbc, Base64.getEncoder().encodeToString(new byte[32]), "", true, true);
         assertNull(rotated.authenticate(request));
-        assertNull(new AuthTokens(jdbc, "", "", true).authenticate(request));
+        assertNull(new AuthTokens(jdbc, "", "", true, true).authenticate(request));
     }
 
     @ParameterizedTest @ValueSource(strings={"issuer", "audience", "expired", "missingExpiry", "future", "subject", "signature", "algorithm"})
