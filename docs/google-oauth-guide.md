@@ -2,7 +2,7 @@
 
 최종 확인: 2026-09-13 · 대상: Google Cloud 설정자, BE/프론트엔드 개발자
 
-요고비의 Google 로그인 코드는 이미 구현되어 있다. 아래 순서대로 **웹 애플리케이션 OAuth 클라이언트 생성 → BE `.env` 설정 → 내장 계정 화면 확인**만 하면 로컬 로그인을 붙일 수 있다. Google 로그인만 시험할 때 SMTP는 필요 없다.
+요고비의 Google 로그인 코드는 이미 구현되어 있다. 아래 순서대로 **웹 애플리케이션 OAuth 클라이언트 생성 → BE `.env` 설정 → 내장 계정 화면 확인**만 하면 로컬 로그인을 붙일 수 있다.
 
 > 현재 `yogob-508300` 프로젝트의 `496468...` 클라이언트는 **데스크톱 앱** 유형이다. 요고비 BE 로그인에는 사용할 수 없으므로 삭제하거나 바꾸지 말고, 아래 절차로 **웹 애플리케이션** 클라이언트를 새로 만든다.
 
@@ -82,8 +82,6 @@ AUTH_SESSION_COOKIE_NAME=YGB_SESSION
 AUTH_RETURN_URL=http://localhost:8080/account.html
 YOGOBI_CORS_ALLOWED_ORIGINS=http://localhost:8080
 
-AUTH_EMAIL_ENABLED=false
-AUTH_EMAIL_LINK_URL=http://localhost:8080/account.html
 ```
 
 세 비밀 값의 역할은 서로 다르다.
@@ -100,7 +98,7 @@ AUTH_EMAIL_LINK_URL=http://localhost:8080/account.html
 python3 scripts/check_auth_config.py --local
 ```
 
-이 검사는 자체 이메일 가입까지 포함한다. 위 Google 전용 설정에서는 `AUTH_EMAIL_ENABLED=false`와 SMTP 항목만 미준비로 나오는 것이 정상이다. Google, JWT, URL, 쿠키 관련 오류는 실행 전에 해결한다.
+Google, JWT, URL, 쿠키 관련 오류는 실행 전에 해결한다.
 
 ## 4. 실행하고 로그인 확인
 
@@ -140,7 +138,6 @@ docker compose up -d --wait
 ```dotenv
 AUTH_RETURN_URL=http://localhost:5173/account
 YOGOBI_CORS_ALLOWED_ORIGINS=http://localhost:5173
-AUTH_EMAIL_LINK_URL=http://localhost:5173/account
 ```
 
 로그인 버튼은 Google SDK나 Client secret을 사용하지 않고 BE로 브라우저를 이동시킨다.
@@ -177,7 +174,6 @@ AUTH_SECURE_COOKIES=true
 AUTH_SESSION_COOKIE_NAME=__Host-YGB_SESSION
 AUTH_RETURN_URL=https://app.example.com/account.html
 YOGOBI_CORS_ALLOWED_ORIGINS=https://app.example.com
-AUTH_EMAIL_LINK_URL=https://app.example.com/account.html
 ```
 
 Google Console의 운영 클라이언트에도 같은 HTTPS 콜백을 정확히 등록한다. 프록시는 다음 경로를 BE로 전달해야 한다.
@@ -207,7 +203,7 @@ OAuth 임시 세션은 BE 메모리에 있고 5분 유효하다. 로그인 중 �
 | 성공 후 `/me` 401 | 쿠키 미저장·Secure/호스트/SameSite 문제 | `credentials`, 로컬 Secure=false, 주소·사이트 구성 확인 |
 | 변경 API 403 | CSRF 누락/만료 | 같은 브라우저에서 CSRF를 다시 받아 헤더로 전송 |
 | 429 | 15분 인증 제한 | 제한 해제 대신 대기하고 프록시가 IP를 한 값으로 합치는지 확인 |
-| Google은 되나 자체 가입 503 | SMTP 미설정 | Google과 별도 기능이므로 [인증 계약](auth.md)의 메일 설정 적용 |
+| 자체 가입 400 | `name`·`email`·`password` 중 누락 | 가입은 메일 없이 `{name,email,password,nickname?}` 하나뿐이다([auth.md](auth.md)) |
 
 오류를 공유할 때는 발생 시각, 단계, HTTP 상태, 비밀 값 없는 경로만 남긴다. callback의 `code`/`state`, 쿠키, JWT, Client secret이 든 전체 URL·HAR·설정 덤프는 공유하지 않는다.
 
