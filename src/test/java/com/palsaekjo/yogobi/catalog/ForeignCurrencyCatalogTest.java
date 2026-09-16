@@ -7,7 +7,14 @@ import com.palsaekjo.yogobi.common.ApiException;
 import com.palsaekjo.yogobi.recommend.CalculatorRequest;
 import com.palsaekjo.yogobi.recommend.RecommendationRequest;
 import com.palsaekjo.yogobi.recommend.RecommendationService;
+import com.sun.net.httpserver.HttpServer;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,13 +34,36 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Testcontainers
 class ForeignCurrencyCatalogTest {
     @Container static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17");
-    @DynamicPropertySource static void db(DynamicPropertyRegistry r) {
+
+    /** 환율 배치가 실제 외부를 부르지 않도록 로컬 스텁을 세운다. 응답 본문은 테스트가 갈아끼운다. */
+    static final AtomicReference<String> FX_BODY = new AtomicReference<>(
+            "{\"amount\":1.0,\"base\":\"USD\",\"date\":\"2026-09-16\",\"rates\":{\"KRW\":1400.5}}");
+    static final AtomicInteger FX_STATUS = new AtomicInteger(200);
+    static HttpServer fxStub;
+
+    @DynamicPropertySource static void db(DynamicPropertyRegistry r) throws IOException {
         r.add("spring.datasource.url", POSTGRES::getJdbcUrl);
         r.add("spring.datasource.username", POSTGRES::getUsername);
         r.add("spring.datasource.password", POSTGRES::getPassword);
+        fxStub = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        fxStub.createContext("/latest", exchange -> {
+            byte[] body = FX_BODY.get().getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.sendResponseHeaders(FX_STATUS.get(), body.length);
+            try (var out = exchange.getResponseBody()) {
+                out.write(body);
+            }
+        });
+        fxStub.start();
+        r.add("yogobi.fx.url", () -> "http://127.0.0.1:" + fxStub.getAddress().getPort() + "/latest");
+    }
+
+    @AfterAll static void stopStub() {
+        if (fxStub != null) fxStub.stop(0);
     }
 
     @Autowired CatalogReader reader;
+    @Autowired ExchangeRates exchangeRates;
     @Autowired RecommendationService recommendations;
     @Autowired JdbcTemplate jdbc;
 
@@ -102,6 +132,28 @@ class ForeignCurrencyCatalogTest {
         assertThatThrownBy(() -> recommendations.calculate(
                 new CalculatorRequest(planId, List.of(krwTierId, 99_999_999L), null)))
                 .isInstanceOf(ApiException.class);
+    }
+
+    /** 배치는 받은 값과 기준일을 그대로 남긴다. */
+    @Test void dailyRefreshStoresRateAndDate() {
+        FX_STATUS.set(200);
+        exchangeRates.refresh("USD", "KRW");
+
+        var rate = exchangeRates.rate("USD", "KRW").orElseThrow();
+        assertThat(rate.rate()).isEqualByComparingTo("1400.5");
+        assertThat(rate.rateDate()).hasToString("2026-09-16");
+        assertThat(tier().krwEstimate()).isEqualTo(28010);           // 20 × 1400.5
+    }
+
+    /** h: 호출이 실패해도 이전 값이 남는다 — 화면이 비지 않는다. */
+    @Test void failedRefreshKeepsThePreviousRate() {
+        FX_STATUS.set(500);
+        exchangeRates.refresh("USD", "KRW");
+
+        var rate = exchangeRates.rate("USD", "KRW").orElseThrow();
+        assertThat(rate.rate()).isEqualByComparingTo("1359.15");     // @BeforeEach 가 넣은 값 그대로
+        assertThat(rate.rateDate()).hasToString("2026-09-15");
+        FX_STATUS.set(200);
     }
 
     private CatalogReader.TierView tier() {
