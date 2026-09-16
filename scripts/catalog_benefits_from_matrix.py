@@ -16,6 +16,7 @@
 import argparse
 import collections
 import csv
+import json
 import re
 import sys
 from urllib.parse import urlsplit, urlunsplit
@@ -64,7 +65,39 @@ def benefits_in(label):
     return found
 
 
-def convert(source):
+def load_details(path):
+    """fetch_skt_ott_benefits.py 결과 → {(요금제명, service_id): (benefit_type, discount_value, tier_id)}.
+
+    등급이 확정된 단일 서비스만 쓴다. '티빙&웨이브' 같은 묶음 상품은 우리 카탈로그에 해당 상품이 없어
+    할인액을 한쪽 서비스에 붙이면 과대 할인이 되므로 제외한다.
+    """
+    if not path:
+        return {}
+    out = {}
+    for record in json.load(open(path, encoding="utf-8")).values():
+        tier, service_id = record.get("tier"), record.get("serviceId")
+        if not tier or not service_id or tier[0] != service_id:
+            continue                                   # 등급 미확정 또는 묶음 상품
+        if "&" in record["planName"]:
+            continue                                   # 티빙&웨이브 등 묶음
+        if record.get("kind") == "INCLUDED":
+            pays = record.get("customerPays") or 0
+            # 부담금 0 = 실제 무료 제공. 부담금이 있으면 그만큼만 내므로 (정가 - 부담금) 할인이다.
+            entry = ("FREE", "", tier[1]) if pays == 0 else ("FIXED_DISCOUNT", None, tier[1], pays)
+        else:
+            amount = record.get("maxDiscount")
+            if not amount:
+                continue
+            entry = ("FIXED_DISCOUNT", str(amount), tier[1])
+        out[(record["planName"], service_id)] = entry
+    return out
+
+
+def convert(source, details=None):
+    details = details or {}
+    tier_price = {1: 7000, 2: 13500, 3: 17000, 4: 9900, 5: 13900, 6: 5500, 7: 9500, 8: 13500,
+                  9: 17000, 10: 5500, 11: 7900, 12: 10900, 13: 13900, 14: 7900, 15: 12900,
+                  16: 8500, 17: 14900}          # db/seed/subscription_tier.csv 정가 (부담금 → 할인액 환산용)
     dropped = collections.Counter()
     seen = set()
     out = []
@@ -85,8 +118,19 @@ def convert(source):
                     dropped["중복 (요금제·서비스)"] += 1
                     continue
                 seen.add(key)
-                if tier_id is None:
-                    dropped["등급 미표기 → BUNDLE_INCLUDED(표시만)"] += 1
+                # 공식 상세를 수집했으면 등급·금액을 확정해 계산에 넣는다.
+                detail = details.get((plan_name, service_id))
+                if detail:
+                    kind, amount, confirmed_tier = detail[0], detail[1], detail[2]
+                    if amount is None:                         # 부담금만 아는 경우 정가에서 환산
+                        amount = str(max(0, tier_price[confirmed_tier] - detail[3]))
+                    tier_id, benefit_type, discount_value = confirmed_tier, kind, amount
+                    dropped[f"공식 상세 확정 → {kind}"] += 1
+                else:
+                    benefit_type = "FREE" if tier_id is not None else "BUNDLE_INCLUDED"
+                    discount_value = ""
+                    if tier_id is None:
+                        dropped["등급 미표기 → BUNDLE_INCLUDED(표시만)"] += 1
                 out.append({
                     "carrier": carrier,
                     "plan_name": plan_name,
@@ -94,8 +138,8 @@ def convert(source):
                     # 등급을 알 때만 채운다. 비우면 그 서비스의 모든 등급에 매칭된다(PlanBenefit.matches).
                     "tier_id": "" if tier_id is None else str(tier_id),
                     # 등급을 모르면 금액을 깎지 않는다. BUNDLE_INCLUDED 는 apply()가 정가를 그대로 돌려준다.
-                    "benefit_type": "FREE" if tier_id is not None else "BUNDLE_INCLUDED",
-                    "discount_value": "",
+                    "benefit_type": benefit_type,
+                    "discount_value": discount_value,
                     "is_exclusive": "false",
                     "exclusive_group": "",
                     "valid_from": "",
@@ -110,18 +154,21 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("source")
     parser.add_argument("target")
+    parser.add_argument("--details", help="fetch_skt_ott_benefits.py 가 만든 JSON (등급·금액 확정용)")
     args = parser.parse_args()
 
+    details = load_details(args.details)
     with open(args.source, encoding="utf-8-sig", newline="") as source:
-        rows, dropped = convert(source)
+        rows, dropped = convert(source, details)
     with open(args.target, "w", encoding="utf-8", newline="") as target:
         writer = csv.DictWriter(target, fieldnames=HEADER)
         writer.writeheader()
         writer.writerows(rows)
 
-    free = sum(1 for r in rows if r["benefit_type"] == "FREE")
+    counts = collections.Counter(r["benefit_type"] for r in rows)
     print(f"추출 {len(rows)}행 → {args.target}")
-    print(f"  FREE(등급 확인·계산 반영) {free}행 / BUNDLE_INCLUDED(표시만) {len(rows) - free}행")
+    for kind, n in counts.most_common():
+        print(f"  {kind}: {n}행" + ("  (표시만, 계산 미반영)" if kind == "BUNDLE_INCLUDED" else "  (계산 반영)"))
     for reason, count in dropped.most_common():
         print(f"  {reason}: {count}")
     return 0

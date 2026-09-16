@@ -83,6 +83,16 @@ python3 scripts/catalog_benefits_from_matrix.py <매트릭스.csv> <작업폴더
 요금제명의 공식 표기만 근거로 쓴다. **등급이 표기된 행만 `FREE`로 계산에 넣고**, 서비스만 적힌 행은
 `BUNDLE_INCLUDED`(금액 효과 0, 표시만)로 둔다 — 등급을 모른 채 `FREE`로 넣으면 프리미엄 등급까지
 0원이 되어 실제보다 싸게 추천한다. **스마트초이스는 쓰지 않는다**(저작권 정책상 단체의 복제 불허, `data.md §1-C`).
+
+SKT는 상품 상세의 구독 혜택 표에서 등급·할인액을 확정할 수 있다. 먼저 수집한 뒤 `--details`로 넘긴다:
+
+```bash
+python3 scripts/fetch_skt_ott_benefits.py <매트릭스.csv> /tmp/skt_ott.json
+python3 scripts/catalog_benefits_from_matrix.py <매트릭스.csv> <작업폴더>/plan_benefit.csv --details /tmp/skt_ott.json
+```
+
+수집은 **1회 오프라인**이며 요청 간 1.2초를 둔다. 서비스는 발행된 CSV만 읽는다(런타임 호출 금지, D-05).
+등급을 사용자가 고르는 상품(베스트 Max·Pro)과 묶음 상품(티빙&웨이브)은 확정하지 않고 `BUNDLE_INCLUDED`로 남긴다.
 이후 `init`은 현재 발행본을 복사하므로 일부 상품을 수정할 때도 **5종 전체 파일**을 유지한다.
 
 1. 기존 ID는 유지한다. 새 서비스·티어·번들은 미사용 양의 정수 ID를 부여한다. 요금제는 `(carrier, plan_name)`이 식별 기준이다.

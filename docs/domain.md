@@ -76,6 +76,7 @@
 |---|---|---|
 | CSV 버전 반영 | `CatalogCsvSync` | 승인 CSV 버전/해시 검증·단일 DB 반영, 60초 주기 |
 | CSV 운영 도구 | `catalog_csv.py` | 작업 사본·검수·불변 버전 발행 |
+| SKT 혜택 상세 수집 | `fetch_skt_ott_benefits.py` | 공식 상품 상세의 구독 혜택 표에서 **등급·할인액** 1회 수집(런타임 호출 금지) |
 | 수집 혜택 추출 | `catalog_benefits_from_matrix.py` | 요금제명 공식 표기 → `plan_benefit.csv`. 등급 표기가 있으면 `FREE`+`tier_id`, 없으면 `BUNDLE_INCLUDED`(표시만) |
 | 수집 매트릭스 변환 | `catalog_matrix_to_csv.py` | 팀 수집 매트릭스(35열) → `mobile_plan.csv`(12열). 매핑 불가 행은 사유별 개수로 보고하고 **지어내지 않는다** |
 | 정보 오류 제보 | `catalog_report` / `CatalogReportController` | 공개 접수·원본 자동 변경 없음·90일 파기 |
