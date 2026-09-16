@@ -36,7 +36,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 class DirectSignupTest {
     @Container static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17");
     static final ObjectMapper JSON = new ObjectMapper();
-    static final String PASSWORD = "a long local password!";
+    static final String PASSWORD = "a long local password 1";
 
     @DynamicPropertySource static void database(DynamicPropertyRegistry r) {
         r.add("spring.datasource.url", POSTGRES::getJdbcUrl);
@@ -224,11 +224,18 @@ class DirectSignupTest {
                 .andExpect(status().isUnauthorized());
     }
 
+    /** G-13 e·e2·e3: 문자와 숫자를 섞어 8자 이상(사용자 결정 2026-09-16). 한쪽만 있으면 거절한다. */
     @Test void g13e_shortPasswordAndBlankFieldsAreRejected() throws Exception {
+        for (String weak : new String[]{"abcd123", "abcdefgh", "12345678"}) {   // 7자 · 숫자 없음 · 문자 없음
+            new Browser().post("/api/v1/auth/signup",
+                            Map.of("name", "이승훈", "email", "a@example.com", "password", weak, "nickname", "훈이"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.error.field").value("password"));
+        }
         new Browser().post("/api/v1/auth/signup",
-                        Map.of("name", "이승훈", "email", "a@example.com", "password", "short", "nickname", "훈이"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error.field").value("password"));
+                        Map.of("name", "이승훈", "email", "a@example.com", "password", "abcd1234", "nickname", "훈이"))
+                .andExpect(status().isOk());
+        jdbc.update("DELETE FROM app_user WHERE email = 'a@example.com'");
         new Browser().post("/api/v1/auth/signup", signup("   ", "b@example.com", "훈이"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error.field").value("name"));

@@ -31,7 +31,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 class MeApiTest {
     @Container static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17");
     static final ObjectMapper JSON = new ObjectMapper();
-    static final String PASSWORD = "a long local password!";
+    static final String PASSWORD = "a long local password 1";
 
     @DynamicPropertySource static void db(DynamicPropertyRegistry r) {
         r.add("spring.datasource.url", POSTGRES::getJdbcUrl);

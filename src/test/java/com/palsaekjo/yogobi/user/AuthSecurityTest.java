@@ -58,7 +58,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Import({AuthSecurityTest.ProviderConfig.class, AuthSecurityTest.MailCapture.class})
 class AuthSecurityTest {
     static final String SECRET = "VHlwZS1vbmx5LXRlc3Qta2V5LTMyaGFyYWN0ZXJzLW9yLW1vcmUh";
-    static final String PASSWORD = "a long local password!";
+    static final String PASSWORD = "a long local password 1";
     @Container static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17");
     static final ObjectMapper JSON = new ObjectMapper();
     static final RSAKey RSA;
@@ -495,7 +495,7 @@ class AuthSecurityTest {
     @Test void passwordResetRevokesSessionsAndSwapsPassword() throws Exception {
         Browser alice = signupViaEmail("alice@example.com"); Cookie[] old = alice.cookies;
         new Browser().post("/api/v1/auth/password/reset-request", Map.of("email", "alice@example.com")).andExpect(status().isOk());
-        String fresh = "a fresh long password!";
+        String fresh = "a fresh long password 2";
         new Browser().post("/api/v1/auth/password/reset", Map.of("token", mailToken("alice@example.com"), "password", fresh)).andExpect(status().isOk());
         mvc.perform(get("/api/v1/me").cookie(old)).andExpect(status().isUnauthorized());
         new Browser().post("/api/v1/auth/login", Map.of("email", "alice@example.com", "password", PASSWORD)).andExpect(status().isUnauthorized());
@@ -573,7 +573,7 @@ class AuthSecurityTest {
         new Browser().post("/api/v1/auth/password/reset-request", Map.of("email", "legacy@example.com")).andExpect(status().isOk());
         String proof = mailToken("legacy@example.com");
         var reset = new Browser();
-        var result = reset.post("/api/v1/auth/password/reset", Map.of("token", proof, "password", "a different secure password!"))
+        var result = reset.post("/api/v1/auth/password/reset", Map.of("token", proof, "password", "a different secure password 3"))
                 .andExpect(status().isOk()).andReturn();
         reset.accept(result); reset.me().andExpect(status().isUnauthorized()); // Reset never logs in.
         assertTrue(members.member(before.id()).emailVerified());
@@ -590,9 +590,9 @@ class AuthSecurityTest {
         signup("alice@example.com");
         new Browser().post("/api/v1/auth/password/reset-request", Map.of("email", "alice@example.com")).andExpect(status().isOk());
         String proof = mailToken("alice@example.com"); MailCapture.fail = true;
-        new Browser().post("/api/v1/auth/password/reset", Map.of("token", proof, "password", "a replacement password!"))
+        new Browser().post("/api/v1/auth/password/reset", Map.of("token", proof, "password", "a replacement password 4"))
                 .andExpect(status().isOk());
-        assertNotNull(members.login("alice@example.com", "a replacement password!"));
+        assertNotNull(members.login("alice@example.com", "a replacement password 4"));
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM auth_session", Integer.class));
     }
 
@@ -603,7 +603,7 @@ class AuthSecurityTest {
         b.post("/api/v1/auth/google/link", Map.of("password", PASSWORD)).andExpect(status().isOk());
         Flow flow = start(b);
         b.accept(callback(flow, grant(flow, "google-1", "alice@example.com", c -> {}, RSA)).andReturn());
-        new Browser().post("/api/v1/auth/password/reset", Map.of("token", proof, "password", "attacker chosen password!"))
+        new Browser().post("/api/v1/auth/password/reset", Map.of("token", proof, "password", "attacker chosen password 5"))
                 .andExpect(status().isBadRequest());
         b.me().andExpect(status().isOk());
         assertNotNull(members.login("alice@example.com", PASSWORD));

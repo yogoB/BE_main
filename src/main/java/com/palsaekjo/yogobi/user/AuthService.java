@@ -288,10 +288,18 @@ public class AuthService {
         emailProofs.notifyResetAfterCommit(proof.email());
     }
 
+    /**
+     * 비밀번호 규칙(사용자 결정 2026-09-16): **문자와 숫자를 섞어 8자 이상**.
+     * 72바이트 상한은 취향이 아니라 bcrypt 의 입력 한계라 그대로 둔다(넘으면 조용히 잘린다).
+     */
     public String encodePassword(String password) {
-        if (password == null || password.codePointCount(0, password.length()) < 15
-                || password.getBytes(StandardCharsets.UTF_8).length > 72)
-            throw ApiException.requiredMissing("password", "비밀번호는 15자 이상, UTF-8 기준 72바이트 이하로 입력해 주세요.");
+        boolean hasLetter = password != null && password.codePoints().anyMatch(Character::isLetter);
+        boolean hasDigit = password != null && password.codePoints().anyMatch(Character::isDigit);
+        if (password == null || password.codePointCount(0, password.length()) < 8
+                || password.getBytes(StandardCharsets.UTF_8).length > 72
+                || !hasLetter || !hasDigit)
+            throw ApiException.requiredMissing("password",
+                    "비밀번호는 문자와 숫자를 섞어 8자 이상, UTF-8 기준 72바이트 이하로 입력해 주세요.");
         return passwords.encode(password);
     }
 
