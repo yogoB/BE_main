@@ -97,7 +97,10 @@ user / subscription / detection / recommend / chat / alert
 ### 테스트
 
 - 새 `DiscountRule`은 `docs/testing.md`에 골든 케이스를 **먼저 적고** 구현한다.
-- `pricing`은 분기 커버리지 100%가 목표다.
+- `pricing`·`detection` 은 **분기 커버리지 100%가 강제된다** — `./gradlew check` 가 미달 시 실패한다(2026-09-17).
+  기준 숫자의 출처는 `docs/testing.md` "기준" 절이고 `build.gradle` 은 그것을 지키는 장치다.
+- 골든 케이스에는 **누가 검증하는지를 적는다.** `python3 scripts/golden_audit.py --check` 가 침묵을 잡는다.
+  "없음 — 프론트 로직" 처럼 없다고 적는 것도 정답이다. 금지하는 것은 아무 말도 안 하는 것이다.
 
 ---
 
