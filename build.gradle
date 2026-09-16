@@ -1,5 +1,6 @@
 plugins {
     id 'java'
+    id 'jacoco'
     id 'org.springframework.boot' version '3.5.16'
 }
 
@@ -44,3 +45,32 @@ tasks.named('processResources') {
 tasks.named('test') {
     useJUnitPlatform()
 }
+
+// docs/testing.md "기준" 절이 pricing 분기 100%·라인 90%, detection 라인 80% 를 요구해 왔지만
+// 재는 도구가 없어 한 번도 검증되지 않았다(2026-09-17 확인). 기준을 빌드가 강제하게 한다.
+jacocoTestReport {
+    dependsOn tasks.named('test')
+    reports { xml.required = true; html.required = true }
+}
+tasks.named('test') { finalizedBy tasks.named('jacocoTestReport') }
+
+// 기준의 출처는 docs/testing.md "기준" 절이다. 숫자를 여기서 새로 정하지 않는다 —
+// 문서가 계약이고 이 블록은 그 계약을 빌드가 지키게 하는 장치다.
+jacocoTestCoverageVerification {
+    dependsOn tasks.named('jacocoTestReport')
+    violationRules {
+        rule {
+            element = 'PACKAGE'
+            includes = ['com.palsaekjo.yogobi.pricing', 'com.palsaekjo.yogobi.pricing.*']
+            limit { counter = 'BRANCH'; value = 'COVEREDRATIO'; minimum = 1.00 }
+            limit { counter = 'LINE'; value = 'COVEREDRATIO'; minimum = 0.90 }
+        }
+        rule {
+            element = 'PACKAGE'
+            includes = ['com.palsaekjo.yogobi.detection', 'com.palsaekjo.yogobi.detection.*']
+            limit { counter = 'BRANCH'; value = 'COVEREDRATIO'; minimum = 1.00 }
+            limit { counter = 'LINE'; value = 'COVEREDRATIO'; minimum = 0.90 }
+        }
+    }
+}
+tasks.named('check') { dependsOn tasks.named('jacocoTestCoverageVerification') }
