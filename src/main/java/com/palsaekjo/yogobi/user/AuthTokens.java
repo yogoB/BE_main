@@ -26,8 +26,15 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class AuthTokens {
-    // ponytail: no refresh token. Reauthenticate after 15 minutes; add proof-bound renewal only when longer sessions are needed.
-    private static final Duration LIFETIME = Duration.ofMinutes(15);
+    /**
+     * 절대 24시간 · 유휴 2시간 (D-48, 2026-09-18). 처음엔 15분·5분이었다(D-10) — 디테일 모드는 회원 API 를
+     * 한 번도 안 부르므로(카탈로그·추천은 공개) 입력에 5분만 걸려도 세션이 죽었고, 로그인한 사람이
+     * 결과 화면에서 다시 로그인하라는 게이트를 봤다. refresh 는 여전히 없다 — 만료 뒤엔 Google 한 번이다.
+     * 탈취 창은 DB 세션 행이 막는다: `/me/sessions` 로 보고 끊을 수 있고, 로그아웃·탈퇴·재발급이 행을 지운다.
+     */
+    private static final Duration LIFETIME = Duration.ofHours(24);
+    /** SQL 에 그대로 들어가는 유휴 한도. 세 군데가 같은 값을 봐야 하므로 한 곳에 둔다. */
+    private static final String IDLE = "interval '2 hours'";
     private static final String ISSUER = "yogobi";
     private static final String AUDIENCE = "yogobi-member";
     private final JdbcTemplate jdbc;
@@ -70,7 +77,7 @@ public class AuthTokens {
                 .audience(List.of(AUDIENCE)).issuedAt(now).expiresAt(now.plus(LIFETIME)).id(randomValue()).build();
         String token = encoder.encode(JwtEncoderParameters.from(JwsHeader.with(MacAlgorithm.HS256).build(), claims))
                 .getTokenValue();
-        jdbc.update("DELETE FROM auth_session WHERE expires_at <= now() OR last_seen_at <= now()-interval '5 minutes'");
+        jdbc.update("DELETE FROM auth_session WHERE expires_at <= now() OR last_seen_at <= now()-" + IDLE + "");
         String agent = request.getHeader("User-Agent");
         agent = agent == null ? "Unknown" : agent.replaceAll("[\\p{Cntrl}]", "");
         jdbc.update("INSERT INTO auth_session(token_hash,user_id,binding_hash,expires_at,user_agent) VALUES (?,?,?,?,?)",
@@ -90,12 +97,10 @@ public class AuthTokens {
                     || !jwt.getExpiresAt().isAfter(Instant.now()) || jwt.getIssuedAt() == null
                     || jwt.getIssuedAt().isAfter(Instant.now().plusSeconds(30))) return null;
             long userId = Long.parseLong(jwt.getSubject());
-            return jdbc.query("""
-                    UPDATE auth_session SET last_seen_at=now()
-                    WHERE token_hash=? AND binding_hash=? AND user_id=? AND expires_at>now()
-                    AND last_seen_at>now()-interval '5 minutes'
-                    RETURNING user_id
-                    """, (rs, i) -> rs.getLong(1), hash(token), hash(binding), userId).stream().findFirst().orElse(null);
+            return jdbc.query("UPDATE auth_session SET last_seen_at=now() "
+                    + "WHERE token_hash=? AND binding_hash=? AND user_id=? AND expires_at>now() "
+                    + "AND last_seen_at>now()-" + IDLE + " RETURNING user_id",
+                    (rs, i) -> rs.getLong(1), hash(token), hash(binding), userId).stream().findFirst().orElse(null);
         } catch (JwtException | IllegalArgumentException e) { return null; }
     }
 
@@ -110,10 +115,9 @@ public class AuthTokens {
     public record Session(java.util.UUID id, Instant createdAt, Instant lastSeenAt, Instant expiresAt, String userAgent, boolean current) { }
 
     public List<Session> sessions(long userId, HttpServletRequest request) {
-        return jdbc.query("""
-                SELECT id,created_at,last_seen_at,expires_at,user_agent,token_hash=? FROM auth_session
-                WHERE user_id=? AND expires_at>now() AND last_seen_at>now()-interval '5 minutes' ORDER BY created_at DESC
-                """, (rs, i) -> new Session(rs.getObject(1,java.util.UUID.class),rs.getTimestamp(2).toInstant(),
+        return jdbc.query("SELECT id,created_at,last_seen_at,expires_at,user_agent,token_hash=? FROM auth_session "
+                + "WHERE user_id=? AND expires_at>now() AND last_seen_at>now()-" + IDLE + " ORDER BY created_at DESC",
+                (rs, i) -> new Session(rs.getObject(1,java.util.UUID.class),rs.getTimestamp(2).toInstant(),
                 rs.getTimestamp(3).toInstant(),rs.getTimestamp(4).toInstant(),rs.getString(5),rs.getBoolean(6)),sessionHash(request),userId);
     }
 

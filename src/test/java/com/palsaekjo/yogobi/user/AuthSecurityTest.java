@@ -401,12 +401,13 @@ class AuthSecurityTest {
     @Test void sessionIdleTimeoutAndAbsoluteLifetimeLimitCopiedCookies() throws Exception {
         Browser b = signup("alice@example.com");
         var claims = SignedJWT.parse(b.cookies[0].getValue()).getJWTClaimsSet();
-        assertEquals(900_000, claims.getExpirationTime().getTime()-claims.getIssueTime().getTime());
-        for (Cookie cookie : b.cookies) assertEquals(900, cookie.getMaxAge());
-        jdbc.update("UPDATE auth_session SET last_seen_at=now()-interval '4 minutes'");
+        // D-48: 절대 24시간 · 유휴 2시간. 15분·5분은 디테일 모드 입력 중에 세션을 죽였다(G-33).
+        assertEquals(86_400_000, claims.getExpirationTime().getTime()-claims.getIssueTime().getTime());
+        for (Cookie cookie : b.cookies) assertEquals(86_400, cookie.getMaxAge());
+        jdbc.update("UPDATE auth_session SET last_seen_at=now()-interval '110 minutes'");
         b.me().andExpect(status().isOk());
         assertTrue(jdbc.queryForObject("SELECT last_seen_at>now()-interval '1 minute' FROM auth_session", Boolean.class));
-        jdbc.update("UPDATE auth_session SET last_seen_at=now()-interval '6 minutes'");
+        jdbc.update("UPDATE auth_session SET last_seen_at=now()-interval '121 minutes'");
         b.me().andExpect(status().isUnauthorized());
         assertTrue(tokens.sessions(Long.parseLong(claims.getSubject()), new org.springframework.mock.web.MockHttpServletRequest()).isEmpty());
     }

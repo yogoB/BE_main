@@ -169,7 +169,7 @@ AI의 `/parse`·`/narrate`·`/ocr`는 토큰 누락·불일치 시 401, 서버 �
 회원 인증 계약(2026-09-10 사용자 승인 1~4): `docs/auth.md`.
 추천·계산기·카탈로그 **엔드포인트는 비회원에게 공개한다.** 개인 데이터 저장·관리는 회원 전용이다.
 단 **결과 리포트 화면은 로그인 후에만 그린다**(D-36) — 화면 게이트이며 API 권한이 아니다. API 를 직접 부르면 우회되고, 그것을 알고 둔 선택이다.
-자체·Google 로그인 모두 동일한 내부 `userId`와 15분 JWT를 사용한다(refresh 없음, 만료 후 재로그인). JWT는 HttpOnly 쿠키로만 전달하며
+자체·Google 로그인 모두 동일한 내부 `userId`와 **24시간 JWT**를 사용한다(refresh 없음, 만료 후 재로그인 — D-48, 처음 15분이던 것을 올렸다). JWT는 HttpOnly 쿠키로만 전달하며
 별도 브라우저 확인 쿠키와 DB 발급 지문을 함께 검사한다. 회원 요청은 `credentials: include`, 변경 요청은 CSRF 헤더가 필요하다.
 자체 가입은 `{name,email,password,nickname?}` 한 번으로 끝난다(D-21). **메일은 쓰지 않는다** — 본인 확인 메일·메일 토큰 가입·메일 재설정
 엔드포인트와 `AuthEmail`·`spring-boot-starter-mail`을 2026-09-16 에 제거했다. 이메일 소유는 확인하지 않으며 `email_verified`는 자체 가입에서 FALSE 로 남는다.
@@ -368,7 +368,7 @@ CREATE INDEX idx_plan_benefit_plan ON plan_benefit(mobile_plan_id);
 `app_user.password_hash`는 Google 전용 회원에서 null 가능, `google_sub`는 UNIQUE, 정규화 이메일 UNIQUE, 로그인 수단 최소 1개.
 V4에서 `email_verified`(자체 가입은 검증 토큰 소비 시 TRUE), `credential_version`(비밀번호·연결 변경 시 증가 → 이전 발급 토큰 무효화 기준) 추가.
 `auth_session`(token_hash PK, user_id FK, binding_hash, expires_at + V4: id UUID, created_at, last_seen_at, user_agent):
-원문 JWT·브라우저 확인값은 저장하지 않고 SHA-256 지문만. 15분 만료·5분 유휴로 정리하며 `/me/sessions`로 조회·폐기한다.
+원문 JWT·브라우저 확인값은 저장하지 않고 SHA-256 지문만. 24시간 만료·2시간 유휴로 정리하며(D-48) `/me/sessions`로 조회·폐기한다.
 `auth_email_token`(token_hash PK, purpose SIGNUP|RESET, email, user_id, credential_version, expires_at): 10분·단일 사용 본인 확인 토큰.
 이메일별 트랜잭션 잠금 후 소비해 동시 링크 정리의 교착을 방지한다.
 자격 증명 변경과 세션 발급은 회원 행/버전을 검사하며 재설정 전 로그인 결과의 뒤늦은 발급을 차단한다.

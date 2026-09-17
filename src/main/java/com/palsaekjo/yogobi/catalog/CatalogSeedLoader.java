@@ -39,7 +39,9 @@ public class CatalogSeedLoader implements ApplicationRunner {
         var parts = CombinedCatalogCsv.bundled();
         load(parts.get("subscription_service"), parts.get("subscription_tier"), parts.get("bundle_product"));
         // 혜택은 요금제를 참조하므로 순서를 지킨다.
-        loadMobilePlans(parts.get("mobile_plan"));
+        // 합본에 없는 요금제는 물러난다(G-34). 업서트만 하면 이름을 고친 옛 행("케이티엠모바일")과
+        // 개발용 더미("5G 웨이브팩" 999999MB)가 영원히 남아 추천 1순위에 올라온다 — 운영에서 실제로 그랬다.
+        loadMobilePlans(parts.get("mobile_plan"), true);
         loadPlanBenefits(parts.get("plan_benefit"));
     }
 
@@ -106,6 +108,15 @@ public class CatalogSeedLoader implements ApplicationRunner {
      * - id 컬럼이 없으므로 (carrier_id, name) 충돌 기준으로 갱신한다.
      */
     void loadMobilePlans(Resource mobilePlans) throws SQLException, IOException {
+        loadMobilePlans(mobilePlans, false);
+    }
+
+    /**
+     * {@code retireMissing} 이면 이 파일에 없는 요금제를 {@code active=false} 로 내린다 — 파일이 <b>전체</b>일 때만
+     * (합본 시드·외부 스냅샷). 개발 더미처럼 일부만 담은 파일에 켜면 나머지 전부가 물러난다.
+     * 지우지 않고 내리는 이유는 회원의 현재 요금제가 그 행을 가리킬 수 있어서다(G-30 은 비활성도 찾는다).
+     */
+    void loadMobilePlans(Resource mobilePlans, boolean retireMissing) throws SQLException, IOException {
         try (var connection = dataSource.getConnection()) {
             boolean ownTransaction = connection.getAutoCommit();
             if (ownTransaction) connection.setAutoCommit(false);
@@ -146,6 +157,11 @@ public class CatalogSeedLoader implements ApplicationRunner {
                             contract_discount_24m = EXCLUDED.contract_discount_24m,
                             age_limit = EXCLUDED.age_limit, source_url = EXCLUDED.source_url,
                             collected_at = EXCLUDED.collected_at, active = TRUE;
+                        """);
+                if (retireMissing) execute(connection, """
+                        UPDATE mobile_plan m SET active = FALSE WHERE active AND NOT EXISTS (
+                            SELECT 1 FROM seed_mobile_plan s JOIN carrier c ON c.name = btrim(s.carrier)
+                            WHERE m.carrier_id = c.id AND m.name = btrim(s.plan_name) AND btrim(s.source_url) <> '');
                         """);
                 if (ownTransaction) connection.commit();
             } catch (SQLException | IOException | RuntimeException e) {
@@ -221,16 +237,13 @@ public class CatalogSeedLoader implements ApplicationRunner {
             var shared = new CatalogSeedLoader(new org.springframework.jdbc.datasource.SingleConnectionDataSource(connection, true));
             try {
                 shared.load(files.get("subscription_service"), files.get("subscription_tier"), files.get("bundle_product"));
-                shared.loadMobilePlans(files.get("mobile_plan"));
+                shared.loadMobilePlans(files.get("mobile_plan"), true);
                 execute(connection, "DELETE FROM plan_benefit");
                 shared.loadPlanBenefits(files.get("plan_benefit"));
                 execute(connection, """
                         UPDATE subscription_service SET active = FALSE WHERE id NOT IN (SELECT id FROM seed_subscription_service);
                         UPDATE subscription_tier SET active = FALSE WHERE id NOT IN (SELECT id FROM seed_subscription_tier);
                         UPDATE bundle_product SET active = FALSE WHERE id NOT IN (SELECT id FROM seed_bundle_product);
-                        UPDATE mobile_plan m SET active = FALSE WHERE NOT EXISTS (
-                            SELECT 1 FROM seed_mobile_plan s JOIN carrier c ON c.name = btrim(s.carrier)
-                            WHERE m.carrier_id = c.id AND m.name = btrim(s.plan_name) AND btrim(s.source_url) <> '');
                         """);
                 connection.commit();
             } catch (SQLException | IOException | RuntimeException e) {

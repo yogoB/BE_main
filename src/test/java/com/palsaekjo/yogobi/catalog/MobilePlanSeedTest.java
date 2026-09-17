@@ -45,6 +45,36 @@ class MobilePlanSeedTest {
         jdbc.execute("DELETE FROM carrier");
     }
 
+    /**
+     * G-34 — 합본에 없는 요금제는 시작 시 물러난다. 운영 DB 에 개발 더미 "5G 웨이브팩"(999999MB) 과
+     * 이름을 고치기 전의 "케이티엠모바일" 행 22건이 남아 있었고, 그중 셋이 가상 사용자의 추천 1·2·4위였다.
+     * 지우지 않고 내린다 — 회원의 현재 요금제가 그 행일 수 있다.
+     */
+    @Test
+    void bundledSeedRetiresPlansThatAreNoLongerInTheCsv() throws Exception {
+        loader.loadMobilePlans(csv(HEADER
+                + "KT,5G 웨이브팩,5G,45000,999999,999999,999999,,,ALL,http://seed,2026-09-08\n"
+                + "케이티엠모바일,모두 15GB+,LTE,40700,15360,100,100,,,ALL,https://t/9,2026-09-07\n"));
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM mobile_plan WHERE active", Integer.class)).isEqualTo(2);
+
+        loader.run(null);
+
+        // 합본에 없는 둘은 남되 물러난다. 합본의 요금제는 전부 활성이다.
+        assertThat(jdbc.queryForList("SELECT name FROM mobile_plan WHERE NOT active", String.class))
+                .containsExactlyInAnyOrder("5G 웨이브팩", "모두 15GB+");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM mobile_plan WHERE active", Integer.class))
+                .isEqualTo(bundledPlanCount());
+        // 부분 파일(개발 더미)로 다시 실으면 아무것도 물러나지 않는다 — 전체 파일일 때만 켠다.
+        loader.loadMobilePlans(csv(HEADER + "KT,5G 웨이브팩,5G,45000,999999,999999,999999,,,ALL,http://seed,2026-09-08\n"));
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM mobile_plan WHERE active", Integer.class))
+                .isEqualTo(bundledPlanCount() + 1);
+    }
+
+    private static long bundledPlanCount() throws java.io.IOException {
+        String text = CombinedCatalogCsv.bundled().get("mobile_plan").getContentAsString(StandardCharsets.UTF_8);
+        return text.lines().filter(l -> !l.isBlank() && !l.startsWith("#")).count() - 1;   // 헤더 제외
+    }
+
     @Test
     void loadsPlansDerivesCarriersMapsNetworkAndSkipsRowsWithoutSource() throws Exception {
         loader.loadMobilePlans(csv(HEADER

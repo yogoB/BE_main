@@ -405,7 +405,7 @@ CSV에 없는 것을 물어도 **200으로 답한다.** 아는 것으로 계산�
 `localLogin` 은 항상 `false`, `googleLogin` 은 항상 `true` 다. 운영자 백오피스 로그인(`/api/v1/admin/login`)은
 별개이며 비밀번호를 쓴다(D-32).
 
-JWT 절대 수명 15분·유휴 제한 5분(refresh 없음). 상태를 바꾸는 요청은 모두 CSRF 토큰이 필요하다.
+JWT 절대 수명 24시간·유휴 제한 2시간(refresh 없음, D-48). 상태를 바꾸는 요청은 모두 CSRF 토큰이 필요하다.
 상세 실행법·설정은 [auth.md](auth.md), 공격 검증은 [auth-security.md](auth-security.md).
 
 | Method | Path | 요청 | 응답 |
