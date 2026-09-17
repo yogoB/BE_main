@@ -229,6 +229,9 @@ Google 전용 계정은 동일 Google `sub` 재인증으로 자체 비밀번호�
 }
 ```
 
+`breakdown[].provenance` 는 `Provenance` enum 4값이다: `OFFICIAL`·`DERIVED`·`USER_PROVIDED`·`ESTIMATED`.
+가족결합 할인은 `USER_PROVIDED` 다(G-28). 내레이터는 값을 열거로 묶지 않는다 — 2026-09-18 에 `USER_PROVIDED` 가
+빠져 있어 결합 사용자 전원의 설명이 422 로 비었다.
 `baseline`은 아무 할인 없이 정가로만 냈을 때다. 절감액 표시의 기준선.
 `current`는 **지금 쓰는 요금제로 같은 구독을 유지했을 때**의 금액이다(G-30). 후보와 같은 계산기·같은 컨텍스트로 내므로
 `results[0]`과 나란히 놓고 빼도 되는 두 금액이며, 그 뺄셈도 여기서 해서 보낸다 — 화면은 금액을 만들지 않는다(원칙 2).
