@@ -123,10 +123,13 @@ class MeApiTest {
         mvc.perform(get("/api/v1/me/subscriptions").cookie(a.cookies)).andExpect(jsonPath("$.data.length()").value(1));
     }
 
-    @Test void detectionsEndpointReturnsList() throws Exception {
+    @Test void detectionsEndpointReturnsFindingsAndTheirExplanation() throws Exception {
+        // 문구는 내레이터가 만든다(D-46). 내레이터가 없어도 findings·lines 는 비어 있지 않은 배열이어야 한다.
         Browser a = new Browser(); signup("alice@example.com", a);
         mvc.perform(get("/api/v1/me/detections").cookie(a.cookies)).andExpect(status().isOk())
-                .andExpect(jsonPath("$.data").isArray());
+                .andExpect(jsonPath("$.data.findings").isArray())
+                .andExpect(jsonPath("$.data.lines").isArray())
+                .andExpect(jsonPath("$.data.summary").exists());
     }
 
     @Test void switchTimingComparesCurrentVsTarget() throws Exception {

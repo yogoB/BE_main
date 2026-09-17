@@ -499,6 +499,10 @@ JWT 절대 수명 15분·유휴 제한 5분(refresh 없음). 상태를 바꾸는
 
 ### 5-5. 중복 결제 탐지 — `GET /api/v1/me/detections`
 
+> **D-46**: 응답이 `{findings, lines, summary}` 로 바뀌었다. `lines` 는 내레이터가 만든 문구
+> (`title`·`target`·`amount`·`how`)이고 `findings` 는 기존 원본이다. 내레이터가 닿지 않으면
+> `lines` 는 규칙 코드와 금액만 담고 `how` 는 빈 문자열이다 — 화면이 통째로 비지 않는다.
+
 요청 시 현재 구독·요금제 기준으로 **재탐지해 저장·반환**한다. 응답 200 `data`는 탐지 결과 배열:
 
 ```json

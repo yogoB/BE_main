@@ -31,12 +31,15 @@ class RecommendationControllerTest {
         when(service.recommend(any()))
                 .thenReturn(new RecommendationResponse(Accuracy.PARTIAL, missing, List.of(best), 127));
         when(narrator.narrationFor(eq(best), eq(missing), eq(127)))
-                .thenReturn(new Narrator.Narration("월 13,500원 절약할 수 있어요.", List.of("넷플릭스가 포함돼요.")));
+                .thenReturn(new Narrator.Narration("월 13,500원 절약할 수 있어요.", List.of("넷플릭스가 포함돼요."),
+                        List.of("확인 필요 — 마이페이지")));
 
         var response = controller.recommend(request, null);
 
         assertThat(response.data().reasons()).containsExactly("넷플릭스가 포함돼요.");
         assertThat(response.data().message()).isEqualTo("월 13,500원 절약할 수 있어요.");
+        // 화면 ⓘ 안내도 서버가 만든다(D-46) — 화면이 missingInputs 로 다시 조립하지 않는다.
+        assertThat(response.data().notices()).containsExactly("확인 필요 — 마이페이지");
         assertThat(response.data().results()).containsExactly(best);
         assertThat(response.data().candidateCount()).isEqualTo(127);
         // 후보 수는 CostResult 에 없다. 혜택도 할인도 없는 요금제에는 이게 유일한 근거라 따로 넘긴다.

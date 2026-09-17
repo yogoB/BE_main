@@ -59,7 +59,7 @@ public interface PaymentHistoryProvider {   // subscription/port
 ```
 POST /api/v1/recommendations  (BE_main)
   → 내부 recommend 호출 (pricing 이 금액을 만든다)
-  → AI: POST /narrate  → { message, reasons }   ← 설명만. 실패해도 results 는 그대로 나간다
+  → 내레이터: POST /narrate  → { message, reasons, notices }   ← 설명만. 실패해도 results 는 그대로 나간다
 
 POST /api/v1/admin/catalog/{dataset}  (운영자 변경 제안, D-29·D-45)
   → 스마트초이스 Open API   → 조건별 추천에서 (통신사, 요금제명) 대조
@@ -247,19 +247,40 @@ narrate 오케스트레이션은 컨트롤러가 한다(`RecommendationControlle
 `candidateCount`는 `CostResult`에 없어 컨트롤러가 따로 싣는다. **기준 카탈로그 1,706개 중 1,645개는
 제휴 혜택도 약정할인도 없어 절감액이 0이다** — 그런 요금제에는 "몇 개 중에서 골랐나"가 유일한 근거다.
 `CostResult`를 통째로 직렬화하면 AI가 쓰지 않는 필드까지 나간다 — 복구된 `priceCrossCheck`가 실제로 그랬다.
-AI는 계약 밖 필드를 **422로 거부**하고 BE는 그것을 장애로 삼키므로, 사유가 화면에서 조용히 사라진다.
+내레이터는 계약 밖 필드를 **422로 거부**하고 BE는 그것을 장애로 삼키므로, 사유가 화면에서 조용히 사라진다.
 레코드에 필드를 더하면 이 목록에 적을지 먼저 정한다. 적지 않으면 AI로 가지 않는다.
 
 ```jsonc
-// AI: POST /narrate 200
+// 내레이터: POST /narrate 200
 {
   "message": "“SKT 5G 슬림+”의 실제 내시는 금액은 월 71,300원이에요. ...",  // 고정 템플릿
-  "reasons": [                                                            // 0~3개. 모델 또는 규칙
+  "reasons": [                                                            // 0~3개. 규칙이 만든다
     "따로 내시던 넷플릭스 스탠다드 13,500원이 요금제에 포함돼 있어요.",
     "선택약정 25% 할인으로 월 13,750원이 빠져요."
+  ],
+  "notices": [                                                            // 0~10개. 화면 ⓘ 안내 (D-46)
+    "가족 결합 시 최대 11,000원 추가 절감 가능 — 통신사 마이페이지 > 결합 상품"
   ]
 }
 ```
+
+`notices`는 `missingInputs`의 `impact`·`howToFind`를 **고쳐 쓰지 않고 이은 것**이다(D-46). 화면이 조립하던 것을
+서버로 모아 표현이 갈라지지 않게 한다. 300자를 넘는 줄은 자르지 않고 통째로 뺀다 — 잘린 안내는 오해를 만든다.
+
+```jsonc
+// 내레이터: POST /narrate/detections 200  (D-46)
+// 요청 { "findings": [{ "rule", "targetName", "wastedAmount", "provenance" }] }
+{
+  "lines": [{ "title": "요금제에 포함된 구독을 따로 결제 중", "target": "넷플릭스",
+              "amount": "월 13,500원",            // ESTIMATED 면 "최대 월 13,500원"
+              "how": "요금제 혜택으로 이미 제공돼요. 개별 결제를 해지하면 그만큼 줄어요." }],
+  "summary": "겹치는 결제 1건을 찾았어요. 해지·변경은 각 서비스에서 직접 해주세요 — 요고비는 금액만 알려드려요."
+}
+```
+
+대상 이름은 **BE가 카탈로그에서 찾아 넘긴다** — 내레이터는 카탈로그를 모른다. 모르는 규칙 코드는 제목에
+그대로 두고 `how`를 비운다. 새 규칙이 화면에서 조용히 사라지지 않게 하기 위해서다.
+요약은 **건수만** 말한다. 금액을 더하는 순간 계산이고 계산은 `pricing` 몫이다(절대 원칙 2).
 
 `reasons`는 화면의 "왜 나에게 이 상품이 추천됐나요?" 목록을 채운다. 보조 정보이므로 **비어 있을 수 있다.**
 **모델 장애 시에는 내레이터가 규칙으로 만든 사유가 내려간다**(D-38, 사용자 승인 2026-09-17).
