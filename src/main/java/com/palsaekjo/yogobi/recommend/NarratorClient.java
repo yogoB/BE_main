@@ -91,6 +91,14 @@ public class NarratorClient implements Narrator, DetectionNarrator {
     /**
      * 문자열 배열을 계약대로 검증해 옮긴다. 어긋나면 폐기한다 —
      * 화면은 이 값을 그대로 렌더링하므로 길이·개행을 여기서 막지 않으면 레이아웃이 깨진다.
+     *
+     * <p>ponytail: 한 줄이 어긋나면 <b>설명 전체</b>가 사라진다(줄 단위로 빼지 않는다). 지금은 운영
+     * 최장 82자 · 최악 222자로 300에서 멀어 괜찮다. 한도에 닿기 시작하면 그때 줄 단위로 거른다.
+     *
+     * <p>세는 단위가 내레이터와 다르다 — 파이썬 {@code len()} 은 코드포인트, 자바
+     * {@code String.length()} 는 UTF-16 코드유닛이다. 지금 문구에 비-BMP 문자가 0개라 차이가 없지만,
+     * 이모지가 서비스명이나 {@code impact} 에 섞이면 자바가 글자당 2로 세어 내레이터가 통과시킨 줄을
+     * 여기서 초과로 볼 수 있다(2026-09-17 AI 세션 확인).
      */
     private static List<String> lines(JsonNode node, int maxCount, int maxLength) {
         if (node.isMissingNode() || node.isNull()) return List.of();
