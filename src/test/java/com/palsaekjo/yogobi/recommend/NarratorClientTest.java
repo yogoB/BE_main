@@ -25,6 +25,7 @@ import org.junit.jupiter.api.Test;
 class NarratorClientTest {
     private HttpServer server;
     private String body = "";
+    private String received = "";
     private NarratorClient client;
 
     private static final CostResult COST = new CostResult(1, "5G 슬림+", "SKT", 55000, 68500,
@@ -34,6 +35,7 @@ class NarratorClientTest {
     void startStub() throws IOException {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/narrate", exchange -> {
+            received = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
             byte[] payload = body.getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().add("Content-Type", "application/json");
             exchange.sendResponseHeaders(200, payload.length);
@@ -63,6 +65,24 @@ class NarratorClientTest {
         assertThat(narration.message()).isEqualTo("월 55,000원이에요.");
         assertThat(narration.reasons()).containsExactly("넷플릭스가 포함돼 있어요.");
         assertThat(narration.notices()).containsExactly("가족결합 할인 11,000원은 SKT 요금제에만 반영했어요");
+    }
+
+    /**
+     * 현재 요금제를 알면 금액과 절감액을 <b>둘 다</b> 보낸다 — 내레이터가 두 수를 빼지 않도록(절대 원칙 2).
+     * 모르면 두 필드 모두 싣지 않는다 — 내레이터가 정가 기준 문장으로 돌아가는 조건이다.
+     */
+    @Test
+    void sendsCurrentTotalsOnlyWhenKnown() {
+        body = """
+                {"message":"월 55,000원이에요.","reasons":[]}""";
+        var current = new RecommendationResponse.CurrentCost(
+                new CostResult(2, "지금 요금제", "KT", 70390, 70390, 0, 0, List.of()), 17100, 205200);
+
+        client.narrationFor(COST, List.of(), 127, current);
+        assertThat(received).contains("\"currentMonthlyTotal\":70390").contains("\"currentMonthlySavings\":17100");
+
+        client.narrationFor(COST, List.of(), 127, null);
+        assertThat(received).doesNotContain("currentMonthlyTotal").doesNotContain("currentMonthlySavings");
     }
 
     /** G-31 b — 셋 중 둘만 와도 받는다. 안내가 없는 결과가 정상이기 때문이다. */

@@ -26,11 +26,12 @@ public interface Narrator {
      *                       (기준 카탈로그의 96%)에는 이 값이 "왜 추천됐나"의 유일한 근거다.
      */
     /**
-     * @param currentMonthlyTotal 지금 쓰는 요금제로 같은 구독을 유지했을 때의 실질월비용(응답 {@code current}).
-     *                            없으면 null — 그때 내레이터는 정가 기준으로 말한다. 있으면 "지금보다" 기준이다.
-     *                            같은 화면의 히어로("지금보다 매달 N원")와 문장("절약되는 금액은 없어요")이
-     *                            어긋나던 것을 이 값으로 맞춘다(2026-09-18, 사용자 승인 계약 변경).
+     * @param current 지금 쓰는 요금제로 같은 구독을 유지했을 때의 금액과 1순위 대비 절감액(응답 {@code current}).
+     *                없으면 null — 그때 내레이터는 정가 기준으로 말한다. 있으면 "지금보다" 기준이다.
+     *                같은 화면의 히어로("지금보다 매달 N원")와 문장("절감되는 금액은 없어요")이
+     *                어긋나던 것을 이 값으로 맞춘다(2026-09-18, 사용자 승인 계약 변경).
+     *                절감액도 같이 보낸다 — 내레이터가 두 수를 빼지 않도록(절대 원칙 2).
      */
     Narration narrationFor(CostResult result, List<MissingInput> missingInputs, Integer candidateCount,
-                           Long currentMonthlyTotal);
+                           RecommendationResponse.CurrentCost current);
 }

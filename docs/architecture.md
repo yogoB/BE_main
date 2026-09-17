@@ -257,8 +257,8 @@ narrate 오케스트레이션은 컨트롤러가 한다(`RecommendationControlle
 `recommend`가 `chat`의 `NarratorClient`에 직접 의존하면 순환이 되므로 포트 `recommend.Narrator`(구현: `NarratorClient`)로 역전한다.
 
 **`/narrate` 요청에 싣는 필드는 아래 10개뿐이다**(`NarratorClient.NARRATE_FIELDS`):
-`planId`·`planName`·`carrier`·`monthlyTotal`·`baseline`·`monthlySavings`·`annualSavings`·`breakdown`·`missingInputs`·`candidateCount`·`currentMonthlyTotal`(선택).
-`currentMonthlyTotal` 은 응답 `current.cost.monthlyTotal` 이며 `currentPlanId` 를 받았을 때만 싣는다 — 있으면 내레이터가 "지금보다" 기준으로 말하고 없으면 정가 기준이다(2026-09-18 사용자 승인. 히어로와 문장이 어긋나던 것을 맞춘다).
+`planId`·`planName`·`carrier`·`monthlyTotal`·`baseline`·`monthlySavings`·`annualSavings`·`breakdown`·`missingInputs`·`candidateCount`·`currentMonthlyTotal`·`currentMonthlySavings`(뒤 둘은 선택, 같이 온다).
+`currentMonthlyTotal` 은 응답 `current.cost.monthlyTotal`, `currentMonthlySavings` 는 `current.monthlySavings` 이며 `currentPlanId` 를 받았을 때만 싣는다 — 있으면 내레이터가 "지금보다" 기준으로 말하고 없으면 정가 기준이다(2026-09-18 사용자 승인. 히어로와 문장이 어긋나던 것을 맞춘다). 절감액을 같이 보내는 이유는 내레이터가 두 수를 빼지 않게 하려는 것이다(절대 원칙 2). 두 값이 어긋나면 내레이터는 정가 기준으로 물러난다.
 `candidateCount`는 `CostResult`에 없어 컨트롤러가 따로 싣는다. **기준 카탈로그 1,706개 중 1,645개는
 제휴 혜택도 약정할인도 없어 절감액이 0이다** — 그런 요금제에는 "몇 개 중에서 골랐나"가 유일한 근거다.
 `CostResult`를 통째로 직렬화하면 AI가 쓰지 않는 필드까지 나간다 — 복구된 `priceCrossCheck`가 실제로 그랬다.
