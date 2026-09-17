@@ -1,12 +1,8 @@
-package com.palsaekjo.yogobi.chat;
+package com.palsaekjo.yogobi.recommend;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.palsaekjo.yogobi.catalog.CatalogVerifier;
-import com.palsaekjo.yogobi.recommend.CostResult;
-import com.palsaekjo.yogobi.recommend.MissingInput;
-import com.palsaekjo.yogobi.recommend.Narrator;
 import java.io.IOException;
 import java.net.http.HttpClient;
 import java.time.Duration;
@@ -24,7 +20,7 @@ import org.springframework.web.client.RestClientException;
 
 /** AI 서버 호출과 응답 검증. 금액은 CostResult를 그대로 전달한다. */
 @Component
-public class AiGateway implements Narrator, CatalogVerifier {
+public class NarratorClient implements Narrator {
     /**
      * `/narrate` 요청에 실어 보내는 계약 필드(architecture.md §3). <b>이 목록이 곧 계약이다.</b>
      *
@@ -41,8 +37,8 @@ public class AiGateway implements Narrator, CatalogVerifier {
     private final ObjectMapper json;
     private final String internalToken;
 
-    public AiGateway(ObjectMapper json, @Value("${AI_SERVER_URL:http://localhost:8000}") String baseUrl,
-                     @Value("${AI_INTERNAL_TOKEN:}") String internalToken) {
+    public NarratorClient(ObjectMapper json, @Value("${NARRATOR_URL:http://localhost:8000}") String baseUrl,
+                     @Value("${NARRATOR_INTERNAL_TOKEN:}") String internalToken) {
         this.json = json;
         this.internalToken = internalToken;
         var factory = new JdkClientHttpRequestFactory(HttpClient.newBuilder()
@@ -96,28 +92,6 @@ public class AiGateway implements Narrator, CatalogVerifier {
             out.add(text);
         }
         return List.copyOf(out);
-    }
-
-    /**
-     * 카탈로그 상품 1건을 AI 서버에서 조회한다(D-29의 2차 더블체크). AI 는 공개 출처를 찾아 보고할 뿐이고
-     * 우리 값과 맞는지 판정하는 규칙은 BE 가 갖는다(절대 원칙 2). 확인 못 하거나 응답이 계약과 어긋나면 empty.
-     */
-    @Override
-    public java.util.Optional<Finding> lookup(String productType, String query) {
-        JsonNode result;
-        try {
-            result = post("/catalog/candidates", Map.of("query", query, "productType", productType));
-        } catch (Unavailable e) {
-            return java.util.Optional.empty();   // AI 장애는 "확인 못 함"이지 "틀림"이 아니다.
-        }
-        if (result == null || !"CANDIDATE_FOUND".equals(result.path("status").asText())) return java.util.Optional.empty();
-        JsonNode candidate = result.path("candidate");
-        JsonNode price = candidate.path("monthlyPriceWon");
-        JsonNode confidence = result.path("confidence");
-        JsonNode source = candidate.path("sourceUrl");
-        if (!price.isIntegralNumber() || price.longValue() < 0 || !confidence.isNumber()
-                || !Double.isFinite(confidence.doubleValue()) || !source.isTextual()) return java.util.Optional.empty();
-        return java.util.Optional.of(new Finding(price.longValue(), confidence.doubleValue(), source.textValue()));
     }
 
     private JsonNode post(String path, Object request) {

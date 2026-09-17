@@ -37,7 +37,7 @@ public class AuthTokens {
     private final SecureRandom random = new SecureRandom();
 
     public AuthTokens(JdbcTemplate jdbc, @Value("${JWT_SECRET:}") String secret,
-                      @Value("${AI_INTERNAL_TOKEN:}") String aiToken,
+                      @Value("${NARRATOR_INTERNAL_TOKEN:}") String aiToken,
                       @Value("${yogobi.auth.secure-cookies:true}") boolean secure) {
         this.jdbc = jdbc;
         this.secure = secure;

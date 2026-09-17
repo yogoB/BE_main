@@ -2,7 +2,6 @@ package com.palsaekjo.yogobi.admin;
 
 import com.palsaekjo.yogobi.catalog.CatalogAuditLog;
 import com.palsaekjo.yogobi.catalog.CatalogChangeRequests;
-import com.palsaekjo.yogobi.catalog.CatalogVerifier;
 import com.palsaekjo.yogobi.user.AdminAccount;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -37,20 +36,14 @@ public class CatalogDailyHarvest {
     private final JdbcTemplate jdbc;
     private final CatalogChangeRequests requests;
     private final AdminAccount admin;
-    private final ObjectProvider<CatalogVerifier> verifier;
     private final int planLimit;
-    private final int tierLimit;
 
     public CatalogDailyHarvest(JdbcTemplate jdbc, CatalogChangeRequests requests, AdminAccount admin,
-                               ObjectProvider<CatalogVerifier> verifier,
-                               @Value("${yogobi.harvest.plan-limit:20}") int planLimit,
-                               @Value("${yogobi.harvest.tier-limit:10}") int tierLimit) {
+                               @Value("${yogobi.harvest.plan-limit:20}") int planLimit) {
         this.jdbc = jdbc;
         this.requests = requests;
         this.admin = admin;
-        this.verifier = verifier;
         this.planLimit = planLimit;
-        this.tierLimit = tierLimit;
     }
 
     /** 한국시간 매일 09:00. 실패해도 다음 날 다시 돈다 — 카탈로그는 그대로 유지된다(fail-soft). */
@@ -69,10 +62,10 @@ public class CatalogDailyHarvest {
     public Map<String, Object> harvest() {
         long proposer = admin.id();
         int plans = harvestPlans(proposer);
-        int tiers = harvestTiers(proposer);
         var out = new LinkedHashMap<String, Object>();
         out.put("proposedMobilePlans", plans);
-        out.put("proposedSubscriptionTiers", tiers);
+        // 구독 등급 갱신은 대조 소스가 AI뿐이라 D-45 로 사라졌다. 새 소스가 생기면 되살린다.
+        out.put("proposedSubscriptionTiers", 0);
         out.put("pending", jdbc.queryForObject(
                 "SELECT count(*) FROM catalog_change_request WHERE status = 'PENDING'", Long.class));
         return out;
@@ -104,39 +97,6 @@ public class CatalogDailyHarvest {
                     "일일 수집(스마트초이스): 기존 " + row.get("ours") + "원 → " + price + "원")) made++;
         }
         return made;
-    }
-
-    /** 활성 구독 등급을 AI 로 조회해 가격이 다른 것만 제안한다. 호출 비용이 있으므로 건수를 더 좁게 잡는다. */
-    private int harvestTiers(long proposer) {
-        CatalogVerifier ai = verifier.getIfAvailable();
-        if (ai == null) return 0;
-        List<Map<String, Object>> tiers = jdbc.queryForList("""
-                SELECT t.id, s.name AS service_name, t.name AS tier_name, t.price
-                FROM subscription_tier t JOIN subscription_service s ON s.id = t.service_id
-                WHERE t.active AND s.active
-                ORDER BY t.id LIMIT ?""", tierLimit);
-
-        int made = 0;
-        for (Map<String, Object> row : tiers) {
-            String key = String.valueOf(row.get("id"));
-            if (pending("subscription_tier", key)) continue;
-            long ours = ((Number) row.get("price")).longValue();
-            var found = lookup(ai, row.get("service_name") + " " + row.get("tier_name") + " 월정액");
-            if (found == null || Math.abs(found.monthlyPriceWon() - ours) <= TOLERANCE_WON) continue;
-            if (propose(proposer, "subscription_tier", key,
-                    Map.of("price", String.valueOf(found.monthlyPriceWon())),
-                    "일일 수집(AI): 기존 " + ours + "원 → " + found.monthlyPriceWon() + "원 · " + found.sourceUrl()))
-                made++;
-        }
-        return made;
-    }
-
-    private CatalogVerifier.Finding lookup(CatalogVerifier ai, String query) {
-        try {
-            return ai.lookup("SUBSCRIPTION", query).orElse(null);
-        } catch (RuntimeException e) {
-            return null;   // AI 장애는 수집을 멈출 이유가 아니다.
-        }
     }
 
     /** 같은 대상의 대기 중 제안이 있으면 또 만들지 않는다 — 매일 같은 줄이 쌓이면 검수함이 못 쓰게 된다. */

@@ -10,7 +10,7 @@
 |---|---|---|---|
 | `yogob` | github.com/yogoB/Front | React 프론트 + **API 프록시**(nginx) | 공개 |
 | **`yogob-api`** | 이 레포 | Spring BE | 공개 |
-| `yogob-ai` | github.com/yogoB/AI- | 설명 문장·추천 사유 | **사설 전용** |
+| `yogob-narrator` | github.com/yogoB/AI- | 설명 문장·추천 사유 | **사설 전용** |
 
 **브라우저에 노출되는 오리진은 `https://yogob.fly.dev` 하나다.** 프론트의 `nginx.conf`가
 `/api`·`/oauth2`·`/login/oauth2`를 `yogob-api`로 넘긴다. 같은 오리진이므로 CORS 설정도,
@@ -22,7 +22,7 @@
 `yogob-api`에 설정한 값: `POSTGRES_*`(`yogob-db` attach), `JWT_SECRET`(**표준 Base64여야 한다** —
 URL-safe 문자열을 넣으면 `JWT_SECRET must be Base64`로 기동에 실패한다), `AUTH_RETURN_URL`(프론트
 `account.html`), `YOGOBI_CORS_ALLOWED_ORIGINS`(프록시라 사실상 미사용),
-`AI_SERVER_URL`·`AI_INTERNAL_TOKEN`(아래 §3-2).
+`NARRATOR_URL`·`NARRATOR_INTERNAL_TOKEN`(아래 §3-2).
 
 ---
 
@@ -97,39 +97,39 @@ fly secrets set --app yogob-api \
 > 대안: 코드 수정 없이 `SPRING_DATASOURCE_URL=jdbc:postgresql://yogobi-db.internal:5432/<db>` +
 > `SPRING_DATASOURCE_USERNAME` + `SPRING_DATASOURCE_PASSWORD` secret 으로 줘도 된다(Spring 완화 바인딩).
 
-### 3-2. AI 서버(`yogob-ai`) — 공개 IP 없이 (2026-09-17)
+### 3-2. 내레이터(`yogob-narrator`) — 공개 IP 없이 (2026-09-17)
 
-AI 서버는 **인터넷에 노출하지 않는다.** BE 만 사설망으로 부른다(`docs/architecture.md` §2).
+내레이터는 **인터넷에 노출하지 않는다.** BE 만 사설망으로 부른다(`docs/architecture.md` §2).
 공개 IP 를 할당하지 않고 **flycast**(Fly 프록시를 지나는 사설 IPv6) 하나만 둔다 —
 `.internal` 은 프록시를 우회하므로 멈춘 머신을 깨우지 못해 `auto_stop` 과 같이 쓸 수 없다.
 
 ```bash
 cd ../AI-
-fly apps create yogob-ai --org personal
-fly ips allocate-v6 --private -a yogob-ai     # 공개 IP 는 할당하지 않는다
+fly apps create yogob-narrator --org personal
+fly ips allocate-v6 --private -a yogob-narrator     # 공개 IP 는 할당하지 않는다
 fly deploy --ha=false
-fly ips list -a yogob-ai                      # private ingress 한 줄만 나와야 한다
+fly ips list -a yogob-narrator                      # private ingress 한 줄만 나와야 한다
 ```
 
 두 서버가 **같은 내부 토큰**을 공유한다. 한 번 만들어 양쪽에 같은 값을 넣는다(값은 출력하지 않는다):
 
 ```bash
 TOKEN="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
-fly secrets set AI_INTERNAL_TOKEN="$TOKEN" -a yogob-ai
-fly secrets set AI_INTERNAL_TOKEN="$TOKEN" AI_SERVER_URL=http://yogob-ai.flycast -a yogob-api
+fly secrets set NARRATOR_INTERNAL_TOKEN="$TOKEN" -a yogob-narrator
+fly secrets set NARRATOR_INTERNAL_TOKEN="$TOKEN" NARRATOR_URL=http://yogob-narrator.flycast -a yogob-api
 unset TOKEN
 ```
 
 - 포트는 붙이지 않는다. flycast 서비스가 80 → 8000 으로 넘긴다(`force_https = false` — 사설망엔 TLS 종단이 없다).
 - 순서가 중요하다: **AI 앱에 먼저** 넣는다. BE 가 먼저 주소를 알면 그동안 401 을 받아 설명이 빈다.
-- 두 앱의 `fly secrets list` 에서 `AI_INTERNAL_TOKEN` 의 DIGEST 가 같아야 한다. 다르면 값이 어긋난 것이다.
+- 두 앱의 `fly secrets list` 에서 `NARRATOR_INTERNAL_TOKEN` 의 DIGEST 가 같아야 한다. 다르면 값이 어긋난 것이다.
 - **`ANTHROPIC_API_KEY` 는 넣지 않아도 된다.** 설명 문장과 추천 사유는 결정론적 경로로 나온다(D-38·D-40).
   모델 키는 운영자 경로(`/catalog/candidates`·카탈로그 추출 배치)에만 필요하다.
 
 확인:
 
 ```bash
-fly logs -a yogob-ai --no-tail | grep 'POST /narrate'   # BE 호출이 찍힌다
+fly logs -a yogob-narrator --no-tail | grep 'POST /narrate'   # BE 호출이 찍힌다
 curl -sS -X POST https://yogob-api.fly.dev/api/v1/recommendations \
   -H 'content-type: application/json' \
   -d '{"required":{"monthlyDataGb":20,"wantedServiceIds":[1]}}'
@@ -143,7 +143,7 @@ Spring Boot 기동은 12~13초라, 쉬다가 들어온 첫 요청은 느린 게 
 (운영 로그 04:48:21 `Starting machine` → 04:48:30 `gave up after 15 attempts (in 8.31s)` → 04:48:36 `Tomcat started`).
 Google 로그인이 이 경로를 매번 밟는다 — 동의 화면에 머무는 동안 BE 트래픽이 0 이라 머신이 멈추고,
 다음 요청이 곧 OAuth 콜백이다. 재시작하면 인메모리 OAuth 임시 세션도 사라져 재시도마저 `#auth=failed` 다.
-AI(`yogob-ai`)는 FastAPI 기동이 1초 남짓이라 프록시의 8초 안에 들어오므로 `min_machines_running = 0` 그대로 둔다.
+AI(`yogob-narrator`)는 FastAPI 기동이 1초 남짓이라 프록시의 8초 안에 들어오므로 `min_machines_running = 0` 그대로 둔다.
 
 ---
 
@@ -209,12 +209,12 @@ fly certs show api.yourdomain.com --app yogob-api   # 넣어야 할 DNS 레코�
 
 ## 8. 운영 메모
 
-- **비밀값**: `POSTGRES_*`·`JWT_SECRET`(인증 구현 후)·`SMARTCHOICE_API_KEY`·`AI_INTERNAL_TOKEN`·
-  `AI_SERVER_URL`은 `fly secrets`로만 넣는다.
+- **비밀값**: `POSTGRES_*`·`JWT_SECRET`(인증 구현 후)·`SMARTCHOICE_API_KEY`·`NARRATOR_INTERNAL_TOKEN`·
+  `NARRATOR_URL`은 `fly secrets`로만 넣는다.
   코드·`fly.toml`·git에 적지 않는다(`.dockerignore`가 `.env`를 차단).
 - **비용 절감**: `auto_stop_machines="stop"` 은 그대로지만 BE 는 `min_machines_running=1` 이라 항상 한 대가 떠 있다.
   shared-cpu-1x·512MB 한 대 상시 가동 비용(월 2달러 수준)을 내고 위의 콜드 스타트 실패를 없앤 것이다.
-  프론트(`yogob`)·AI(`yogob-ai`)는 기동이 빨라 `0` 을 유지한다.
+  프론트(`yogob`)·AI(`yogob-narrator`)는 기동이 빨라 `0` 을 유지한다.
 - **마이그레이션**: 적용된 Flyway 파일은 수정 금지, 항상 새 `V{n}` 추가(`AGENTS.md`).
 - **롤백**: `fly releases --app yogob-api` → `fly deploy --image <이전 이미지>` 또는 `fly apps restart`.
 

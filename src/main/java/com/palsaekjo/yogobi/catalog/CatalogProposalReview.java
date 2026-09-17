@@ -12,9 +12,8 @@ import org.springframework.stereotype.Component;
 /**
  * 변경 제안 내용의 자동 검토(D-29). 사람이 눈으로 확인하는 대신 두 소스로 대조한다.
  *
- * <p>① **공식 시세**(스마트초이스, 통신사 공식 목록 — {@link PriceOracle} 구현 전부)
- * ② **AI 서버 LLM 조회**(더블체크).
- * 판정 규칙은 BE 가 갖는다 — AI 는 출처를 찾아 보고할 뿐 숫자를 확정하지 않는다(절대 원칙 2·D-03).
+ * <p>소스는 {@link PriceOracle} 구현 전부다 — 스마트초이스 조건별 추천과 통신사 공식 목록.
+ * D-45 로 모델 조회를 뺐다. 둘 다 1차 출처를 직접 읽으므로 판정 근거에 URL 이 남는다.
  *
  * <ul>
  *   <li>{@code VERIFIED} — 한 곳 이상이 같은 금액을 확인했고, 다른 금액을 말한 곳이 없다.</li>
@@ -36,11 +35,9 @@ public class CatalogProposalReview {
     }
 
     private final ObjectProvider<PriceOracle> oracle;
-    private final ObjectProvider<CatalogVerifier> verifier;
 
-    public CatalogProposalReview(ObjectProvider<PriceOracle> oracle, ObjectProvider<CatalogVerifier> verifier) {
+    public CatalogProposalReview(ObjectProvider<PriceOracle> oracle) {
         this.oracle = oracle;
-        this.verifier = verifier;
     }
 
     /**
@@ -68,18 +65,6 @@ public class CatalogProposalReview {
             } else {
                 notes.add(port.sourceName() + ": 확인 못 함");
             }
-        }
-
-        Optional<CatalogVerifier.Finding> found = ai(dataset, values);
-        if (found.isPresent()) {
-            var finding = found.get();
-            boolean same = Math.abs(finding.monthlyPriceWon() - claimed) <= TOLERANCE_WON;
-            notes.add("AI " + finding.monthlyPriceWon() + "원(확신 " + finding.confidence() + ", "
-                    + finding.sourceUrl() + ") — " + (same ? "일치" : "불일치"));
-            confirmed |= same;
-            mismatched |= !same;
-        } else {
-            notes.add("AI: 확인 못 함");
         }
 
         String detail = "제안 " + claimed + "원 · " + String.join(" / ", notes);
@@ -116,33 +101,5 @@ public class CatalogProposalReview {
             log.warn("{} 대조 실패 — 확인 못 함으로 처리 ({})", port.sourceName(), e.getClass().getSimpleName());
             return Optional.empty();
         }
-    }
-
-    private Optional<CatalogVerifier.Finding> ai(String dataset, Map<String, String> values) {
-        CatalogVerifier port = verifier.getIfAvailable();
-        if (port == null) return Optional.empty();
-        String productType = "mobile_plan".equals(dataset) ? "MOBILE_PLAN" : "SUBSCRIPTION";
-        String query = query(dataset, values);
-        if (query == null) return Optional.empty();
-        try {
-            return port.lookup(productType, query);
-        } catch (RuntimeException e) {
-            log.warn("AI 대조 실패 — 확인 못 함으로 처리 ({})", e.getClass().getSimpleName());
-            return Optional.empty();
-        }
-    }
-
-    /** AI 에 물을 문장. 우리가 아는 식별 정보만 넣는다(금액은 넣지 않는다 — 답을 흘리면 대조가 무의미하다). */
-    private static String query(String dataset, Map<String, String> values) {
-        List<String> parts = "mobile_plan".equals(dataset)
-                ? List.of(text(values, "carrier"), text(values, "plan_name"), text(values, "network_type"))
-                : List.of(text(values, "name"));
-        String query = String.join(" ", parts.stream().filter(s -> !s.isBlank()).toList()).strip();
-        return query.length() < 2 ? null : query + " 월정액";
-    }
-
-    private static String text(Map<String, String> values, String key) {
-        String value = values.get(key);
-        return value == null ? "" : value.strip();
     }
 }
