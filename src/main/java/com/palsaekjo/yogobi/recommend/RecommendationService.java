@@ -33,6 +33,13 @@ public class RecommendationService {
     private static final int MB_PER_GB = 1024;
 
     private final CatalogReader catalog;
+    /**
+     * 통신사 이름이 아니라 분류인 값들. 예전 프론트가 알뜰폰 브랜드를 '알뜰폰' 하나로 묶어 보냈는데,
+     * 그걸 결손으로 세면 "알뜰폰을 수집하라" 는 쓸모없는 행만 쌓인다. 배포 시차 동안 옛 화면이
+     * 보내는 값도 있으므로 남겨 둔다.
+     */
+    private static final Set<String> GENERIC_CARRIERS = Set.of("알뜰폰", "MVNO", "기타");
+
     private final CatalogCandidateRecorder gaps;
     private final PriceCrossCheck crossCheck;
     private final CostCalculator calculator = new CostCalculator();
@@ -95,6 +102,7 @@ public class RecommendationService {
         ContractType contractType = parseContract(optional);
         Boolean hasFamilyBundle = optional == null ? null : optional.hasFamilyBundle();
         Long familyDiscount = familyBundleDiscount(optional);
+        recordUnknownCarrier(optional);
 
         long dataMb = (long) required.monthlyDataGb() * MB_PER_GB;
         List<CandidatePlan> candidates = catalog.findCandidatePlans(dataMb, networkType);
@@ -257,6 +265,25 @@ public class RecommendationService {
             throw ApiException.requiredMissing("familyBundleDiscountKrw", "가족결합 할인액은 0원 이상으로 입력해 주세요.");
         }
         return Boolean.TRUE.equals(optional.hasFamilyBundle()) ? optional.familyBundleDiscountKrw() : null;
+    }
+
+    /**
+     * 카탈로그에 없는 통신사를 <b>결손으로 남긴다</b>. 사용자가 직접 적은 통신사가 우리에게 없다는 것은
+     * "아예 없다" 이고, 그게 `catalog_candidate` 가 세는 값이다(D-17 결손 기록, 계산에는 쓰지 않는다).
+     *
+     * <p>지금까지 `currentCarrier` 는 받아만 두고 아무 데도 쓰지 않았다. 수집 우선순위를 정하는 신호로 쓴다 —
+     * 많이 적힐수록 `requested_cnt` 가 올라가고 백오피스 결손 목록 위로 온다.
+     *
+     * <p>기록이 실패해도 추천은 그대로 나간다(`CatalogCandidateRecorder` 가 fail-soft 다).
+     */
+    private void recordUnknownCarrier(RecommendationRequest.Optional optional) {
+        String carrier = optional == null ? null : optional.currentCarrier();
+        if (carrier == null || carrier.isBlank() || GENERIC_CARRIERS.contains(carrier.strip())) {
+            return;
+        }
+        if (!catalog.carrierExists(carrier)) {
+            gaps.record(Kind.MOBILE_PLAN, "carrier:" + carrier.strip());
+        }
     }
 
     private static String mapNetwork(String networkType) {

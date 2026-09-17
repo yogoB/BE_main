@@ -124,6 +124,45 @@ class RecommendationApiTest {
                 .andExpect(jsonPath("$.data.missingInputs[?(@.field=='familyBundleDiscountKrw')]").exists());
     }
 
+    /**
+     * QA 피드백(2026-09-17): 목록에 없는 통신사를 직접 적을 수 있게 하되 그게 수집 신호가 돼야 한다.
+     * 지금까지 currentCarrier 는 받아만 두고 아무 데도 쓰지 않았다 — 결손으로 남긴다.
+     */
+    @Test
+    void unknownCarrierIsRecordedAsACatalogGap() throws Exception {
+        recommendWithCarrier("듣도보도못한모바일").andExpect(status().isOk());
+        recommendWithCarrier("듣도보도못한모바일").andExpect(status().isOk());
+
+        var row = jdbc.queryForMap(
+                "SELECT kind, requested_cnt FROM catalog_candidate WHERE query_text = ?", "carrier:듣도보도못한모바일");
+        assertThat(row.get("kind")).isEqualTo("MOBILE_PLAN");
+        // 같은 이름이 또 오면 세기만 한다 — 수집 우선순위가 된다.
+        assertThat(((Number) row.get("requested_cnt")).intValue()).isEqualTo(2);
+    }
+
+    /** 아는 통신사는 결손이 아니다. 공백·대소문자가 달라도 같은 것으로 본다. */
+    @Test
+    void knownCarrierIsNotRecorded() throws Exception {
+        recommendWithCarrier("s k t").andExpect(status().isOk());
+        recommendWithCarrier("SKT").andExpect(status().isOk());
+        assertThat(jdbc.queryForObject(
+                "SELECT count(*) FROM catalog_candidate WHERE query_text LIKE 'carrier:%'", Integer.class)).isZero();
+    }
+
+    /** '알뜰폰' 은 통신사 이름이 아니라 분류다. 옛 화면이 보내던 값이라 결손으로 세지 않는다. */
+    @Test
+    void genericCarrierLabelIsNotRecorded() throws Exception {
+        recommendWithCarrier("알뜰폰").andExpect(status().isOk());
+        assertThat(jdbc.queryForObject(
+                "SELECT count(*) FROM catalog_candidate WHERE query_text LIKE 'carrier:%'", Integer.class)).isZero();
+    }
+
+    private org.springframework.test.web.servlet.ResultActions recommendWithCarrier(String carrier) throws Exception {
+        return mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
+                {"required":{"monthlyDataGb":20,"wantedServiceIds":[1]},
+                 "optional":{"contractType":"NONE","currentCarrier":"%s"}}""".formatted(carrier)));
+    }
+
     @Test
     void wantingWave_rankReverses() throws Exception {
         // 요금제 쌍은 그대로, 원하는 서비스만 웨이브로 → 순위 역전

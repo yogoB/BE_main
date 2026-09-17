@@ -196,6 +196,25 @@ public class CatalogReader {
      * 지정한 ID 의 티어들 (계산기 — 특정 조합). 존재하는 것만 반환하므로 호출부가 누락을 검증한다.
      * **원화 확정 가격만** 반환한다 — 해외 표기 금액을 원으로 섞으면 $20 이 20원이 된다.
      */
+    /**
+     * 활성 요금제를 가진 통신사인가. 공백·대소문자는 무시한다 — 사용자가 "KT 엠모바일" 이라고 적어도
+     * 카탈로그의 "KT엠모바일" 과 같은 것으로 본다(프론트 검색과 같은 규칙).
+     *
+     * <p>요금제가 하나도 없는 통신사는 <b>모르는 통신사로 친다.</b> 이름만 알고 요금제를 모르면
+     * 추천에 쓸 수 없고, 그게 바로 수집이 필요하다는 신호다.
+     */
+    public boolean carrierExists(String name) {
+        if (name == null || name.isBlank()) {
+            return false;
+        }
+        return Boolean.TRUE.equals(jdbc.queryForObject("""
+                SELECT EXISTS (
+                    SELECT 1 FROM carrier c JOIN mobile_plan p ON p.carrier_id = c.id AND p.active
+                    WHERE lower(replace(c.name, ' ', '')) = lower(replace(:name, ' ', ''))
+                )
+                """, new MapSqlParameterSource("name", name), Boolean.class));
+    }
+
     public List<SubscriptionTier> findTiersByIds(List<Long> tierIds) {
         if (tierIds.isEmpty()) {
             return List.of();
