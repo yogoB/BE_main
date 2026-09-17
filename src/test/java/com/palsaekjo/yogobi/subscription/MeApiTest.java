@@ -153,6 +153,32 @@ class MeApiTest {
                 .andExpect(jsonPath("$.data.status").value("SWITCH_NOW"));
     }
 
+    /** G-35 — 이번 흐름에서 고른 요금제(currentPlanId)가 저장값보다 앞선다. 프로필은 그대로다. */
+    @Test void switchTimingTakesCurrentPlanIdFromTheQueryFirst() throws Exception {
+        jdbc.execute("INSERT INTO carrier(id,name,carrier_type) VALUES (1,'SKT','MNO')");
+        jdbc.execute("""
+                INSERT INTO mobile_plan(id,carrier_id,name,network_type,base_price,data_mb,voice_min,sms_cnt,source_url,collected_at)
+                VALUES (1,1,'현재','FIVE_G',55000,100000,999999,9999,'http://seed','2026-09-14'),
+                       (2,1,'대상','FIVE_G',45000,100000,999999,9999,'http://seed','2026-09-14'),
+                       (3,1,'저장된','FIVE_G',99000,100000,999999,9999,'http://seed','2026-09-14')""");
+        Browser a = new Browser(); long id = signup("alice@example.com", a);
+        // 저장한 적이 없어도 흐름의 입력만으로 판정이 나온다.
+        mvc.perform(get("/api/v1/me/switch-timing").cookie(a.cookies).param("targetPlanId", "2").param("currentPlanId", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.currentMonthlyCost").value(55000))
+                .andExpect(jsonPath("$.data.monthlySavings").value(10000));
+        // 저장값(99,000)이 있어도 넘긴 값(55,000)이 이긴다. 저장값은 바뀌지 않는다.
+        jdbc.update("UPDATE app_user SET current_plan_id=3 WHERE id=?", id);
+        mvc.perform(get("/api/v1/me/switch-timing").cookie(a.cookies).param("targetPlanId", "2").param("currentPlanId", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.currentMonthlyCost").value(55000));
+        assertThat(jdbc.queryForObject("SELECT current_plan_id FROM app_user WHERE id=?", Long.class, id)).isEqualTo(3L);
+        // 넘기지 않으면 예전대로 저장값이다.
+        mvc.perform(get("/api/v1/me/switch-timing").cookie(a.cookies).param("targetPlanId", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.currentMonthlyCost").value(99000));
+    }
+
     @Test void switchTimingRequiresCurrentPlanSet() throws Exception {
         Browser a = new Browser(); signup("alice@example.com", a);
         mvc.perform(get("/api/v1/me/switch-timing").cookie(a.cookies).param("targetPlanId", "1"))

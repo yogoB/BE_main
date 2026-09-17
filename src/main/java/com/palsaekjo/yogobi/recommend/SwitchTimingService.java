@@ -30,16 +30,22 @@ public class SwitchTimingService {
                            long switchingCost, Integer paybackMonths, int remainingContractMonths, String status) {
     }
 
-    public Response evaluate(long userId, long targetPlanId, long switchingCost, int remainingContractMonths) {
+    /**
+     * {@code currentPlanIdOverride} 는 이번 흐름에서 고른 현재 요금제다(디테일 1단계). 있으면 저장값보다
+     * 앞선다 — 마이페이지에 저장한 적 없는 사람이 대부분이고, 흐름의 입력이 프로필을 덮어쓰면 안 된다(G-35).
+     */
+    public Response evaluate(long userId, long targetPlanId, long switchingCost, int remainingContractMonths,
+                             Long currentPlanIdOverride) {
         if (switchingCost < 0) {
             throw ApiException.requiredMissing("switchingCost", "전환비용은 0 이상이어야 합니다.");
         }
         if (remainingContractMonths < 0) {
             throw ApiException.requiredMissing("remainingContractMonths", "약정 잔여 개월은 0 이상이어야 합니다.");
         }
-        Long currentPlanId = jdbc.queryForObject("SELECT current_plan_id FROM app_user WHERE id = ?", Long.class, userId);
+        Long currentPlanId = currentPlanIdOverride != null ? currentPlanIdOverride
+                : jdbc.queryForObject("SELECT current_plan_id FROM app_user WHERE id = ?", Long.class, userId);
         if (currentPlanId == null) {
-            throw ApiException.requiredMissing("currentPlan", "현재 요금제를 먼저 설정하세요 (POST /me/current-plan).");
+            throw ApiException.requiredMissing("currentPlan", "현재 요금제를 알려주세요 (currentPlanId 또는 POST /me/current-plan).");
         }
         // 현재·대상 모두 사용자의 활성 구독(같은 집합)을 얹어 같은 조건으로 비교한다.
         List<Long> tierIds = jdbc.queryForList(
