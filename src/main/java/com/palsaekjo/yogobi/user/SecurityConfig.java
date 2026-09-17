@@ -33,6 +33,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 @Configuration
 public class SecurityConfig {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SecurityConfig.class);
     @Bean PasswordEncoder passwordEncoder() { return new BCryptPasswordEncoder(12); }
 
     @Bean
@@ -86,7 +87,10 @@ public class SecurityConfig {
      */
     private static String clientKey(HttpServletRequest req) {
         String forwarded = req.getHeader("X-Client-IP");
-        return forwarded == null || forwarded.isBlank() || forwarded.length() > 64 ? req.getRemoteAddr() : forwarded.strip();
+        boolean usable = forwarded != null && !forwarded.isBlank() && forwarded.length() <= 64;
+        // 헤더가 비어 오면 조용히 peer 로 떨어져 버킷이 다시 공유된다 — 그걸 볼 수 있어야 한다(DEBUG 로 한 번 확인).
+        log.debug("rate-limit key source={} header={}", usable ? "X-Client-IP" : "peer", forwarded);
+        return usable ? forwarded.strip() : req.getRemoteAddr();
     }
 
     @Bean
