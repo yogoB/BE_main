@@ -12,6 +12,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.http.HttpHeaders;
@@ -34,6 +36,8 @@ public class NarratorClient implements Narrator, DetectionNarrator {
     private static final Set<String> NARRATE_FIELDS = Set.of(
             "planId", "planName", "carrier", "monthlyTotal", "baseline",
             "monthlySavings", "annualSavings", "breakdown", "missingInputs", "candidateCount");
+
+    private static final Logger log = LoggerFactory.getLogger(NarratorClient.class);
 
     private final RestClient client;
     private final ObjectMapper json;
@@ -67,18 +71,23 @@ public class NarratorClient implements Narrator, DetectionNarrator {
         requireObject(result, "message", "reasons", "notices");
         JsonNode message = result.path("message");
         if (!message.isTextual() || message.textValue().isBlank() || message.textValue().length() > 50000)
-            throw new Unavailable();
+            throw new Unavailable("message 가 비었거나 너무 길다");
         return new Narrator.Narration(message.textValue(), reasons(result.path("reasons")),
                 lines(result.path("notices"), 10, 300));
     }
 
-    /** 필터 경로용. AI 장애는 빈 설명으로 흡수한다 — 결과·계산은 영향 없다(보조 정보). */
+    /**
+     * 필터 경로용. AI 장애는 빈 설명으로 흡수한다 — 결과·계산은 영향 없다(보조 정보).
+     * <b>삼키기 전에 이유를 남긴다.</b> 흡수는 옳지만 침묵은 아니다 — 흡수만 하면
+     * 화면에서 문장이 사라진 것을 누가 신고할 때까지 아무도 모른다.
+     */
     @Override
     public Narrator.Narration narrationFor(CostResult result, List<MissingInput> missingInputs,
                                            Integer candidateCount) {
         try {
             return narrate(result, missingInputs, candidateCount);
         } catch (Unavailable e) {
+            log.warn("추천 설명을 쓰지 못했다 — 금액은 그대로 나간다: {}", e.getMessage());
             return Narrator.Narration.none();
         }
     }
@@ -102,14 +111,15 @@ public class NarratorClient implements Narrator, DetectionNarrator {
      */
     private static List<String> lines(JsonNode node, int maxCount, int maxLength) {
         if (node.isMissingNode() || node.isNull()) return List.of();
-        if (!node.isArray() || node.size() > maxCount) throw new Unavailable();
+        if (!node.isArray() || node.size() > maxCount)
+            throw new Unavailable("줄 목록이 배열이 아니거나 " + maxCount + "줄을 넘었다");
         var out = new ArrayList<String>();
         for (JsonNode item : node) {
-            if (!item.isTextual()) throw new Unavailable();
+            if (!item.isTextual()) throw new Unavailable("줄이 문자열이 아니다");
             String text = item.textValue();
             if (text.isBlank() || text.length() > maxLength
                     || text.indexOf('\n') >= 0 || text.indexOf('\r') >= 0)
-                throw new Unavailable();
+                throw new Unavailable("줄이 비었거나 " + maxLength + "자를 넘었거나 줄바꿈이 있다");
             out.add(text);
         }
         return List.copyOf(out);
@@ -144,6 +154,7 @@ public class NarratorClient implements Narrator, DetectionNarrator {
             }
             return new DetectionNarrator.Explanation(List.copyOf(out), optional(result, "summary", 300));
         } catch (Unavailable e) {
+            log.warn("탐지 설명을 쓰지 못했다 — 금액과 대상은 그대로 보인다: {}", e.getMessage());
             return DetectionNarrator.fallback(findings, targetNames);
         }
     }
@@ -165,18 +176,19 @@ public class NarratorClient implements Narrator, DetectionNarrator {
 
     private JsonNode post(String path, Object request) {
         if (internalToken.isEmpty() || internalToken.chars().anyMatch(c -> c <= 32 || c >= 127))
-            throw new Unavailable();
+            throw new Unavailable("NARRATOR_INTERNAL_TOKEN 이 비었거나 형식이 아니다");
         try {
             return client.post().uri(path).header(HttpHeaders.AUTHORIZATION, "Bearer " + internalToken)
                     .contentType(MediaType.APPLICATION_JSON).body(request)
                     .exchange((sent, response) -> {
-                        if (response.getStatusCode().value() != 200) throw new Unavailable();
+                        if (response.getStatusCode().value() != 200)
+                            throw new Unavailable(path + " 가 " + response.getStatusCode().value() + " 로 답했다");
                         JsonNode body = json.readTree(response.getBody());
-                        if (body == null || !body.isObject()) throw new Unavailable();
+                        if (body == null || !body.isObject()) throw new Unavailable(path + " 응답이 객체가 아니다");
                         return body;
                     });
         } catch (RestClientException e) {
-            throw new Unavailable();
+            throw new Unavailable(path + " 를 부르지 못했다: " + e.getMessage());
         }
     }
 
@@ -185,16 +197,26 @@ public class NarratorClient implements Narrator, DetectionNarrator {
     }
 
     private static void requireObject(JsonNode node, String... fields) {
-        if (node == null || !node.isObject()) throw new Unavailable();
+        if (node == null || !node.isObject()) throw new Unavailable("응답이 객체가 아니다");
         Set<String> allowed = Set.of(fields);
         node.fieldNames().forEachRemaining(key -> {
-            if (!allowed.contains(key)) throw new Unavailable();
+            // 이름을 적는다. 이 한 단어가 없어서 D-46 이 운영에서 죽은 채로 배포됐다(G-31).
+            if (!allowed.contains(key)) throw new Unavailable("계약에 없는 필드: " + key);
         });
     }
 
+    /**
+     * 설명을 쓰지 못한 이유. <b>메시지가 전부다</b> — 이 예외는 삼켜지므로, 여기 적지 않으면
+     * 화면에서 문장이 사라진 것 말고는 아무 흔적도 남지 않는다. 2026-09-17 에 그런 일이 세 번 났고
+     * (허용 목록 누락 · 서버 미배포 · 응답 500) 셋 다 화면에서는 똑같이 "문장 없음" 이었다.
+     */
     public static class Unavailable extends RuntimeException {
         public Unavailable() {
-            super("AI 응답을 사용할 수 없습니다.");
+            this("AI 응답을 사용할 수 없습니다.");
+        }
+
+        public Unavailable(String reason) {
+            super(reason);
         }
     }
 }

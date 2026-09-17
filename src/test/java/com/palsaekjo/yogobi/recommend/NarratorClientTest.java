@@ -1,6 +1,7 @@
 package com.palsaekjo.yogobi.recommend;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
@@ -83,5 +84,19 @@ class NarratorClientTest {
                 {"message":"월 55,000원이에요.","reasons":[],"surprise":"?"}""";
 
         assertThat(client.narrationFor(COST, List.of(), 127).message()).isNull();
+    }
+
+    /**
+     * G-31 d — 폐기한 이유에 <b>필드 이름이 적힌다.</b> 이 예외는 삼켜지므로 메시지가 유일한 흔적이고,
+     * 그 한 단어가 없어서 오늘 D-46 이 운영에서 죽은 채 배포됐다.
+     */
+    @Test
+    void theReasonNamesTheOffendingField() {
+        body = """
+                {"message":"월 55,000원이에요.","reasons":[],"surprise":"?"}""";
+
+        assertThatThrownBy(() -> client.narrate(COST, List.of(), 127))
+                .isInstanceOf(NarratorClient.Unavailable.class)
+                .hasMessageContaining("surprise");
     }
 }
