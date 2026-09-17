@@ -507,6 +507,18 @@ JWT 절대 수명 15분·유휴 제한 5분(refresh 없음). 상태를 바꾸는
 
 `rule` = `BENEFIT_OVERLAP`·`TIER_DUPLICATE`·`BUNDLE_OVERLAP`, `wastedAmount`는 월 단위 낭비 금액(원).
 
+
+각 항목은 `{ rule, targetRef, wastedAmount, provenance }` 다.
+
+| provenance | 뜻 |
+|---|---|
+| `DERIVED` | 카탈로그 정가·혜택으로 계산한 금액 |
+| `ESTIMATED` | 요금제가 **등급을 밝히지 않아** 상한(사용자가 내는 금액 전액)으로 잡은 값. **표시 전용**(D-17) |
+
+`ESTIMATED` 는 "확실히 이만큼 버린다" 가 아니라 "확인해 보세요" 다. 화면은 둘을 같은 말로 적으면 안 된다.
+`BENEFIT_OVERLAP` 은 2026-09-17 부터 `FREE` 뿐 아니라 **할인·요금제 포함 혜택도** 본다 —
+그전에는 운영 혜택의 70%(`BUNDLE_INCLUDED`)를 놓쳤다. 골든 케이스 G-09 e·f.
+
 ### 5-6. 종료 예정 알림 — 미구현 (P2)
 
 ---

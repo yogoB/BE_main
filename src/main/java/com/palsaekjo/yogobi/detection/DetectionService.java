@@ -31,11 +31,11 @@ public class DetectionService {
     @Transactional
     public List<DetectionFinding> detectForUser(long userId) {
         List<ActiveSubscription> active = jdbc.query("""
-                SELECT st.service_id, us.tier_id, st.name, us.monthly_price
+                SELECT st.service_id, us.tier_id, st.name, us.monthly_price, st.price AS list_price
                 FROM user_subscription us JOIN subscription_tier st ON st.id = us.tier_id
                 WHERE us.user_id = ? AND us.ended_at IS NULL
                 """, (rs, i) -> new ActiveSubscription(rs.getLong("service_id"), rs.getLong("tier_id"),
-                rs.getString("name"), rs.getLong("monthly_price")), userId);
+                rs.getString("name"), rs.getLong("monthly_price"), rs.getLong("list_price")), userId);
 
         List<PlanBenefit> benefits = currentPlanBenefits(userId);
         Set<Long> tierIds = new LinkedHashSet<>(active.stream().map(ActiveSubscription::tierId).toList());
@@ -46,9 +46,9 @@ public class DetectionService {
         jdbc.update("DELETE FROM detection_result WHERE user_id = ?", userId);
         for (DetectionFinding f : findings) {
             jdbc.update("""
-                    INSERT INTO detection_result (user_id, rule_code, target_ref, wasted_amount)
-                    VALUES (?, ?, ?, ?)
-                    """, userId, f.rule().name(), f.targetRef(), f.wastedAmount());
+                    INSERT INTO detection_result (user_id, rule_code, target_ref, wasted_amount, provenance)
+                    VALUES (?, ?, ?, ?, ?)
+                    """, userId, f.rule().name(), f.targetRef(), f.wastedAmount(), f.provenance().name());
         }
         return findings;
     }

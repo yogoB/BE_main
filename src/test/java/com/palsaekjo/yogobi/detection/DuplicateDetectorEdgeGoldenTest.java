@@ -25,8 +25,8 @@ class DuplicateDetectorEdgeGoldenTest {
     private static final long TVING = 3;
     private static final long WAVE = 4;
 
-    private static final ActiveSubscription TVING_STD = new ActiveSubscription(TVING, 8L, "티빙 스탠다드", 13_500);
-    private static final ActiveSubscription WAVE_STD = new ActiveSubscription(WAVE, 12L, "웨이브 스탠다드", 10_900);
+    private static final ActiveSubscription TVING_STD = new ActiveSubscription(TVING, 8L, "티빙 스탠다드", 13_500, 13_500);
+    private static final ActiveSubscription WAVE_STD = new ActiveSubscription(WAVE, 12L, "웨이브 스탠다드", 10_900, 10_900);
 
     private final DuplicateDetector detector = new DuplicateDetector();
 
@@ -36,7 +36,7 @@ class DuplicateDetectorEdgeGoldenTest {
     @Test
     void g26a_다른_등급이면_혜택_겹침이_아니다() {
         var freeStandardOnly = new PlanBenefit(TVING, 8L, BenefitType.FREE, null, false, null);
-        var premium = new ActiveSubscription(TVING, 9L, "티빙 프리미엄", 17_000);
+        var premium = new ActiveSubscription(TVING, 9L, "티빙 프리미엄", 17_000, 17_000);
 
         assertThat(detector.detect(List.of(premium), List.of(freeStandardOnly), List.of())).isEmpty();
         // 같은 등급이면 겹침이 맞다 — 경계의 반대편도 같이 고정한다.
@@ -49,7 +49,7 @@ class DuplicateDetectorEdgeGoldenTest {
     @Test
     void g26b_등급을_모르면_등급_지정_혜택과_겹쳤다고_단정하지_않는다() {
         var freeStandardOnly = new PlanBenefit(TVING, 8L, BenefitType.FREE, null, false, null);
-        var unknownTier = new ActiveSubscription(TVING, null, "티빙(등급 모름)", 13_500);
+        var unknownTier = new ActiveSubscription(TVING, null, "티빙(등급 모름)", 13_500, 13_500);
 
         assertThat(detector.detect(List.of(unknownTier), List.of(freeStandardOnly), List.of())).isEmpty();
         // 혜택이 서비스 전체(tierId=null)라면 등급을 몰라도 겹침이 맞다.
@@ -66,19 +66,23 @@ class DuplicateDetectorEdgeGoldenTest {
     }
 
     /**
-     * G-26d. <b>FREE 가 아닌 혜택</b>은 겹침으로 보지 않는다. 정액·정률 할인은 돈을 내고 쓰는 것이지
-     * 무료로 주는 것이 아니다 — "이미 공짜인데 또 낸다"는 경고가 성립하지 않는다.
+     * G-26d 는 2026-09-17 에 <b>뒤집혔다</b> — G-09 e·f 로 옮겼다.
+     *
+     * <p>처음에는 "FREE 가 아닌 혜택은 돈 내고 쓰는 것이니 겹침이 아니다" 라고 적었는데,
+     * 그건 <b>현재 동작을 고정한 것</b>이지 옳은 규칙인지 확인한 것이 아니었다. 운영 데이터가 틀렸다고
+     * 말해 줬다: 요금제가 서비스를 포함(BUNDLE_INCLUDED)하는데 따로 결제 중인 회원이 실제로 있었다.
+     *
+     * <p>여기 남는 것은 <b>여전히 겹침이 아닌 것</b> 하나뿐이다 — 이미 혜택가 이하로 내고 있으면
+     * 버리는 돈이 없다.
      */
     @Test
-    void g26d_할인_혜택은_겹침이_아니다() {
-        for (PlanBenefit paid : List.of(
-                new PlanBenefit(TVING, 8L, BenefitType.FIXED_DISCOUNT, BigDecimal.valueOf(4_000), false, null),
-                new PlanBenefit(TVING, 8L, BenefitType.RATE_DISCOUNT, new BigDecimal("0.30"), false, null),
-                new PlanBenefit(TVING, 8L, BenefitType.BUNDLE_INCLUDED, null, false, null))) {
-            assertThat(detector.detect(List.of(TVING_STD), List.of(paid), List.of()))
-                    .as("%s 는 무료 제공이 아니다", paid.benefitType())
-                    .isEmpty();
-        }
+    void g26d_이미_혜택가_이하로_내고_있으면_낭비가_아니다() {
+        // 정가 13,500 에 4,000 정액 할인 → 실부담 9,500. 사용자가 9,000 만 내고 있다면 버리는 돈이 없다.
+        var discount = new PlanBenefit(TVING, 8L, BenefitType.FIXED_DISCOUNT,
+                BigDecimal.valueOf(4_000), false, null);
+        var payingLess = new ActiveSubscription(TVING, 8L, "티빙(특가)", 9_000, 13_500);
+
+        assertThat(detector.detect(List.of(payingLess), List.of(discount), List.of())).isEmpty();
     }
 
     /* ── 번들 겹침으로 보지 않아야 하는 것 ─────────────────────────────────── */
@@ -113,7 +117,7 @@ class DuplicateDetectorEdgeGoldenTest {
     /** G-26g. 등급을 모르는 구독은 번들 판정에서 제외한다 — 어느 등급인지 모르면 묶을 수 없다. */
     @Test
     void g26g_등급을_모르는_구독은_번들_판정에_넣지_않는다() {
-        var unknownTier = new ActiveSubscription(TVING, null, "티빙(등급 모름)", 13_500);
+        var unknownTier = new ActiveSubscription(TVING, null, "티빙(등급 모름)", 13_500, 13_500);
         var bundle = new BundleProduct(6, "티빙×웨이브 묶음", 15_000, Set.of(8L, 12L));
 
         assertThat(detector.detect(List.of(unknownTier, WAVE_STD), List.of(), List.of(bundle))).isEmpty();
