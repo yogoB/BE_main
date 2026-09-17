@@ -137,9 +137,13 @@ curl -sS -X POST https://yogob-api.fly.dev/api/v1/recommendations \
 → `data.message` 가 문장이고 `data.reasons` 가 비어 있지 않으면 연결된 것이다.
 `warnings` 에 `YGB-EXT-001` 이 있으면 BE 가 AI 에 닿지 못한 것이다(추천 결과 자체는 정상).
 
-**콜드 스타트**: 머신이 멈춰 있어도 요청이 깨운다(실측: 정지 상태에서 추천 1건 왕복 **4.1초**, 성공).
-프록시가 연결을 잡고 기다리므로 `AiGateway` 의 connect 5초가 아니라 read 25초 안에서 끝난다.
-쉬다가 들어온 첫 요청만 느리다. 이게 `min_machines_running = 0` 의 대가이고, 그만큼 값이 싸다.
+**콜드 스타트 (2026-09-17 정정)**: BE(`yogob-api`)는 더 이상 멈추지 않는다 — `min_machines_running = 1`.
+그 전의 "첫 요청만 느리다"는 **틀렸다**. Fly 프록시는 깨운 머신의 8080 을 8.3초만 기다리고 포기하는데
+Spring Boot 기동은 12~13초라, 쉬다가 들어온 첫 요청은 느린 게 아니라 **실패했다**
+(운영 로그 04:48:21 `Starting machine` → 04:48:30 `gave up after 15 attempts (in 8.31s)` → 04:48:36 `Tomcat started`).
+Google 로그인이 이 경로를 매번 밟는다 — 동의 화면에 머무는 동안 BE 트래픽이 0 이라 머신이 멈추고,
+다음 요청이 곧 OAuth 콜백이다. 재시작하면 인메모리 OAuth 임시 세션도 사라져 재시도마저 `#auth=failed` 다.
+AI(`yogob-ai`)는 FastAPI 기동이 1초 남짓이라 프록시의 8초 안에 들어오므로 `min_machines_running = 0` 그대로 둔다.
 
 ---
 
@@ -208,8 +212,9 @@ fly certs show api.yourdomain.com --app yogob-api   # 넣어야 할 DNS 레코�
 - **비밀값**: `POSTGRES_*`·`JWT_SECRET`(인증 구현 후)·`SMARTCHOICE_API_KEY`·`AI_INTERNAL_TOKEN`·
   `AI_SERVER_URL`은 `fly secrets`로만 넣는다.
   코드·`fly.toml`·git에 적지 않는다(`.dockerignore`가 `.env`를 차단).
-- **비용 절감**: `auto_stop_machines="stop"` + `min_machines_running=0`이라 트래픽 없으면 머신이 멈춘다.
-  첫 요청은 콜드 스타트로 몇 초 걸릴 수 있다.
+- **비용 절감**: `auto_stop_machines="stop"` 은 그대로지만 BE 는 `min_machines_running=1` 이라 항상 한 대가 떠 있다.
+  shared-cpu-1x·512MB 한 대 상시 가동 비용(월 2달러 수준)을 내고 위의 콜드 스타트 실패를 없앤 것이다.
+  프론트(`yogob`)·AI(`yogob-ai`)는 기동이 빨라 `0` 을 유지한다.
 - **마이그레이션**: 적용된 Flyway 파일은 수정 금지, 항상 새 `V{n}` 추가(`AGENTS.md`).
 - **롤백**: `fly releases --app yogob-api` → `fly deploy --image <이전 이미지>` 또는 `fly apps restart`.
 

@@ -198,6 +198,7 @@ OAuth 임시 세션은 BE 메모리에 있고 5분 유효하다. 로그인 중 �
 | Google 화면 전 503 | JWT 또는 Google 설정 미비 | `JWT_SECRET`, `GOOGLE_AUTH_ENABLED`, 웹 자격 증명 확인 후 재시작 |
 | `org_internal`/접근 거부 | Audience 또는 조직 정책 | 외부 서비스는 External, 필요한 테스트 사용자·관리자 정책 확인 |
 | callback 404 | 프록시가 SPA로 보냄 | `/login/oauth2/code/google`을 BE로 전달 |
+| 로그인 누르면 타임아웃·502 (화면 자체가 안 뜸) | **머신 autostop**. 동의 화면에 머무는 동안 BE 트래픽이 0 이라 머신이 멈추고, Fly 프록시는 깨운 머신을 8.3초만 기다리는데 Spring Boot 기동은 12~13초다 | `min_machines_running = 1` (2026-09-17 적용). `fly logs` 에 `gave up after 15 attempts` 가 있으면 이 건이다 |
 | `#auth=failed` | 임시 세션 만료·호스트 변경·재시작 | 같은 창에서 처음부터 5분 안에 재시도 |
 | `#auth=account-conflict` | 같은 이메일 자체 회원 존재 | 기존 로그인 후 명시적 Google 연결 |
 | 성공 후 `/me` 401 | 쿠키 미저장·Secure/호스트/SameSite 문제 | `credentials`, 로컬 Secure=false, 주소·사이트 구성 확인 |

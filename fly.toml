@@ -15,7 +15,15 @@ primary_region = "nrt"
   force_https = true
   auto_stop_machines = "stop"
   auto_start_machines = true
-  min_machines_running = 0
+  # 0 으로 두면 안 된다. Fly 프록시는 깨운 머신의 8080 을 **8.3초**만 기다리다 포기하는데
+  # Spring Boot 는 12~13초를 쓴다 — 쉬다가 들어온 첫 요청은 느린 게 아니라 **실패한다**
+  # (2026-09-17 운영 로그: 04:48:21 Starting machine → 04:48:30 "gave up after 15 attempts" →
+  #  04:48:36 Tomcat started). Google 로그인이 이걸 매번 밟는다: 사용자가 동의 화면에 머무는
+  #  동안 BE 트래픽이 0 이라 머신이 멈추고(유휴 약 4분), 그 다음 요청이 하필 OAuth 콜백이다.
+  #  게다가 OAuth 임시 세션은 인메모리라 재시작하면 state·PKCE 가 사라진다
+  #  (google-oauth-guide.md §6 "로그인 중 자동 정지·재시작하지 않게 한다" — 이게 그 장치다).
+  #  09:00 KST 일일 수집(backoffice.md)도 잠든 머신에서는 발화하지 않는다. 같은 한 줄이 고친다.
+  min_machines_running = 1
 
   # 헬스체크: 액추에이터가 없으므로 항상 200 을 주는 카탈로그 엔드포인트로 확인한다(DB 연결까지 검증됨).
   # Spring Boot 콜드 스타트가 있으므로 grace_period 를 넉넉히 준다.
