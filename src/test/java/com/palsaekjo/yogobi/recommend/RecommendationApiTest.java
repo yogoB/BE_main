@@ -104,6 +104,26 @@ class RecommendationApiTest {
                 .andExpect(jsonPath("$.data.results[1].monthlyTotal").value(58500));
     }
 
+    /** G-28 g — 음수 할인액은 400. 요금을 올리는 "할인"은 입력 실수다. */
+    @Test
+    void g28g_negativeFamilyDiscountIsRejected() throws Exception {
+        mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
+                {"required":{"monthlyDataGb":20,"wantedServiceIds":[1]},
+                 "optional":{"contractType":"NONE","hasFamilyBundle":true,"familyBundleDiscountKrw":-1}}"""))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.field").value("familyBundleDiscountKrw"));
+    }
+
+    /** G-28 b — 결합 중인데 할인액을 모르면 그 금액을 묻는 안내가 남는다. */
+    @Test
+    void g28b_bundledWithoutAmountAsksForIt() throws Exception {
+        mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
+                {"required":{"monthlyDataGb":20,"wantedServiceIds":[1]},
+                 "optional":{"contractType":"NONE","hasFamilyBundle":true}}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.missingInputs[?(@.field=='familyBundleDiscountKrw')]").exists());
+    }
+
     @Test
     void wantingWave_rankReverses() throws Exception {
         // 요금제 쌍은 그대로, 원하는 서비스만 웨이브로 → 순위 역전

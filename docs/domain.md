@@ -134,7 +134,7 @@
 | 월 절감액 | `monthlySavings` | `baseline - effectiveMonthlyCost` |
 | 선택약정할인 | `selectiveContractDiscount` | 월정액의 25% |
 | 약정할인 | `planContractDiscount` | 요금제 고유 1년/2년 |
-| 결합할인 | `bundleDiscount` | |
+| 결합할인 | `FamilyBundleDiscountRule` / `familyBundleDiscountKrw` | 우선순위 300. 금액은 사용자 입력(`USER_PROVIDED`), 회선 수(`familyLineCount`)는 표시용이라 pricing 에 넣지 않는다 |
 | 할인반환금 | `earlyTerminationFee` | `penalty` 금지 |
 | 전환비용 | `switchingCost` | 위약금+잔여할부+재약정손실 |
 | 회수기간 | `paybackMonths` | `breakEven` 금지 |
@@ -270,6 +270,8 @@ N≈300, |S|≈5면 밀리초다. **조기 최적화 금지.**
 | 선택 | 현재 통신사 | 번호이동 판단 불가 |
 | 선택 | 약정 유형·가입일 | 변경 시점 계산 불가 |
 | 선택 | 가족 결합 여부 | 결합할인 미반영 |
+| 선택 | 가족결합 월 할인액 | 결합할인 미반영. **사용자가 적어 준 금액을 그대로 뺀다**(`USER_PROVIDED`) — 통신사별 결합 할인표가 카탈로그에 없어 우리가 만들 수 없다(G-28) |
+| 선택 | 가족결합 회선 수 | 근거 문구만 빠진다. **금액 계산에 쓰지 않는다** |
 | 선택 | 현재 구독 목록 | 중복 탐지 불가 |
 
 선택 필드가 비면 응답의 `missingInputs`에 담아 **무엇을 더 주면 얼마나 정확해지는지**를

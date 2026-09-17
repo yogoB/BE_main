@@ -184,7 +184,8 @@ Google 전용 계정은 동일 Google `sub` 재인증으로 자체 비밀번호�
   "required": { "monthlyDataGb": 20, "wantedServiceIds": [1, 5],
                 "wantedTierIds": [2, 12] },   // 선택 — 비우면 서버가 대표 등급(스탠다드 우선)을 고른다
   "optional": { "currentCarrier": "SKT", "networkType": "5G",
-                "contractType": "SELECTIVE_25", "hasFamilyBundle": true }
+                "contractType": "SELECTIVE_25", "hasFamilyBundle": true,
+                "familyLineCount": 3, "familyBundleDiscountKrw": 11000 }
 }
 ```
 

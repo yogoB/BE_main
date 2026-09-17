@@ -78,7 +78,7 @@ class ChatControllerTest {
                 .andExpect(jsonPath("$.data.message").value("실제 내시는 금액은 월 55,000원이에요."))
                 .andExpect(jsonPath("$.warnings").isEmpty());
         verify(service).recommend(new RecommendationRequest(new RecommendationRequest.Required(20, List.of(1L), null),
-                new RecommendationRequest.Optional(null, null, null, null)));
+                new RecommendationRequest.Optional(null, null, null, null, null, null)));
         assertEquals(List.of("/parse", "/narrate"), paths);
         assertEquals(List.of("Bearer test-backend-only-token", "Bearer test-backend-only-token"), authorizations);
         assertEquals(json.readTree("{\"text\":\"데이터 20기가 넷플릭스\"}"), bodies.getFirst());

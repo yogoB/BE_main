@@ -177,7 +177,9 @@ AI 연결과 내부 인증은 BE가 담당하며 프론트에는 AI 주소·내�
     "currentCarrier": "SKT",
     "networkType": "5G",
     "contractType": "SELECTIVE_25",
-    "hasFamilyBundle": true
+    "hasFamilyBundle": true,
+    "familyLineCount": 3,
+    "familyBundleDiscountKrw": 11000
   }
 }
 ```
@@ -191,6 +193,8 @@ AI 연결과 내부 인증은 BE가 담당하며 프론트에는 AI 주소·내�
 | `optional.networkType` | `5G`\|`LTE`\|`3G` | | 망 종류(필터) |
 | `optional.contractType` | contractType | | 약정 유형 |
 | `optional.hasFamilyBundle` | bool | | 가족 결합 여부 |
+| `optional.familyLineCount` | int | | 결합 회선 수. **금액 계산에 쓰지 않는다** — 근거 문구용이다 |
+| `optional.familyBundleDiscountKrw` | long (≥0) | | 가족결합 월 할인액. **사용자가 확인해 적어 준 금액**을 그대로 뺀다(`USER_PROVIDED`). 선택약정 25% 적용 **후**에 뺀다(`domain.md §4` 300). 결합 중이 아니면 무시하고, 요금보다 크면 0원까지만 깎는다. 음수는 400 |
 
 `optional`의 빈 필드는 응답 `missingInputs`로 안내된다.
 

@@ -13,7 +13,13 @@ public record RecommendationRequest(Required required, Optional optional) {
     public record Required(Integer monthlyDataGb, List<Long> wantedServiceIds, List<Long> wantedTierIds) {
     }
 
+    /**
+     * {@code familyBundleDiscountKrw} 는 <b>사용자가 확인해 적어 준 월 할인액</b>이다(G-28).
+     * 통신사별 결합 할인표가 카탈로그에 없어 우리가 만들 수 없는 값이라 받아서 쓴다 — `USER_PROVIDED`.
+     * {@code familyLineCount} 는 근거 문구용이며 <b>금액 계산에 넣지 않는다.</b>
+     */
     public record Optional(String currentCarrier, String networkType,
-                           String contractType, Boolean hasFamilyBundle) {
+                           String contractType, Boolean hasFamilyBundle,
+                           Integer familyLineCount, Long familyBundleDiscountKrw) {
     }
 }

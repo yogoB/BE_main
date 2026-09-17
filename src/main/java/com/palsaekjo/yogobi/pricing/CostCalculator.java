@@ -12,6 +12,7 @@ import com.palsaekjo.yogobi.pricing.domain.PricingContext;
 import com.palsaekjo.yogobi.pricing.domain.SubscriptionTier;
 import com.palsaekjo.yogobi.pricing.domain.ValuedAmount;
 import com.palsaekjo.yogobi.pricing.rule.DiscountRule;
+import com.palsaekjo.yogobi.pricing.rule.FamilyBundleDiscountRule;
 import com.palsaekjo.yogobi.pricing.rule.PlanContractDiscountRule;
 import com.palsaekjo.yogobi.pricing.rule.SelectiveContractDiscountRule;
 import java.util.ArrayList;
@@ -27,7 +28,8 @@ import java.util.Set;
 public final class CostCalculator {
     private static final List<DiscountRule> TELECOM_RULES = List.of(
                     new PlanContractDiscountRule(),
-                    new SelectiveContractDiscountRule())
+                    new SelectiveContractDiscountRule(),
+                    new FamilyBundleDiscountRule())
             .stream()
             .sorted(Comparator.comparingInt(DiscountRule::priority))
             .toList();
@@ -44,8 +46,10 @@ public final class CostCalculator {
                 continue;
             }
             Money after = rule.apply(telecom, planCtx);
+            // 출처는 규칙이 정한다. 가족결합 할인만 USER_PROVIDED 다 — 사용자가 적어 준 금액을
+            // 그대로 빼는 것이라 우리가 계산한 값이 아니다(절대 원칙 4 · G-28).
             lines.add(new CostLine(rule.label(),
-                    new ValuedAmount(Money.of(after.won() - telecom.won()), Provenance.DERIVED)));
+                    new ValuedAmount(Money.of(after.won() - telecom.won()), rule.provenance())));
             telecom = after;
         }
 

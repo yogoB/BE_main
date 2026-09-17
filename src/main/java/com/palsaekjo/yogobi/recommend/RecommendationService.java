@@ -94,6 +94,7 @@ public class RecommendationService {
         String networkType = optional == null ? null : mapNetwork(optional.networkType());
         ContractType contractType = parseContract(optional);
         Boolean hasFamilyBundle = optional == null ? null : optional.hasFamilyBundle();
+        Long familyDiscount = familyBundleDiscount(optional);
 
         long dataMb = (long) required.monthlyDataGb() * MB_PER_GB;
         List<CandidatePlan> candidates = catalog.findCandidatePlans(dataMb, networkType);
@@ -108,7 +109,7 @@ public class RecommendationService {
         }
 
         // 요금제별 planContractDiscount 는 CostCalculator 가 plan 에서 가져가므로 여기선 0 (placeholder).
-        var ctx = new PricingContext(contractType, hasFamilyBundle, 0, bundles);
+        var ctx = new PricingContext(contractType, hasFamilyBundle, familyDiscount, 0, bundles);
         // 같은 계산 결과로 정렬하고 상위 N개만 응답으로 변환한다.
         List<CostResult> results = candidates.stream()
                 .map(c -> Map.entry(c, calculator.calculate(c.plan(), wanted, ctx)))
@@ -150,7 +151,7 @@ public class RecommendationService {
 
         var optional = request.optional();
         var ctx = new PricingContext(parseContract(optional),
-                optional == null ? null : optional.hasFamilyBundle(), 0, bundles);
+                optional == null ? null : optional.hasFamilyBundle(), familyBundleDiscount(optional), 0, bundles);
         CostResult result = toResult(candidate, calculator.calculate(candidate.plan(), wanted, ctx))
                 .withPriceCrossCheck(crossCheck.check(candidate));
 
@@ -208,12 +209,17 @@ public class RecommendationService {
                     "통신사 고객센터 또는 마이페이지 > 약정 정보"));
         }
         if (o == null || o.hasFamilyBundle() == null) {
-            // 결합할인은 아직 금액에 반영하지 않는다(docs/domain.md §9 "가족 결합 여부 → 결합할인 미반영").
-            // 그런데 여기서는 "추가로 반영돼요" 라고 약속하고 있었다 — 오지 않을 할인을 예고하는 문구다.
-            // 규칙과 데이터가 들어오기 전까지는 실제로 달라지는 것(정확도 표시)만 적는다.
+            // 결합 중이라고 하면 할인액을 물어 그 금액을 뺀다(G-28). 그러니 여기서 약속해도 된다 —
+            // 단, 깎이는 것은 사용자가 적어 준 금액이지 우리가 계산한 값이 아니다.
             missing.add(new MissingInput("hasFamilyBundle",
-                    "가족 결합 여부를 알려주시면 추천 정확도 표시가 올라가요 — 결합할인 금액은 아직 반영하지 않아요",
+                    "가족 결합 중이라면 할인액을 알려주세요. 그 금액을 빼고 계산해요",
                     "통신사 마이페이지 > 결합 상품"));
+        }
+        // 결합 중이라고 했는데 할인액을 모르면 그만큼 금액이 덜 깎인다. 우리가 만들 수 없는 값이라 묻는다(G-28 b).
+        if (o != null && Boolean.TRUE.equals(o.hasFamilyBundle()) && o.familyBundleDiscountKrw() == null) {
+            missing.add(new MissingInput("familyBundleDiscountKrw",
+                    "가족결합으로 매달 얼마를 할인받는지 알려주시면 그 금액을 빼고 계산해요",
+                    "통신사 앱 > 요금 청구서의 결합할인 항목"));
         }
         if (o == null || o.currentCarrier() == null) {
             missing.add(new MissingInput("currentCarrier",
@@ -237,6 +243,20 @@ public class RecommendationService {
         } catch (IllegalArgumentException e) {
             throw ApiException.requiredMissing("contractType", "약정 유형 값이 올바르지 않습니다.");
         }
+    }
+
+    /**
+     * 사용자가 적어 준 결합 할인액. 음수는 받지 않는다 — 요금을 올리는 "할인"은 입력 실수다.
+     * 결합 중이 아니라고 했으면 금액이 와도 무시한다(G-28 c).
+     */
+    private static Long familyBundleDiscount(RecommendationRequest.Optional optional) {
+        if (optional == null || optional.familyBundleDiscountKrw() == null) {
+            return null;
+        }
+        if (optional.familyBundleDiscountKrw() < 0) {
+            throw ApiException.requiredMissing("familyBundleDiscountKrw", "가족결합 할인액은 0원 이상으로 입력해 주세요.");
+        }
+        return Boolean.TRUE.equals(optional.hasFamilyBundle()) ? optional.familyBundleDiscountKrw() : null;
     }
 
     private static String mapNetwork(String networkType) {
