@@ -28,7 +28,9 @@ import sys
 from urllib.parse import urlsplit, urlunsplit
 
 # 원자료의 `구분` → 우리 카테고리. **순서가 곧 ID 부여 순서**라 바꾸면 기존 등급 ID 가 밀린다.
-CATEGORIES = [("OTT", "OTT"), ("음악", "MUSIC"), ("AI", "AI"), ("전자책", "EBOOK"), ("클라우드", "CLOUD")]
+CATEGORIES = [("OTT", "OTT"), ("음악", "MUSIC"), ("AI", "AI"), ("전자책", "EBOOK"), ("클라우드", "CLOUD"),
+              # 새 카테고리는 **맨 뒤에** 붙인다 — 앞에 끼우면 기존 등급 ID 가 밀린다.
+              ("이모티콘", "EMOTICON")]
 # 개인이 직접 고를 수 있는 유형만. 나머지는 화면에 올려도 선택할 수 없다.
 PERSONAL = {"individual", "family", "student"}
 
