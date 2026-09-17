@@ -63,7 +63,8 @@ public class NarratorClient implements Narrator, DetectionNarrator {
         }
         request.retain(NARRATE_FIELDS);
         JsonNode result = post("/narrate", request);
-        requireObject(result, "message", "reasons");
+        // notices 를 빠뜨리면 설명이 통째로 폐기된다 — 아래에서 읽기 전에 여기서 먼저 막힌다(G-31).
+        requireObject(result, "message", "reasons", "notices");
         JsonNode message = result.path("message");
         if (!message.isTextual() || message.textValue().isBlank() || message.textValue().length() > 50000)
             throw new Unavailable();
