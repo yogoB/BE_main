@@ -45,6 +45,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 /** Real security filters, PostgreSQL, JWT signatures and an HTTP OIDC provider; no mocked authentication. */
 @SpringBootTest(properties = {"JWT_SECRET=VHlwZS1vbmx5LXRlc3Qta2V5LTMyaGFyYWN0ZXJzLW9yLW1vcmUh",
+        "yogobi.auth.ip-limit=40",   // 운영 기본은 2000(H-1). 41번째를 보려고 내린다
         "yogobi.auth.google-enabled=true", "GOOGLE_CLIENT_ID=test-client", "GOOGLE_CLIENT_SECRET=test-secret",
         "GOOGLE_REDIRECT_URI=https://localhost/login/oauth2/code/google", "yogobi.auth.return-url=https://frontend.example/",
         // 로컬 .env(spring.config.import)가 무엇이든 보안 쿠키 단언은 여기서 고정한다.

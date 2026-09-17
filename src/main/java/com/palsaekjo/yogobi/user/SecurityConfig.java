@@ -65,6 +65,16 @@ public class SecurityConfig {
                 .csrf(c -> c.disable()).cors(c -> c.disable()).build();
     }
 
+    /**
+     * IP 버킷 상한(15분). 운영 경로가 브라우저 → 프론트 nginx → Fly 프록시 → BE 라 {@code getRemoteAddr()} 는
+     * <b>모든 사용자에게 같은 값</b>이다 — 전 사용자가 한 버킷을 쓴다. 40 이던 시절엔 정상 사용자 41명이
+     * 15분 안에 로그인 버튼을 누르면 전원이 429 였고 로그인이 Google 하나뿐이라 우회가 없었다(H-1, 2026-09-18).
+     * 그래서 이 상한은 "한 사람" 이 아니라 "서비스 전체" 의 폭주 방어선이다. 진짜 발신지 기준 제한은
+     * BE 가 공개 주소로도 열려 있어 헤더 위조 경로를 먼저 막아야 한다 — 별도 작업.
+     */
+    @Value("${yogobi.auth.ip-limit:2000}")
+    private int ipLimit;
+
     @Bean
     @org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication(type = org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication.Type.SERVLET)
     SecurityFilterChain security(HttpSecurity http, AuthTokens tokens, AuthRateLimit limits, GoogleLogin google,
@@ -108,7 +118,7 @@ public class SecurityConfig {
                             String path = req.getRequestURI();
                             if ((path.startsWith("/api/v1/auth/") && "POST".equals(req.getMethod()))
                                     || path.equals("/oauth2/authorization/google"))
-                                limits.check("ip:" + req.getRemoteAddr(), 40); // Never trust caller-supplied X-Forwarded-For.
+                                limits.check("ip:" + req.getRemoteAddr(), ipLimit); // Never trust caller-supplied X-Forwarded-For.
                             if (path.equals("/oauth2/authorization/google")) google.requireEnabled();
                             chain.doFilter(req, res);
                         } catch (ApiException ex) { error(json, res, ex); }
