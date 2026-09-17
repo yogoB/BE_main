@@ -32,6 +32,16 @@ public class PrivacyController {
         return ApiResponse.ok(consent.view(Long.parseLong(principal.getName())));
     }
 
+    /**
+     * 바뀐 처리방침을 확인했다고 기록한다(필수 항목만 현재 버전으로). 마케팅 동의는 승계하지 않는다 —
+     * "방침을 읽었다"가 "광고를 받겠다"를 뜻하지 않는다.
+     */
+    @PostMapping("/me/consent/acknowledge")
+    public ApiResponse<Map<String, String>> acknowledge(Principal principal) {
+        return ApiResponse.ok(Map.of("acknowledgedVersion",
+                consent.acknowledge(Long.parseLong(principal.getName()))));
+    }
+
     @PostMapping("/me/consent/marketing")
     public ApiResponse<Map<String, Boolean>> marketing(@RequestBody JsonNode body, Principal principal) {
         if (!body.path("agree").isBoolean()) {

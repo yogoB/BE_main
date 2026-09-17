@@ -111,6 +111,80 @@ class PrivacyApiTest {
         assertThat(id).isPositive();
     }
 
+    /* ── G-27. 처리방침 버전이 오르면 (2026-09-17) ───────────────────────── */
+
+    /** G-27a·d. 새 가입은 처음부터 현재 버전이고, 구버전 기록은 `current:false` 로 드러난다. */
+    @Test void g27ad_구버전_동의는_현재가_아닌_것으로_보인다() throws Exception {
+        long id = signup("a@example.com");
+        mvc.perform(get("/api/v1/me/consent").cookie(cookies))
+                .andExpect(jsonPath("$.data[0].item").value("ESSENTIAL"))
+                .andExpect(jsonPath("$.data[0].current").value(true));
+
+        // 방침이 올라가기 전에 동의한 회원을 흉내 낸다.
+        jdbc.update("UPDATE user_consent SET policy_version='2026-09-15' WHERE user_id=?", id);
+        mvc.perform(get("/api/v1/me/consent").cookie(cookies))
+                .andExpect(jsonPath("$.data[0].current").value(false))
+                .andExpect(jsonPath("$.data[0].agreed").value(true));   // 기록을 지우지는 않는다
+    }
+
+    /** G-27b. 확인하면 필수 항목이 현재 버전이 된다. 서비스를 막지 않는다 — 계약 이행 근거다. */
+    @Test void g27b_확인하면_필수항목이_현재_버전이_된다() throws Exception {
+        long id = signup("a@example.com");
+        jdbc.update("UPDATE user_consent SET policy_version='2026-09-15' WHERE user_id=?", id);
+
+        csrf();
+        mvc.perform(post("/api/v1/me/consent/acknowledge").cookie(cookies).session(session)
+                        .header("X-CSRF-TOKEN", csrf))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.acknowledgedVersion").value(PrivacyPolicy.VERSION));
+
+        mvc.perform(get("/api/v1/me/consent").cookie(cookies))
+                .andExpect(jsonPath("$.data[0].item").value("ESSENTIAL"))
+                .andExpect(jsonPath("$.data[0].policyVersion").value(PrivacyPolicy.VERSION))
+                .andExpect(jsonPath("$.data[0].current").value(true));
+    }
+
+    /**
+     * G-27c. 확인은 <b>마케팅 동의를 승계하지 않는다.</b> "방침을 읽었다"가 "광고를 받겠다"를 뜻하지 않는다.
+     * 구버전 마케팅 동의는 `current:false` 로 남고, 다시 받아야 유효하다.
+     */
+    @Test void g27c_확인은_마케팅_동의를_승계하지_않는다() throws Exception {
+        long id = signup("a@example.com");
+        csrf();
+        mvc.perform(post("/api/v1/me/consent/marketing").cookie(cookies).session(session)
+                .header("X-CSRF-TOKEN", csrf).contentType("application/json").content("{\"agree\":true}"))
+                .andExpect(status().isOk());
+        jdbc.update("UPDATE user_consent SET policy_version='2026-09-15' WHERE user_id=?", id);
+
+        csrf();
+        mvc.perform(post("/api/v1/me/consent/acknowledge").cookie(cookies).session(session)
+                .header("X-CSRF-TOKEN", csrf)).andExpect(status().isOk());
+
+        var body = mvc.perform(get("/api/v1/me/consent").cookie(cookies)).andReturn()
+                .getResponse().getContentAsString();
+        var items = JSON.readTree(body).path("data");   // item 오름차순: ESSENTIAL, MARKETING
+        assertThat(items.get(0).path("item").asText()).isEqualTo("ESSENTIAL");
+        assertThat(items.get(0).path("current").asBoolean()).isTrue();
+        assertThat(items.get(1).path("item").asText()).isEqualTo("MARKETING");
+        assertThat(items.get(1).path("current").asBoolean()).isFalse();   // 승계되지 않았다
+
+        // 다시 받으면 현재 버전이 된다.
+        csrf();
+        mvc.perform(post("/api/v1/me/consent/marketing").cookie(cookies).session(session)
+                .header("X-CSRF-TOKEN", csrf).contentType("application/json").content("{\"agree\":true}"))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/v1/me/consent").cookie(cookies))
+                .andExpect(jsonPath("$.data[1].current").value(true));
+    }
+
+    /** G-27e. 확인도 인증·CSRF 를 요구한다 — 남이 대신 눌러 줄 수 있으면 기록이 의미가 없다. */
+    @Test void g27e_확인은_인증과_CSRF를_요구한다() throws Exception {
+        mvc.perform(post("/api/v1/me/consent/acknowledge")).andExpect(status().isForbidden());
+        signup("a@example.com");
+        mvc.perform(post("/api/v1/me/consent/acknowledge").cookie(cookies))
+                .andExpect(status().isForbidden());   // CSRF 없음
+    }
+
     @Test void accountDeletionErasesAllPersonalDataAndRevokesSession() throws Exception {
         long id = signup("alice@example.com");
         jdbc.update("INSERT INTO user_subscription(user_id,tier_id,monthly_price) VALUES (?,2,13500)", id);

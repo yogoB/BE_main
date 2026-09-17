@@ -159,6 +159,7 @@ AI의 `/parse`·`/narrate`·`/ocr`는 토큰 누락·불일치 시 401, 서버 �
 | DELETE | `/api/v1/me` | 회원 탈퇴 — 일반 이용 데이터 파기·세션 무효화·쿠키 삭제. 법정 보존 사본은 별도 확정 기한 적용 |
 | GET | `/api/v1/me/consent` | 내 수집·이용 동의 조회 |
 | POST | `/api/v1/me/consent/marketing` | 선택(마케팅) 동의/철회 `{agree}` |
+| POST | `/api/v1/me/consent/acknowledge` | 바뀐 처리방침 확인 기록 — **필수 항목만** 현재 버전으로. 마케팅 동의는 승계하지 않는다 (2026-09-17) |
 
 처리방침·인벤토리·보유기간은 `docs/privacy.md`. 보유기간·동의 항목은 정책값이라 확정 시 함께 갱신한다.
 

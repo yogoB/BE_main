@@ -11,8 +11,17 @@ public final class PrivacyPolicy {
     private PrivacyPolicy() {
     }
 
-    /** 처리방침·동의 기록의 버전. 항목·보유기간이 바뀌면 올린다. */
-    public static final String VERSION = "2026-09-15";
+    /**
+     * 처리방침·동의 기록의 버전. 항목·보유기간이 바뀌면 올린다.
+     *
+     * <p>올리면 기존 회원의 {@code user_consent.policy_version} 이 뒤처진다. 그 상태는
+     * {@code GET /api/v1/me/consent} 의 {@code current:false} 로 드러나고,
+     * {@code POST /api/v1/me/consent/acknowledge} 로 해소한다({@link ConsentService}).
+     * <b>조용히 갱신하지 않는다</b> — 사용자가 바뀐 내용을 본 시점이 기록으로 남아야 한다.
+     *
+     * <p>2026-09-17: D-34(Google 전용 로그인)로 회원에게서 비밀번호를 받지 않게 되어 "계정" 항목을 고쳤다.
+     */
+    public static final String VERSION = "2026-09-17";
     public static final String RETENTION_ZONE = "Asia/Seoul";
     public static final int PAYMENT_RETENTION_MONTHS = 12;
     public static final int DETECTION_RETENTION_MONTHS = 6;
@@ -26,7 +35,7 @@ public final class PrivacyPolicy {
 
     public static Policy current() {
         return new Policy(VERSION, List.of(
-                new Item("계정", List.of("email", "password_hash(BCrypt 해시)", "google_sub"),
+                new Item("계정", List.of("email(Google 제공)", "google_sub", "name", "nickname"),
                         "회원 인증·본인 확인", "계약 이행", "탈퇴 시 즉시 파기"),
                 new Item("이용 현황",
                         List.of("current_plan_id", "user_subscription", "payment_record(merchant_raw, amount, paid_at)"),

@@ -527,12 +527,23 @@ JWT 절대 수명 15분·유휴 제한 5분(refresh 없음). 상태를 바꾸는
 
 ```json
 { "data": [
-  { "item": "ESSENTIAL", "policyVersion": "2026-09-12", "agreed": true, "agreedAt": "2026-09-14T...Z", "withdrawnAt": null },
-  { "item": "MARKETING", "policyVersion": "2026-09-12", "agreed": false, "agreedAt": null, "withdrawnAt": "..." }
+  { "item": "ESSENTIAL", "policyVersion": "2026-09-17", "agreed": true, "current": true, "agreedAt": "2026-09-17T...Z", "withdrawnAt": null },
+  { "item": "MARKETING", "policyVersion": "2026-09-15", "agreed": true, "current": false, "agreedAt": "...", "withdrawnAt": null }
 ] }
 ```
 
-`ESSENTIAL`(필수)은 가입 시 기록되며 **철회 불가**(계약 이행 근거). `MARKETING`(선택)만 아래로 변경한다.
+`ESSENTIAL`(필수)은 가입 시 기록되며 **철회 불가**(계약 이행 근거). `MARKETING`(선택)만 6-3 으로 변경한다.
+
+`current` 는 이 기록이 **지금 처리방침 버전**에 대한 것인지다. 하나라도 `false` 면 화면이 다시 물어야 한다.
+`MARKETING` 이 `agreed:true, current:false` 면 **구버전 동의이며 유효하지 않다** — 발송 전에 다시 받아야 한다.
+
+### 6-2-1. 변경 고지 확인 — `POST /api/v1/me/consent/acknowledge` (인증+CSRF)
+
+본문 없음 → 200 `{ "data": { "acknowledgedVersion": "2026-09-17" } }`.
+
+**필수(ESSENTIAL) 항목만** 현재 버전으로 올린다. 마케팅 동의는 승계하지 않는다 —
+"방침을 읽었다"가 "광고를 받겠다"를 뜻하지 않는다. 다시 받으려면 6-3 을 쓴다.
+필수는 계약 이행 근거라 확인 전에도 서비스를 막지 않는다.
 
 ### 6-3. 마케팅 동의 변경 — `POST /api/v1/me/consent/marketing` (인증+CSRF)
 
