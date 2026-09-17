@@ -53,15 +53,13 @@ public interface PaymentHistoryProvider {   // subscription/port
 |---|---|---|
 | 금액 계산 | ✅ 단독 | ❌ 금지 |
 | 조합 탐색 | ✅ | ❌ |
-| 자연어 → 파라미터 | ❌ | ✅ |
 | 결과 → 자연어 | ❌ | ✅ |
 | 세션·이력 저장 | ✅ | ❌ 무상태 |
 
 ```
-POST /api/v1/chat/messages  (BE_main)
-  → AI: POST /parse    → { required, optional, confidence }
-  → 내부 recommend 호출 (필터 경로와 동일 로직)
-  → AI: POST /narrate  → { message, reasons }
+POST /api/v1/recommendations  (BE_main)
+  → 내부 recommend 호출 (pricing 이 금액을 만든다)
+  → AI: POST /narrate  → { message, reasons }   ← 설명만. 실패해도 results 는 그대로 나간다
 
 POST /api/v1/admin/catalog/{dataset}  (운영자 변경 제안, D-29)
   → 스마트초이스 Open API  → 공식 시세 대조 (1차)
@@ -92,11 +90,11 @@ AI의 `/parse`·`/narrate`·`/ocr`는 토큰 누락·불일치 시 401, 서버 �
 - 경계는 코드로 강제된다: `/narrate`의 **금액 문장(`message`)은 LLM을 쓰지 않는 결정론적 템플릿**이고,
   **추천 사유(`reasons`)만 LLM이 만들되 BE가 보낸 금액 외의 금액이 섞이면 그 줄을 버린다**(D-26).
   BE `AiGateway`가 AI 응답(confidence·정수 GB·서비스 ID·enum)을 **전부 재검증**해 어긋나면 폐기,
-  필터·챗봇이 **같은 recommend 엔진**을 탄다(원칙 3).
+  추천 경로가 **하나의 recommend 엔진**을 탄다(원칙 3).
 
 **부수 근거(핵심은 아니지만 정당화):**
 - **기술 적합성** — 결정론적 계산은 Java(BigDecimal·타입), 자연어 파싱/생성은 Python/LLM 생태계.
-- **Fail-soft** — AI(외부 LLM 의존)가 죽어도 필터 추천은 정상, 챗봇만 `FILTER_FALLBACK`으로 우아하게 저하.
+- **Fail-soft** — AI 가 죽어도 추천·계산은 정상이고 결과 설명(`reasons`·`message`)만 빈다.
 - **상태 경계** — BE가 세션·이력·DB를 소유, AI는 무상태. 스케일·배포 프로파일이 다르다.
 - **독립 반복** — 프롬프트·모델 교체가 계산 엔진을 안 건드린다. 계약(§3)이 유일한 이음새(D-06).
 
@@ -110,7 +108,7 @@ AI의 `/parse`·`/narrate`·`/ocr`는 토큰 누락·불일치 시 401, 서버 �
 ### MVP
 | Method | Path | 설명 |
 |---|---|---|
-| POST | `/api/v1/recommendations` | 무상태 추천 — 필터·챗봇 공용 |
+| POST | `/api/v1/recommendations` | 무상태 추천 |
 | POST | `/api/v1/calculator` | 특정 조합 총비용 |
 | GET | `/api/v1/catalog/plans` | 요금제 카탈로그 |
 | GET | `/api/v1/catalog/services` | 구독 서비스·티어. 등급에 `currency`(KRW\|USD)·`taxIncluded`·`krwEstimate`·`krwRateDate` — 해외 결제는 환산 **표시만** (아래) |
@@ -148,7 +146,6 @@ AI의 `/parse`·`/narrate`·`/ocr`는 토큰 누락·불일치 시 401, 서버 �
 | POST | `/api/v1/me/current-plan` | 현재 요금제 설정 (구현) |
 | POST | `/api/v1/me/payments/import` | 결제내역 업로드 |
 | GET | `/api/v1/me/detections` | 탐지 결과 (구현 — 요청 시 재탐지) |
-| POST | `/api/v1/chat/messages` | 챗봇 |
 
 ### Phase 2
 | Method | Path | 설명 |
@@ -170,7 +167,7 @@ AI의 `/parse`·`/narrate`·`/ocr`는 토큰 누락·불일치 시 401, 서버 �
 ### 요청 / 응답
 
 회원 인증 계약(2026-09-10 사용자 승인 1~4): `docs/auth.md`.
-추천·계산기·카탈로그·단일 발화 챗봇 **엔드포인트는 비회원에게 공개한다.** 개인 데이터 저장·관리는 회원 전용이다.
+추천·계산기·카탈로그 **엔드포인트는 비회원에게 공개한다.** 개인 데이터 저장·관리는 회원 전용이다.
 단 **결과 리포트 화면은 로그인 후에만 그린다**(D-36) — 화면 게이트이며 API 권한이 아니다. API 를 직접 부르면 우회되고, 그것을 알고 둔 선택이다.
 자체·Google 로그인 모두 동일한 내부 `userId`와 15분 JWT를 사용한다(refresh 없음, 만료 후 재로그인). JWT는 HttpOnly 쿠키로만 전달하며
 별도 브라우저 확인 쿠키와 DB 발급 지문을 함께 검사한다. 회원 요청은 `credentials: include`, 변경 요청은 CSRF 헤더가 필요하다.
@@ -241,7 +238,7 @@ D-18에서 우체국·스마트초이스 연동과 `priceCrossCheck` 응답 필�
 `SMARTCHOICE_API_KEY`가 없으면 스윕이 돌지 않아 전 결과가 `UNVERIFIED`다(fail-soft).
 D-26에서 AI `/narrate` **응답**에 `reasons`를 더했다. 요청 필드는 그대로다.
 D-26 후속(2026-09-16): BE가 `/narrate`를 호출해 `reasons`를 `/recommendations` 응답 최상위에 싣는다.
-필터·챗봇 두 경로 모두 1순위 결과(`results[0]`)에 대한 사유를 담으며, AI 장애 시에도 `results`는 정상이다.
+1순위 결과(`results[0]`)에 대한 사유를 담으며, AI 장애 시에도 `results`는 정상이다.
 narrate 오케스트레이션은 컨트롤러가 한다(`RecommendationController`·`ChatController`) — `RecommendationService`는 AI를 모른다.
 `recommend`가 `chat`의 `AiGateway`에 직접 의존하면 순환이 되므로 포트 `recommend.Narrator`(구현: `AiGateway`)로 역전한다.
 

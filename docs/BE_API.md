@@ -94,7 +94,7 @@ D-18 변경: 우체국 연동을 제거했다. 스마트초이스와 `CostResult
 | 배포 Base URL | `https://yogob.fly.dev` |
 | 로컬 Base URL | `http://localhost:8080` |
 | 공통 프리픽스 | `/api/v1` |
-| 인증 | 추천·계산기·카탈로그·챗봇 **엔드포인트는 비회원 공개**. `/me`와 계정 관리는 HttpOnly JWT 쿠키 + CSRF. 단 **결과 리포트 화면은 로그인 후에만 그린다**(D-36 — 화면 게이트이며 API 는 그대로 공개다). 상세 `docs/auth.md` |
+| 인증 | 추천·계산기·카탈로그 **엔드포인트는 비회원 공개**. `/me`와 계정 관리는 HttpOnly JWT 쿠키 + CSRF. 단 **결과 리포트 화면은 로그인 후에만 그린다**(D-36 — 화면 게이트이며 API 는 그대로 공개다). 상세 `docs/auth.md` |
 | 콘텐츠 타입 | `application/json` (UTF-8) |
 | CORS | 정확한 프론트 오리진만 허용(`YOGOBI_CORS_ALLOWED_ORIGINS`). 회원 요청은 `credentials: include`; wildcard 금지 |
 
@@ -151,7 +151,6 @@ AI 연결과 내부 인증은 BE가 담당하며 프론트에는 AI 주소·내�
 | `contractType` | `NONE` · `SELECTIVE_25` · `DEVICE_SUBSIDY` | 약정 유형(요청) |
 | `networkType` | `5G` · `LTE` · `3G` | 망 종류(요청). 응답/DB는 `FIVE_G`·`LTE`·`THREE_G` |
 | `benefitType` | `FREE` · `FIXED_DISCOUNT` · `RATE_DISCOUNT` · `BUNDLE_INCLUDED` | 제휴 혜택 형태 |
-| chat `status` | `RECOMMENDED` · `NEEDS_INPUT` · `FILTER_FALLBACK` | 챗봇 응답 상태 |
 | detection `rule` | `BENEFIT_OVERLAP` · `TIER_DUPLICATE` · `BUNDLE_OVERLAP` | 중복/낭비 탐지 규칙 |
 | switch-timing `status` | `SWITCH_NOW` · `WAIT_UNTIL_EXPIRY` · `NO_BENEFIT` | 변경 시점 판정 |
 | consent `item` | `ESSENTIAL`(철회 불가) · `MARKETING` | 수집·이용 동의 항목 |
@@ -162,7 +161,7 @@ AI 연결과 내부 인증은 BE가 담당하며 프론트에는 AI 주소·내�
 
 ## 1. 추천 — `POST /api/v1/recommendations`
 
-필터·챗봇이 공유하는 무상태 추천. 데이터 요구량을 만족하는 후보 요금제마다 실질월비용을 계산해 **싼 순으로 상위 5개**를 반환한다.
+무상태 추천. 데이터 요구량을 만족하는 후보 요금제마다 실질월비용을 계산해 **싼 순으로 상위 5개**를 반환한다.
 
 ### 요청
 
@@ -382,50 +381,6 @@ CSV에 없는 것을 물어도 **200으로 답한다.** 아는 것으로 계산�
 - `discountValue`: `FIXED_DISCOUNT`면 원 단위 정수, `RATE_DISCOUNT`면 0~1, 그 외 `null`.
 - `exclusive`가 `true`면 `exclusiveGroup` 안에서 **택1**.
 - 없는 요금제 ID → `404 YGB-CAT-001`.
-
----
-
-## 4. 챗봇 — `POST /api/v1/chat/messages`
-
-자연어 한 문장을 받아 AI 서버로 파라미터를 추출(`/parse`)하고, 필터와 **동일한 추천 엔진**을 태운 뒤 설명을 붙여(`/narrate`) 반환한다. 금액·순서는 추천 엔진 값 그대로다.
-
-> AI 서버(`AI_SERVER_URL`, 기본 `http://localhost:8000`)가 필요하다. AI가 죽어도 앱은 정상이며 아래처럼 폴백한다.
-
-서버 운영 설정: BE와 AI에 동일한 `AI_INTERNAL_TOKEN`이 필요하다. 프론트 요청에는 이 값을 넣지 않는다.
-내부 토큰이 없거나 불일치해도 프론트 응답은 아래 상태 형식을 유지하며 `FILTER_FALLBACK`으로 안내한다.
-
-### 요청
-
-```json
-{ "text": "데이터 20기가에 넷플릭스 보고 싶어" }
-```
-
-| 필드 | 타입 | 제약 |
-|---|---|---|
-| `text` | string | 1~4,000자. 객체에 `text` 키 하나만 |
-
-### 응답 200
-
-```json
-{
-  "data": {
-    "status": "RECOMMENDED",
-    "message": "가장 저렴한 조합은 ... 입니다.",
-    "recommendation": { "accuracy": "PARTIAL", "missingInputs": [], "results": [ ] }
-  },
-  "warnings": []
-}
-```
-
-| `status` | 의미 | `recommendation` |
-|---|---|---|
-| `RECOMMENDED` | 추천 성공 | 추천 응답 본문(§1) |
-| `NEEDS_INPUT` | 입력이 부족해 되물음 | `null` |
-| `FILTER_FALLBACK` | 대화 처리 어려움 → 필터로 안내 | `null` |
-
-- AI 설명만 실패하면 `status=RECOMMENDED`로 목록은 유지되고 `message`가 대체 문구가 된다.
-- AI 연결 자체가 실패하면 `warnings`에 `YGB-EXT-001`이 실린다.
-- 에러: `400 YGB-REQ-001` — `text` 누락/형식 오류/길이 초과.
 
 ---
 

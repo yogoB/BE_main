@@ -197,7 +197,7 @@ class AuthSecurityTest {
 
     @Test void guestEndpointsRemainPublicAndMemberEndpointsRequireAuthentication() throws Exception {
         mvc.perform(get("/api/v1/catalog/services")).andExpect(status().isOk());
-        for (String path : List.of("/api/v1/recommendations", "/api/v1/calculator", "/api/v1/chat/messages"))
+        for (String path : List.of("/api/v1/recommendations", "/api/v1/calculator"))
             mvc.perform(post(path).contentType("application/json").content("{}" )).andExpect(status().isBadRequest());
         mvc.perform(get("/api/v1/me")).andExpect(status().isUnauthorized());
         mvc.perform(get("/api/v1/me/subscriptions")).andExpect(status().isUnauthorized());
