@@ -93,7 +93,7 @@ public class RecommendationService {
         List<MissingInput> missing = missingInputs(optional, unknownServiceIds, foreignPriced);
         addAgeRestrictionNotice(missing, dataMb, networkType);
         Accuracy accuracy = missing.isEmpty() ? Accuracy.FULL : Accuracy.PARTIAL;
-        return new RecommendationResponse(accuracy, missing, results);
+        return new RecommendationResponse(accuracy, missing, results, candidates.size());
     }
 
     /** 특정 조합(요금제 + 티어들)의 총비용. 후보 탐색·정렬 없이 1회 계산한다. */

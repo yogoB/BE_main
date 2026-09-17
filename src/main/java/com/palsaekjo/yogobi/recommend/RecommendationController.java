@@ -32,8 +32,9 @@ public class RecommendationController {
         RecommendationResponse result = service.recommend(request);
         funnel.record(principal == null ? FunnelCounter.GATE_SHOWN : FunnelCounter.REPORT_SHOWN);
         if (result.results().isEmpty()) return ApiResponse.ok(result); // 카탈로그 결손(G-12): 사유 없음
-        // 챗봇 경로와 같은 결과 카드를 공유하도록 1순위 사유를 붙인다(원칙 3·5-⑤). AI 장애면 빈 목록.
-        return ApiResponse.ok(result.withReasons(
-                narrator.reasonsFor(result.results().get(0), result.missingInputs())));
+        // 챗봇 경로와 같은 결과 카드를 공유하도록 1순위 설명을 붙인다(원칙 3·5-⑤).
+        // message·reasons 둘 다 모델 키 없이 나온다. AI 장애면 둘 다 비고 금액은 그대로다.
+        return ApiResponse.ok(result.withNarration(narrator.narrationFor(
+                result.results().get(0), result.missingInputs(), result.candidateCount())));
     }
 }

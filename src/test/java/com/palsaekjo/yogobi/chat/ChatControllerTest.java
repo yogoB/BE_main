@@ -42,7 +42,7 @@ class ChatControllerTest {
     private final CostResult cost = new CostResult(42, "넷플플랜", "SKT", 55000, 68500, 13500, 162000,
             List.of(new BreakdownLine("기본료", 55000, "OFFICIAL", null)));
     private final RecommendationResponse recommendation = new RecommendationResponse(Accuracy.PARTIAL,
-            List.of(new MissingInput("hasFamilyBundle", "확인 필요", "통신사 마이페이지")), List.of(cost));
+            List.of(new MissingInput("hasFamilyBundle", "확인 필요", "통신사 마이페이지")), List.of(cost), 127);
 
     @BeforeEach
     void setup() throws Exception {
@@ -89,7 +89,8 @@ class ChatControllerTest {
                  "monthlyTotal":55000,"baseline":68500,"monthlySavings":13500,"annualSavings":162000,
                  "breakdown":[{"label":"기본료","amount":55000,"provenance":"OFFICIAL","note":null}],
                  "missingInputs":[{"field":"hasFamilyBundle","impact":"확인 필요",
-                                   "howToFind":"통신사 마이페이지"}]}
+                                   "howToFind":"통신사 마이페이지"}],
+                 "candidateCount":127}
                 """), bodies.get(1));
         // AI 는 계약 밖 필드를 422 로 거부하고 BE 는 그것을 장애로 삼킨다.
         // 하나라도 새면 사유가 화면에서 조용히 사라진다. 이 한 줄이 그 재발을 막는다.

@@ -36,7 +36,7 @@ public class AiGateway implements Narrator, CatalogVerifier {
      */
     private static final Set<String> NARRATE_FIELDS = Set.of(
             "planId", "planName", "carrier", "monthlyTotal", "baseline",
-            "monthlySavings", "annualSavings", "breakdown", "missingInputs");
+            "monthlySavings", "annualSavings", "breakdown", "missingInputs", "candidateCount");
 
     private final RestClient client;
     private final ObjectMapper json;
@@ -103,29 +103,33 @@ public class AiGateway implements Narrator, CatalogVerifier {
         return new RecommendationRequest(new RecommendationRequest.Required(gb.intValue(), ids), options);
     }
 
-    /** AI 설명 1건. message(고정 템플릿) + reasons(LLM 큐레이션, 0~3줄). D-19. */
-    public record Narration(String message, List<String> reasons) {
-    }
-
-    public Narration narrate(CostResult cost, List<MissingInput> missingInputs) {
+    /** AI 설명 1건. 실패는 {@link Unavailable} 로 던진다 — 챗봇은 그때 자기 문구로 대체한다. */
+    public Narrator.Narration narrate(CostResult cost, List<MissingInput> missingInputs,
+                                      Integer candidateCount) {
         ObjectNode request = json.valueToTree(cost);
         request.set("missingInputs", json.valueToTree(missingInputs));
+        // 후보가 몇 개였는지는 CostResult 에 없다. 혜택도 할인도 없는 요금제에는
+        // 이 값이 "왜 추천됐나"의 유일한 근거라 따로 싣는다.
+        if (candidateCount != null && candidateCount > 0) {
+            request.put("candidateCount", candidateCount);
+        }
         request.retain(NARRATE_FIELDS);
         JsonNode result = post("/narrate", request);
         requireObject(result, "message", "reasons");
         JsonNode message = result.path("message");
         if (!message.isTextual() || message.textValue().isBlank() || message.textValue().length() > 50000)
             throw new Unavailable();
-        return new Narration(message.textValue(), reasons(result.path("reasons")));
+        return new Narrator.Narration(message.textValue(), reasons(result.path("reasons")));
     }
 
-    /** 추천 사유만 필요한 필터 경로용. AI 장애는 빈 목록으로 흡수한다 — 결과·계산은 영향 없다(보조 정보). */
+    /** 필터 경로용. AI 장애는 빈 설명으로 흡수한다 — 결과·계산은 영향 없다(보조 정보). */
     @Override
-    public List<String> reasonsFor(CostResult result, List<MissingInput> missingInputs) {
+    public Narrator.Narration narrationFor(CostResult result, List<MissingInput> missingInputs,
+                                           Integer candidateCount) {
         try {
-            return narrate(result, missingInputs).reasons();
+            return narrate(result, missingInputs, candidateCount);
         } catch (Unavailable e) {
-            return List.of();
+            return Narrator.Narration.none();
         }
     }
 

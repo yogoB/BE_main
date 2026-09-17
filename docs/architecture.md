@@ -211,6 +211,8 @@ Google 전용 계정은 동일 Google `sub` 재인증으로 자체 비밀번호�
       "checkedAt": "2026-09-16T03:40:00Z"               // 스냅샷을 모은 시각
     }
   }],
+  "candidateCount": 127,                                  // 정렬 대상 후보 수. results 는 상위 N개만
+  "message": "“SKT 5G 슬림+”의 실제 내시는 금액은 …",     // 1순위 설명. 모델 키 없이 나온다
   "reasons": [                                            // 1순위 조합에 대한 사유, 0~3개
     "따로 내시던 넷플릭스 스탠다드 13,500원이 요금제에 포함돼 있어요.",
     "선택약정 25% 할인으로 월 13,750원이 빠져요."
@@ -237,8 +239,10 @@ D-26 후속(2026-09-16): BE가 `/narrate`를 호출해 `reasons`를 `/recommenda
 narrate 오케스트레이션은 컨트롤러가 한다(`RecommendationController`·`ChatController`) — `RecommendationService`는 AI를 모른다.
 `recommend`가 `chat`의 `AiGateway`에 직접 의존하면 순환이 되므로 포트 `recommend.Narrator`(구현: `AiGateway`)로 역전한다.
 
-**`/narrate` 요청에 싣는 필드는 아래 9개뿐이다**(`AiGateway.NARRATE_FIELDS`):
-`planId`·`planName`·`carrier`·`monthlyTotal`·`baseline`·`monthlySavings`·`annualSavings`·`breakdown`·`missingInputs`.
+**`/narrate` 요청에 싣는 필드는 아래 10개뿐이다**(`AiGateway.NARRATE_FIELDS`):
+`planId`·`planName`·`carrier`·`monthlyTotal`·`baseline`·`monthlySavings`·`annualSavings`·`breakdown`·`missingInputs`·`candidateCount`.
+`candidateCount`는 `CostResult`에 없어 컨트롤러가 따로 싣는다. **기준 카탈로그 1,706개 중 1,645개는
+제휴 혜택도 약정할인도 없어 절감액이 0이다** — 그런 요금제에는 "몇 개 중에서 골랐나"가 유일한 근거다.
 `CostResult`를 통째로 직렬화하면 AI가 쓰지 않는 필드까지 나간다 — 복구된 `priceCrossCheck`가 실제로 그랬다.
 AI는 계약 밖 필드를 **422로 거부**하고 BE는 그것을 장애로 삼키므로, 사유가 화면에서 조용히 사라진다.
 레코드에 필드를 더하면 이 목록에 적을지 먼저 정한다. 적지 않으면 AI로 가지 않는다.
@@ -258,6 +262,9 @@ AI는 계약 밖 필드를 **422로 거부**하고 BE는 그것을 장애로 삼
 **모델 장애 시에는 AI 서버가 규칙으로 만든 사유가 내려간다**(D-38, 사용자 승인 2026-09-17).
 요청의 `breakdown`만 읽어 만들며 모델 문장과 **같은 금액 가드**를 통과하므로 나가는 규칙은 하나다.
 근거가 없으면 빈 배열도 여전히 가능하다. `message`와 추천 결과는 그 경우에도 정상이다.
+**`message`도 `/recommendations` 응답에 실어 결과 화면이 그대로 렌더링한다**(사용자 승인 2026-09-17).
+`message`는 LLM을 쓰지 않는 템플릿이라 **모델 키 없이도 나온다.** BE가 AI에 아예 닿지 못하면 `null`이고
+화면은 자체 최소 문구로 대체한다. 화면은 금액을 문장으로 다시 쓰지 않는다 — 숫자를 만드는 곳은 하나다.
 AI는 요청의 `breakdown`·`missingInputs`에 **실제로 있는 금액만** 인용하며, 그 밖의 금액이 섞인 줄은 AI 서버가 폐기한다.
 `breakdown`에 없는 항목은 근거로 쓰지 않으므로 **미사용 혜택은 사유 문장에도 등장하지 않는다**(절대 원칙 1).
 카탈로그 원본은 검수·승인된 CSV이며 PostgreSQL에 반영된 값으로 계산한다. 발행·복구 절차는 `docs/catalog-data.md`,
