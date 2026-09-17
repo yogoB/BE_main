@@ -134,7 +134,7 @@
 | 월 절감액 | `monthlySavings` | `baseline - effectiveMonthlyCost` |
 | 선택약정할인 | `selectiveContractDiscount` | 월정액의 25% |
 | 약정할인 | `planContractDiscount` | 요금제 고유 1년/2년 |
-| 결합할인 | `FamilyBundleDiscountRule` / `familyBundleDiscountKrw` | 우선순위 300. 금액은 사용자 입력(`USER_PROVIDED`), 회선 수(`familyLineCount`)는 표시용이라 pricing 에 넣지 않는다 |
+| 결합할인 | `FamilyBundleDiscountRule` / `familyBundleDiscountKrw` | 우선순위 300. 금액은 사용자 입력(`USER_PROVIDED`), 회선 수(`familyLineCount`)는 표시용이라 pricing 에 넣지 않는다. **현재 통신사의 요금제에만 적용한다**(G-29) — 통신사를 옮기면 결합이 풀리므로, 어느 후보에 넣을지는 `RecommendationService` 가 정하고 규칙은 받은 금액만 뺀다 |
 | 할인반환금 | `earlyTerminationFee` | `penalty` 금지 |
 | 전환비용 | `switchingCost` | 위약금+잔여할부+재약정손실 |
 | 회수기간 | `paybackMonths` | `breakEven` 금지 |

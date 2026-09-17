@@ -51,7 +51,8 @@ class RecommendationApiTest {
         jdbc.execute("""
                 INSERT INTO mobile_plan(id,carrier_id,name,network_type,base_price,data_mb,voice_min,sms_cnt,source_url,collected_at)
                 VALUES (1,1,'넷플플랜','FIVE_G',55000,100000,999999,9999,'http://seed','2026-09-08'),
-                       (2,2,'웨이브플랜','FIVE_G',45000,100000,999999,9999,'http://seed','2026-09-08')""");
+                       (2,2,'웨이브플랜','FIVE_G',45000,100000,999999,9999,'http://seed','2026-09-08'),
+                       (3,1,'작은플랜','LTE',20000,1000,100,100,'http://seed','2026-09-08')""");
         jdbc.execute("""
                 INSERT INTO plan_benefit(mobile_plan_id,service_id,tier_id,benefit_type,is_exclusive,source_url,collected_at)
                 VALUES (1,1,NULL,'FREE',false,'http://seed','2026-09-08'),
@@ -259,6 +260,147 @@ class RecommendationApiTest {
                 .andExpect(jsonPath("$.data.results[0].planName").value("넷플플랜"));
 
         assertThat(jdbc.queryForObject("SELECT count(*) FROM catalog_candidate", Integer.class)).isEqualTo(10000);
+    }
+
+    /* ── G-29. 가족결합 할인은 지금 통신사에서만 유지된다 ────────────────────────────
+       운영에서 알뜰폰 요금제에 "가족결합 할인 −8,990원"이 찍혔다. 옮기는 순간 사라질 할인을
+       빼고 1등으로 올린 것이라, 사용자는 갈아탄 뒤에 그만큼 더 낸다. */
+
+    /** G-29 a — 지금 통신사(SKT) 요금제에만 붙는다. 다른 통신사 후보는 그대로다. */
+    @Test
+    void g29a_familyBundleAppliesOnlyToTheCurrentCarrier() throws Exception {
+        mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
+                {"required":{"monthlyDataGb":20,"wantedServiceIds":[1]},
+                 "optional":{"contractType":"NONE","currentCarrier":"SKT",
+                             "hasFamilyBundle":true,"familyBundleDiscountKrw":11000}}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.results[0].planName").value("넷플플랜"))
+                .andExpect(jsonPath("$.data.results[0].monthlyTotal").value(44000))
+                .andExpect(jsonPath("$.data.results[1].planName").value("웨이브플랜"))
+                .andExpect(jsonPath("$.data.results[1].monthlyTotal").value(58500));
+    }
+
+    /**
+     * G-29 b — <b>핵심</b>. 결합 할인은 순위를 바꾼다. 모든 후보에서 똑같이 빼면 순위가 안 바뀌므로
+     * 버그가 보이지 않는다. 현재 통신사가 KT 면 45,000 − 11,000 = 47,500 이 1등이 돼야 한다.
+     */
+    @Test
+    void g29b_bundleDiscountFlipsTheRanking() throws Exception {
+        mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
+                {"required":{"monthlyDataGb":20,"wantedServiceIds":[1]},
+                 "optional":{"contractType":"NONE","currentCarrier":"KT",
+                             "hasFamilyBundle":true,"familyBundleDiscountKrw":11000}}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.results[0].planName").value("웨이브플랜"))
+                .andExpect(jsonPath("$.data.results[0].monthlyTotal").value(47500))
+                .andExpect(jsonPath("$.data.results[1].monthlyTotal").value(55000));
+    }
+
+    /** G-29 c — 어느 통신사에 붙은 할인인지 모르면 어디에도 적용하지 않는다. 그 사실을 금액과 함께 말한다. */
+    @Test
+    void g29c_unknownCarrierMeansTheBundleIsNotApplied() throws Exception {
+        mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
+                {"required":{"monthlyDataGb":20,"wantedServiceIds":[1]},
+                 "optional":{"contractType":"NONE","hasFamilyBundle":true,"familyBundleDiscountKrw":11000}}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.results[0].monthlyTotal").value(55000))
+                .andExpect(jsonPath("$.data.results[1].monthlyTotal").value(58500))
+                .andExpect(jsonPath("$.data.missingInputs[?(@.field=='currentCarrier')].impact")
+                        .value(org.hamcrest.Matchers.hasItem(org.hamcrest.Matchers.containsString("11,000"))));
+    }
+
+    /** G-29 c — "알뜰폰"은 통신사가 아니라 분류다. 지목하지 못하는 값이면 모르는 것과 같게 다룬다. */
+    @Test
+    void g29c_genericCarrierCountsAsUnknown() throws Exception {
+        mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
+                {"required":{"monthlyDataGb":20,"wantedServiceIds":[1]},
+                 "optional":{"contractType":"NONE","currentCarrier":"알뜰폰",
+                             "hasFamilyBundle":true,"familyBundleDiscountKrw":11000}}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.results[0].monthlyTotal").value(55000))
+                .andExpect(jsonPath("$.data.missingInputs[?(@.field=='currentCarrier')].impact")
+                        .value(org.hamcrest.Matchers.hasItem(org.hamcrest.Matchers.containsString("11,000"))));
+    }
+
+    /** G-29 d — 이름 비교는 공백·대소문자를 무시한다("KT 엠모바일" = "KT엠모바일"). */
+    @Test
+    void g29d_carrierNameIgnoresSpacingAndCase() throws Exception {
+        mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
+                {"required":{"monthlyDataGb":20,"wantedServiceIds":[1]},
+                 "optional":{"contractType":"NONE","currentCarrier":"s kt ",
+                             "hasFamilyBundle":true,"familyBundleDiscountKrw":11000}}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.results[0].monthlyTotal").value(44000));
+    }
+
+    /** G-29 e — 다른 통신사 후보가 결과에 섞여 있으면 "옮기면 결합이 풀린다"고 말한다. */
+    @Test
+    void g29e_noticeSaysTheBundleIsLostWhenSwitching() throws Exception {
+        mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
+                {"required":{"monthlyDataGb":20,"wantedServiceIds":[1]},
+                 "optional":{"contractType":"NONE","currentCarrier":"SKT",
+                             "hasFamilyBundle":true,"familyBundleDiscountKrw":11000}}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.missingInputs[?(@.field=='familyBundleDiscountKrw')]").exists());
+    }
+
+    /** G-29 f — 요금제를 골랐다면 그 통신사가 현재 통신사다. 이름을 안 적어도 a 와 같은 결과가 나온다. */
+    @Test
+    void g29f_currentPlanIdDecidesTheCarrier() throws Exception {
+        mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
+                {"required":{"monthlyDataGb":20,"wantedServiceIds":[1]},
+                 "optional":{"contractType":"NONE","currentPlanId":1,
+                             "hasFamilyBundle":true,"familyBundleDiscountKrw":11000}}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.results[0].monthlyTotal").value(44000))
+                .andExpect(jsonPath("$.data.results[1].monthlyTotal").value(58500));
+    }
+
+    /* ── G-30. 현재 요금제를 알려주면 같은 기준으로 계산한다 ───────────────────────── */
+
+    /** G-30 a·b — 현재 요금제 + 같은 구독을 후보와 같은 규칙으로 계산하고, 1순위 대비 절감액을 낸다. */
+    @Test
+    void g30ab_currentPlanCostAndSavings() throws Exception {
+        mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
+                {"required":{"monthlyDataGb":20,"wantedServiceIds":[1]},
+                 "optional":{"contractType":"NONE","currentPlanId":2}}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.current.cost.planName").value("웨이브플랜"))
+                .andExpect(jsonPath("$.data.current.cost.monthlyTotal").value(58500))  // 45,000 + 넷플릭스 13,500
+                .andExpect(jsonPath("$.data.current.monthlySavings").value(3500))      // 58,500 − 55,000
+                .andExpect(jsonPath("$.data.current.annualSavings").value(42000));
+    }
+
+    /** G-30 c — 안 보내면 없다. 화면은 예전처럼 사용자가 적은 값을 '현재' 열에 둔다. */
+    @Test
+    void g30c_noCurrentPlanIdMeansNoCurrentBlock() throws Exception {
+        mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
+                {"required":{"monthlyDataGb":20,"wantedServiceIds":[1]},"optional":{"contractType":"NONE"}}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.current").doesNotExist());
+    }
+
+    /** G-30 d — 없는 요금제 id 로 추천 전체를 버리지 않는다. 안내 한 줄로 끝낸다(원칙 5-①). */
+    @Test
+    void g30d_unknownCurrentPlanIdIsANoticeNotAnError() throws Exception {
+        mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
+                {"required":{"monthlyDataGb":20,"wantedServiceIds":[1]},
+                 "optional":{"contractType":"NONE","currentPlanId":9999}}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.results[0].monthlyTotal").value(55000))
+                .andExpect(jsonPath("$.data.current").doesNotExist())
+                .andExpect(jsonPath("$.data.missingInputs[?(@.field=='currentPlanId')]").exists());
+    }
+
+    /** G-30 e — 지금이 더 싸면 음수 그대로. 20GB 를 쓰려면 더 내야 한다는 사실을 감추지 않는다. */
+    @Test
+    void g30e_savingsCanBeNegative() throws Exception {
+        mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
+                {"required":{"monthlyDataGb":20,"wantedServiceIds":[1]},
+                 "optional":{"contractType":"NONE","currentPlanId":3}}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.current.cost.monthlyTotal").value(33500))  // 20,000 + 13,500
+                .andExpect(jsonPath("$.data.current.monthlySavings").value(-21500));
     }
 
     private void assertGap(String kind, String queryText, int expectedCount) {

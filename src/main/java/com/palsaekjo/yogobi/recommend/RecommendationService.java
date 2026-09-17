@@ -103,12 +103,14 @@ public class RecommendationService {
         Boolean hasFamilyBundle = optional == null ? null : optional.hasFamilyBundle();
         Long familyDiscount = familyBundleDiscount(optional);
         recordUnknownCarrier(optional);
+        java.util.Optional<CandidatePlan> currentPlan = findCurrentPlan(optional);
+        String currentCarrier = currentCarrier(optional, currentPlan);
 
         long dataMb = (long) required.monthlyDataGb() * MB_PER_GB;
         List<CandidatePlan> candidates = catalog.findCandidatePlans(dataMb, networkType);
         if (candidates.isEmpty()) {
             gaps.record(Kind.MOBILE_PLAN, "dataMb>=" + dataMb + ",network=" + (networkType == null ? "ANY" : networkType));
-            var noPlan = missingInputs(optional, unknownServiceIds, foreignPriced);
+            var noPlan = missingInputs(optional, currentCarrier, familyDiscount, unknownServiceIds, foreignPriced);
             addAgeRestrictionNotice(noPlan, dataMb, networkType);
             noPlan.add(new MissingInput("monthlyDataGb",
                     "조건을 만족하는 요금제가 아직 카탈로그에 없어요. 확인 중이에요",
@@ -118,19 +120,70 @@ public class RecommendationService {
 
         // 요금제별 planContractDiscount 는 CostCalculator 가 plan 에서 가져가므로 여기선 0 (placeholder).
         var ctx = new PricingContext(contractType, hasFamilyBundle, familyDiscount, 0, bundles);
+        // 통신사를 옮기면 결합이 풀린다. 그 후보에는 할인액을 빼고 계산한다(G-29) — 결합 여부 자체는
+        // 그대로 둔다. 금액에서 빠지는 것은 할인액뿐이고, hasFamilyBundle 은 accuracy 판정에 쓰인다.
+        var ctxWithoutBundle = new PricingContext(contractType, hasFamilyBundle, null, 0, bundles);
         // 같은 계산 결과로 정렬하고 상위 N개만 응답으로 변환한다.
         List<CostResult> results = candidates.stream()
-                .map(c -> Map.entry(c, calculator.calculate(c.plan(), wanted, ctx)))
+                .map(c -> Map.entry(c, calculator.calculate(c.plan(), wanted,
+                        sameCarrier(c.carrier(), currentCarrier) ? ctx : ctxWithoutBundle)))
                 .sorted(Comparator.comparingLong(e -> e.getValue().effectiveMonthlyCost()))
                 .limit(TOP_N)
                 // 대조는 정렬이 끝난 뒤에 붙인다 — 검증값이 순위·금액에 끼어들 여지를 없앤다(D-03·D-20).
                 .map(e -> toResult(e.getKey(), e.getValue()).withPriceCrossCheck(crossCheck.check(e.getKey())))
                 .toList();
 
-        List<MissingInput> missing = missingInputs(optional, unknownServiceIds, foreignPriced);
+        // 현재 요금제는 지금 통신사의 요금제다 — 결합 할인이 붙어 있는 쪽이라 ctx 를 그대로 쓴다(G-30 f).
+        var current = currentPlan
+                .map(p -> currentCost(toResult(p, calculator.calculate(p.plan(), wanted, ctx)), results))
+                .orElse(null);
+
+        List<MissingInput> missing = missingInputs(optional, currentCarrier, familyDiscount,
+                unknownServiceIds, foreignPriced);
         addAgeRestrictionNotice(missing, dataMb, networkType);
+        addFamilyBundleCarrierNotice(missing, familyDiscount, currentCarrier, results);
+        addUnknownCurrentPlanNotice(missing, optional, currentPlan);
         Accuracy accuracy = missing.isEmpty() ? Accuracy.FULL : Accuracy.PARTIAL;
-        return new RecommendationResponse(accuracy, missing, results, candidates.size());
+        return new RecommendationResponse(accuracy, missing, results, candidates.size(), current);
+    }
+
+    /** 현재 요금제를 1순위와 나란히 놓는다. 절감액은 여기서 만든다 — 화면이 두 금액을 빼지 않도록(원칙 2). */
+    private static RecommendationResponse.CurrentCost currentCost(CostResult cost, List<CostResult> results) {
+        long monthly = cost.monthlyTotal() - results.get(0).monthlyTotal();
+        return new RecommendationResponse.CurrentCost(cost, monthly, monthly * 12);
+    }
+
+    /** {@code currentPlanId} 가 있으면 카탈로그에서 찾는다. 없는 id 는 막지 않고 빈 값으로 둔다(G-30 d). */
+    private java.util.Optional<CandidatePlan> findCurrentPlan(RecommendationRequest.Optional o) {
+        if (o == null || o.currentPlanId() == null) {
+            return java.util.Optional.empty();
+        }
+        return catalog.findPlanById(o.currentPlanId());
+    }
+
+    /**
+     * 현재 통신사. 요금제를 골랐다면 그 통신사가 확실하므로 이름보다 앞선다 — 이름은 오타가 나지만
+     * 요금제 id 는 우리 카탈로그에서 고른 값이다(G-29 f).
+     *
+     * <p>"알뜰폰" 같은 분류는 <b>모르는 것으로 친다.</b> 어느 통신사인지 지목하지 못하는 값이라
+     * 결합 할인을 어디에 붙일지 정할 수 없고, 그걸 통신사처럼 다루면 "알뜰폰 요금제에만 반영했어요"
+     * 같은 말이 안 되는 안내가 나간다.
+     */
+    private static String currentCarrier(RecommendationRequest.Optional o, java.util.Optional<CandidatePlan> plan) {
+        if (plan.isPresent()) {
+            return plan.get().carrier();
+        }
+        String name = o == null ? null : o.currentCarrier();
+        return name == null || name.isBlank() || GENERIC_CARRIERS.contains(name.strip()) ? null : name;
+    }
+
+    /**
+     * 같은 통신사인가. `carrierExists` 와 같은 규칙으로 본다 — 공백·대소문자 무시.
+     * 어느 한쪽을 모르면 <b>같다고 하지 않는다.</b> 모르는 것을 같다고 하면 없어질 할인을 빼게 된다.
+     */
+    private static boolean sameCarrier(String a, String b) {
+        return a != null && b != null
+                && a.replace(" ", "").equalsIgnoreCase(b.replace(" ", ""));
     }
 
     /** 특정 조합(요금제 + 티어들)의 총비용. 후보 탐색·정렬 없이 1회 계산한다. */
@@ -158,14 +211,18 @@ public class RecommendationService {
         List<BundleProduct> bundles = catalog.findApplicableBundles(wantedTierIds);
 
         var optional = request.optional();
+        // 고른 요금제가 지금 통신사가 아니면 결합은 풀린다 — 추천 경로와 같은 규칙이다(G-29).
+        String currentCarrier = currentCarrier(optional, findCurrentPlan(optional));
+        Long familyDiscount = familyBundleDiscount(optional);
         var ctx = new PricingContext(parseContract(optional),
-                optional == null ? null : optional.hasFamilyBundle(), familyBundleDiscount(optional), 0, bundles);
+                optional == null ? null : optional.hasFamilyBundle(),
+                sameCarrier(candidate.carrier(), currentCarrier) ? familyDiscount : null, 0, bundles);
         CostResult result = toResult(candidate, calculator.calculate(candidate.plan(), wanted, ctx))
                 .withPriceCrossCheck(crossCheck.check(candidate));
 
         // 계산기는 사용자가 카탈로그에서 고른 ID를 받는다 — 없는 ID는 결손이 아니라 잘못된 요청이라 400 그대로다.
         // 다만 해외 결제 등급은 위에서 걸러 안내로 싣는다.
-        List<MissingInput> missing = missingInputs(optional, List.of(), foreignPriced);
+        List<MissingInput> missing = missingInputs(optional, currentCarrier, familyDiscount, List.of(), foreignPriced);
         Accuracy accuracy = missing.isEmpty() ? Accuracy.FULL : Accuracy.PARTIAL;
         return new CalculatorResponse(accuracy, missing, result);
     }
@@ -196,9 +253,45 @@ public class RecommendationService {
                 "해당 자격이 있다면 통신사에서 더 싼 요금제를 찾을 수 있어요"));
     }
 
+    /**
+     * 결합 할인을 <b>어디에 반영했는지</b> 밝힌다(G-29 c·e). 금액이 없으면 할 말도 없다.
+     *
+     * <p>이 안내가 없으면 사용자는 결과 표의 "가족결합 할인 −11,000원"이 모든 후보에 붙어 있다고
+     * 읽는다. 실제로는 지금 통신사 요금제에만 붙어 있고, 1등이 다른 통신사면 그 금액은 사라진다.
+     */
+    private static void addFamilyBundleCarrierNotice(List<MissingInput> missing, Long familyDiscount,
+            String currentCarrier, List<CostResult> results) {
+        if (familyDiscount == null) {
+            return;
+        }
+        String amount = String.format("%,d", familyDiscount);
+        if (currentCarrier == null) {
+            missing.add(new MissingInput("currentCarrier",
+                    "가족결합 할인 " + amount + "원은 이번 계산에 넣지 않았어요. 어느 통신사에 붙은 할인인지 알아야 하거든요",
+                    "지금 쓰는 통신사(또는 요금제)를 골라 주세요"));
+            return;
+        }
+        if (results.stream().anyMatch(r -> !sameCarrier(r.carrier(), currentCarrier))) {
+            missing.add(new MissingInput("familyBundleDiscountKrw",
+                    "가족결합 할인 " + amount + "원은 " + currentCarrier + " 요금제에만 반영했어요. 다른 통신사로 옮기면 결합이 풀리거든요",
+                    "지금 통신사 안에서 바꾸면 할인은 그대로예요"));
+        }
+    }
+
+    /** 보낸 요금제를 못 찾았을 때. 400 으로 막지 않는다 — '현재' 금액 하나 때문에 추천 전체를 버릴 이유가 없다. */
+    private static void addUnknownCurrentPlanNotice(List<MissingInput> missing, RecommendationRequest.Optional o,
+            java.util.Optional<CandidatePlan> currentPlan) {
+        if (o == null || o.currentPlanId() == null || currentPlan.isPresent()) {
+            return;
+        }
+        missing.add(new MissingInput("currentPlanId",
+                "지금 쓰는 요금제를 카탈로그에서 찾지 못해 '현재' 금액은 계산하지 못했어요",
+                "요금제를 다시 골라 주세요. 목록에 없다면 이름을 알려주시면 확인할게요"));
+    }
+
     /** 채워지지 않은 선택 입력과 카탈로그 결손을 안내한다. accuracy 는 이 목록이 비었는지로 정한다. */
-    private static List<MissingInput> missingInputs(RecommendationRequest.Optional o, List<Long> unknownServiceIds,
-            Map<Long, String> foreignPriced) {
+    private static List<MissingInput> missingInputs(RecommendationRequest.Optional o, String currentCarrier,
+            Long familyDiscount, List<Long> unknownServiceIds, Map<Long, String> foreignPriced) {
         var missing = new ArrayList<MissingInput>();
         if (!foreignPriced.isEmpty()) {
             // 해외 결제 구독은 원화 확정 금액이 없다. 환율 환산값은 표시용이라 계산에 넣지 않는다(D-17).
@@ -229,7 +322,9 @@ public class RecommendationService {
                     "가족결합으로 매달 얼마를 할인받는지 알려주시면 그 금액을 빼고 계산해요",
                     "통신사 앱 > 요금 청구서의 결합할인 항목"));
         }
-        if (o == null || o.currentCarrier() == null) {
+        // 결합 할인이 있는데 통신사를 모르면 addFamilyBundleCarrierNotice 가 더 구체적으로 묻는다.
+        // 같은 것을 두 줄로 묻지 않는다(G-18-h 안내 소음).
+        if (currentCarrier == null && familyDiscount == null) {
             missing.add(new MissingInput("currentCarrier",
                     "현재 통신사를 알면 번호이동 여부를 판단할 수 있어요",
                     "현재 사용 중인 통신사 선택"));

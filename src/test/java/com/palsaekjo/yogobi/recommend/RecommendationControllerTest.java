@@ -29,7 +29,7 @@ class RecommendationControllerTest {
     void attachesFirstResultNarrationFromNarrator() {
         var missing = List.of(new MissingInput("hasFamilyBundle", "확인 필요", "마이페이지"));
         when(service.recommend(any()))
-                .thenReturn(new RecommendationResponse(Accuracy.PARTIAL, missing, List.of(best), 127));
+                .thenReturn(new RecommendationResponse(Accuracy.PARTIAL, missing, List.of(best), 127, null));
         when(narrator.narrationFor(eq(best), eq(missing), eq(127)))
                 .thenReturn(new Narrator.Narration("월 13,500원 절약할 수 있어요.", List.of("넷플릭스가 포함돼요."),
                         List.of("확인 필요 — 마이페이지")));
@@ -49,7 +49,7 @@ class RecommendationControllerTest {
     @Test
     void aiUnavailableYieldsEmptyNarrationButKeepsResults() {
         when(service.recommend(any()))
-                .thenReturn(new RecommendationResponse(Accuracy.FULL, List.of(), List.of(best), 5));
+                .thenReturn(new RecommendationResponse(Accuracy.FULL, List.of(), List.of(best), 5, null));
         // narrationFor 가 장애를 빈 설명으로 흡수한다.
         when(narrator.narrationFor(any(), any(), any())).thenReturn(Narrator.Narration.none());
 

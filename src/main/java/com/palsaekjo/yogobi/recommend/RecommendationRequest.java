@@ -17,9 +17,15 @@ public record RecommendationRequest(Required required, Optional optional) {
      * {@code familyBundleDiscountKrw} 는 <b>사용자가 확인해 적어 준 월 할인액</b>이다(G-28).
      * 통신사별 결합 할인표가 카탈로그에 없어 우리가 만들 수 없는 값이라 받아서 쓴다 — `USER_PROVIDED`.
      * {@code familyLineCount} 는 근거 문구용이며 <b>금액 계산에 넣지 않는다.</b>
+     *
+     * <p>{@code currentPlanId} 는 지금 쓰는 요금제다(G-30). 두 가지에 쓴다 —
+     * 그 요금제의 실질월비용을 후보와 같은 규칙으로 계산해 응답의 {@code current} 에 싣고,
+     * 그 통신사를 <b>현재 통신사로 확정</b>해 가족결합 할인을 어느 후보에 유지할지 정한다(G-29).
+     * 카탈로그에 없는 id 면 막지 않고 안내만 남긴다.
      */
     public record Optional(String currentCarrier, String networkType,
                            String contractType, Boolean hasFamilyBundle,
-                           Integer familyLineCount, Long familyBundleDiscountKrw) {
+                           Integer familyLineCount, Long familyBundleDiscountKrw,
+                           Long currentPlanId) {
     }
 }

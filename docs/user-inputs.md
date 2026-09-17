@@ -40,10 +40,11 @@
 |---|---|---|---|
 | `required.monthlyDataGb` | ✅ | 화면이 기본 10GB로 보내고 **"10GB 기준으로 계산했다"고 적는다** | 구간 선택(칩) |
 | `required.wantedServiceIds` | ✅ | 없으면 추천이 성립하지 않는다(유일한 진짜 필수) | 서비스 카드 선택 |
-| `optional.currentCarrier` | | 안내만 | 통신사 선택. 알뜰폰은 브랜드 대신 "알뜰폰"으로 묶어 보낸다 |
+| `optional.currentCarrier` | | 안내만. 단 결합 할인을 적었다면 **어디에도 반영하지 못한다**(G-29 c) | 통신사 검색 + 직접 입력. 브랜드 이름을 그대로 보낸다 — 카탈로그에 없으면 결손으로 쌓인다(2026-09-17 QA) |
+| `optional.currentPlanId` | | '현재' 금액을 계산하지 않고 화면이 적은 값만 남는다 | 요금제 이름 검색(카탈로그 1,707건). 고르면 통신사도 함께 확정된다 |
 | `optional.networkType` | | 망 필터 없이 계산 | 5G/LTE/3G + "잘 모르겠어요" |
 | `optional.contractType` | | `missingInputs`: "선택약정 25% 적용 시 약 25% 절감 가능 / 통신사 마이페이지 > 약정 정보" | 무약정·선택약정·공시지원 + 모름 |
-| `optional.hasFamilyBundle` | | `missingInputs`: "가족 결합 시 결합할인 추가 / 마이페이지 > 결합 상품" | 예·아니오 + 모름 |
+| `optional.hasFamilyBundle` · `familyBundleDiscountKrw` | | `missingInputs`: "결합 중이면 할인액을 알려주세요 / 통신사 앱 > 요금 청구서" | 예·아니오 + 회선 수·월 할인액. 할인액은 **현재 통신사 요금제에만** 반영된다(G-29) |
 
 응답의 `accuracy`가 `FULL`/`PARTIAL`로 **얼마나 채웠는지**를 그대로 보여준다.
 

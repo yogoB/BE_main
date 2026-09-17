@@ -178,7 +178,8 @@ AI 연결과 내부 인증은 BE가 담당하며 프론트에는 AI 주소·내�
     "contractType": "SELECTIVE_25",
     "hasFamilyBundle": true,
     "familyLineCount": 3,
-    "familyBundleDiscountKrw": 11000
+    "familyBundleDiscountKrw": 11000,
+    "currentPlanId": 42
   }
 }
 ```
@@ -193,7 +194,8 @@ AI 연결과 내부 인증은 BE가 담당하며 프론트에는 AI 주소·내�
 | `optional.contractType` | contractType | | 약정 유형 |
 | `optional.hasFamilyBundle` | bool | | 가족 결합 여부 |
 | `optional.familyLineCount` | int | | 결합 회선 수. **금액 계산에 쓰지 않는다** — 근거 문구용이다 |
-| `optional.familyBundleDiscountKrw` | long (≥0) | | 가족결합 월 할인액. **사용자가 확인해 적어 준 금액**을 그대로 뺀다(`USER_PROVIDED`). 선택약정 25% 적용 **후**에 뺀다(`domain.md §4` 300). 결합 중이 아니면 무시하고, 요금보다 크면 0원까지만 깎는다. 음수는 400 |
+| `optional.familyBundleDiscountKrw` | long (≥0) | | 가족결합 월 할인액. **사용자가 확인해 적어 준 금액**을 그대로 뺀다(`USER_PROVIDED`). 선택약정 25% 적용 **후**에 뺀다(`domain.md §4` 300). 결합 중이 아니면 무시하고, 요금보다 크면 0원까지만 깎는다. 음수는 400. **현재 통신사의 요금제에만 반영한다**(G-29) — 옮기면 결합이 풀리므로 다른 통신사 후보에서는 빼지 않는다 |
+| `optional.currentPlanId` | long | | 지금 쓰는 요금제 ID(G-30). 응답 `current` 를 채우고, 그 요금제의 통신사를 **현재 통신사로 확정**한다(`currentCarrier` 보다 우선). 카탈로그에 없는 ID 는 400 이 아니라 `missingInputs` 안내 |
 
 `optional`의 빈 필드는 응답 `missingInputs`로 안내된다.
 
@@ -222,6 +224,12 @@ AI 연결과 내부 인증은 BE가 담당하며 프론트에는 AI 주소·내�
         ]
       }
     ],
+    "current": {
+      "cost": { "planId": 7, "planName": "5G 언리미티드", "carrier": "SKT", "monthlyTotal": 82300, "baseline": 82300,
+                "monthlySavings": 0, "annualSavings": 0, "breakdown": [] },
+      "monthlySavings": 37300,
+      "annualSavings": 447600
+    },
     "candidateCount": 127,
     "message": "“SKT 5G OTT택1”의 실제 내시는 금액은 월 50,000원이에요. 아무 할인 없이 정가로 내는 금액은 월 68,500원이에요. …",
     "reasons": [
@@ -242,6 +250,9 @@ AI 연결과 내부 인증은 BE가 담당하며 프론트에는 AI 주소·내�
 | `results[].baseline` | long(원) | 할인 없이 정가 합 |
 | `results[].monthlySavings` / `annualSavings` | long(원) | `baseline - monthlyTotal` / ×12 |
 | `results[].breakdown[]` | object[] | 항목별 내역. `amount` 할인은 음수. `provenance`·`note` |
+| `current` | object\|null | 지금 쓰는 요금제로 **같은 구독을 유지했을 때**의 금액(G-30). `currentPlanId` 를 줬고 카탈로그에 있을 때만 |
+| `current.cost` | object | `results[]` 와 같은 모양. 후보와 같은 계산기·같은 컨텍스트로 낸 값이다 |
+| `current.monthlySavings` / `annualSavings` | long(원) | `current.cost.monthlyTotal - results[0].monthlyTotal` / ×12. **지금이 더 싸면 음수 그대로** — 화면이 빼지 않도록 여기서 준다(원칙 2) |
 | `candidateCount` | int | 정렬 대상이 된 후보 요금제 수. `results`에는 그중 상위 5개만 담긴다. 후보가 없으면 `null` |
 | `message` | string | 1순위 조합을 설명하는 3~5문장. **내레이터의 결정론적 템플릿이라 모델 키가 없어도 나온다.** AI에 닿지 못하면 `null`이고 화면은 자체 최소 문구로 대체한다 |
 | `reasons[]` | string[] | 1순위 조합에 대한 사유 0~3개(화면 "왜 나에게 이 상품이 추천됐나요?"). **보조 정보** — 요청에 없는 금액이 섞인 줄은 BE·AI가 폐기한다. **모델 장애 시에는 내레이터가 규칙으로 만든 사유가 온다**(D-38). BE가 AI에 아예 닿지 못하면 빈 배열이고, 결손으로 `results`가 비어도 빈 배열 |

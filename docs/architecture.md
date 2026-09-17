@@ -184,7 +184,8 @@ Google 전용 계정은 동일 Google `sub` 재인증으로 자체 비밀번호�
                 "wantedTierIds": [2, 12] },   // 선택 — 비우면 서버가 대표 등급(스탠다드 우선)을 고른다
   "optional": { "currentCarrier": "SKT", "networkType": "5G",
                 "contractType": "SELECTIVE_25", "hasFamilyBundle": true,
-                "familyLineCount": 3, "familyBundleDiscountKrw": 11000 }
+                "familyLineCount": 3, "familyBundleDiscountKrw": 11000,
+                "currentPlanId": 42 }   // 선택 — 지금 쓰는 요금제(G-30). 없는 id 는 400 이 아니라 안내
 }
 ```
 
@@ -214,6 +215,11 @@ Google 전용 계정은 동일 Google `sub` 재인증으로 자체 비밀번호�
       "checkedAt": "2026-09-16T03:40:00Z"               // 스냅샷을 모은 시각
     }
   }],
+  "current": {                                            // currentPlanId 를 줬고 카탈로그에 있을 때만. 없으면 null
+    "cost": { "planId": 7, "planName": "5G 언리미티드", "carrier": "SKT", "monthlyTotal": 82300, "…": "results 와 같은 모양" },
+    "monthlySavings": 11000,                              // current − results[0]. 지금이 더 싸면 음수 그대로
+    "annualSavings": 132000
+  },
   "candidateCount": 127,                                  // 정렬 대상 후보 수. results 는 상위 N개만
   "message": "“SKT 5G 슬림+”의 실제 내시는 금액은 …",     // 1순위 설명. 모델 키 없이 나온다
   "reasons": [                                            // 1순위 조합에 대한 사유, 0~3개
@@ -224,6 +230,11 @@ Google 전용 계정은 동일 Google `sub` 재인증으로 자체 비밀번호�
 ```
 
 `baseline`은 아무 할인 없이 정가로만 냈을 때다. 절감액 표시의 기준선.
+`current`는 **지금 쓰는 요금제로 같은 구독을 유지했을 때**의 금액이다(G-30). 후보와 같은 계산기·같은 컨텍스트로 내므로
+`results[0]`과 나란히 놓고 빼도 되는 두 금액이며, 그 뺄셈도 여기서 해서 보낸다 — 화면은 금액을 만들지 않는다(원칙 2).
+`familyBundleDiscountKrw`는 **현재 통신사의 요금제에만** 반영한다(G-29). 통신사를 옮기면 결합이 풀려 사라질 할인이라,
+다른 통신사 후보에 빼면 갈아탄 뒤 그만큼 더 내게 된다. 현재 통신사는 `currentPlanId`의 통신사 > `currentCarrier` 순으로 정하고,
+둘 다 없으면 **어디에도 적용하지 않는다.**
 D-18에서 우체국·스마트초이스 연동과 `priceCrossCheck` 응답 필드를 제거했다.
 **2026-09-16 사용자 승인으로 `priceCrossCheck`를 복구했다**(D-12 마지막 줄이 남겨 둔 §3 계약 결정).
 대조 대상은 요금제 **기본료**이며 `baseline`(구독 포함 정가 합계)이 아니다.
