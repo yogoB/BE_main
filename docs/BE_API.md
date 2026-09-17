@@ -633,6 +633,8 @@ JWT 절대 수명 15분·유휴 제한 5분(refresh 없음). 상태를 바꾸는
 | POST | `/api/v1/admin/harvest/run` | 일일 수집 즉시 실행 (정기: 매일 09:00 KST) |
 | POST | `/api/v1/admin/smartchoice/sweep` | 스마트초이스 스냅샷 스윕 즉시 실행 |
 | POST | `/api/v1/admin/fx/refresh` | 환율 즉시 갱신(정기: 09:15 KST). 실패해도 이전 값 유지 — 응답 `updated` 로 구분 |
+| GET | `/api/v1/admin/reports` | **제보 게시판** — `catalog_report`+`service_report` 합본 최신순. `?status=PENDING` · `?limit=`(기본 50·최대 200). **제보자 회원 신원은 싣지 않는다**(D-42) |
+| PATCH | `/api/v1/admin/reports/{kind}/{id}` | 처리 상태 변경(`PENDING`·`RESOLVED`·`REJECTED`). `kind` 는 `CATALOG`·`SERVICE`. **원본 카탈로그는 바뀌지 않는다** — 가격 수정은 D-28 승인을 따로 탄다 |
 | GET | `/api/v1/admin/retention/pending` | 보유기간 만료 **건수만** 조회. 지우지 않는다 |
 | POST | `/api/v1/admin/retention/purge` | 만료 개인정보 파기(정기: 04:00 KST). `{confirm:"파기"}` 없으면 400 — 되돌릴 수 없다 |
 | GET | `/api/v1/admin/catalog` | 카탈로그 원본(합본 CSV) 데이터셋 목록·행 수 (D-24) |

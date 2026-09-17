@@ -107,6 +107,8 @@ ADMIN_ID / ADMIN_PASSWORD  →  app_user 행(부트스트랩)  →  ROLE_ADMIN  
 | POST | `/api/v1/admin/login` | 아이디·비밀번호 로그인(공개). 실패는 401 하나 |
 | GET | `/api/v1/admin/session` | 관리자인지 확인 |
 | GET | `/api/v1/admin/dashboard` | 축 ① 지표 |
+| GET | `/api/v1/admin/reports` | **제보 게시판** — `catalog_report`+`service_report` 합본 최신순. `?status=PENDING` · `?limit=`(기본 50·최대 200). **제보자 회원 신원은 싣지 않는다**(D-42) |
+| PATCH | `/api/v1/admin/reports/{kind}/{id}` | 처리 상태 변경(`PENDING`·`RESOLVED`·`REJECTED`). `kind` 는 `CATALOG`·`SERVICE`. **원본 카탈로그는 바뀌지 않는다** — 가격 수정은 D-28 승인을 따로 탄다 |
 | POST | `/api/v1/admin/harvest/run` | 축 ② 수집 즉시 실행 |
 | POST | `/api/v1/admin/smartchoice/sweep` | 시세 스냅샷 즉시 수집. 수집(②)보다 **먼저** 돌려야 한다 |
 | GET | `/api/v1/admin/catalog/requests` | 검수 목록(`?status=PENDING` 등) |
@@ -132,5 +134,7 @@ yogobi.harvest.tier-limit=10      # 1회 실행당 구독 등급 조회 상한
   통신사 공식 어댑터는 SK세븐모바일·LG헬로모바일·KT엠모바일 셋이라 카탈로그 1,706행 중 462행(27%)을 덮는다.
   나머지 사업자는 스마트초이스·AI 두 곳으로만 대조한다.
   제휴 혜택·번들은 대조 소스가 없어 수집·검토 대상이 아니다.
-- **제보 처리 화면이 없다.** 대기 건수만 보인다. 실제 처리는 아직 DB에서 한다.
+- ~~제보 처리 화면이 없다~~ → **생겼다**(2026-09-17). `/api/v1/admin/reports` 로 두 표를 한 목록에서 보고
+  상태를 바꾼다. 다만 **상태만 바뀐다** — 제보를 읽고 가격을 고치는 것은 여전히 D-28 승인 경로다.
+  제보 본문에서 변경 제안을 자동 생성하지는 않는다.
 - **회원 단위 조회가 없다.** 넣으려면 개인정보 처리방침·접근 통제를 먼저 정해야 한다.

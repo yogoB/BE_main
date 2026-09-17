@@ -130,6 +130,8 @@ AI의 `/parse`·`/narrate`·`/ocr`는 토큰 누락·불일치 시 401, 서버 �
 | POST | `/api/v1/admin/login` | 백오피스 운영자 로그인 `{id,password}` — 공개, 실패는 401 하나 (D-32) |
 | GET | `/api/v1/admin/session` | 관리자 여부 확인 |
 | GET | `/api/v1/admin/dashboard` | 사용 지표(회원·카탈로그·검수·제보·엔드포인트) |
+| GET | `/api/v1/admin/reports` | **제보 게시판** — `catalog_report`+`service_report` 합본 최신순. `?status=PENDING` · `?limit=`(기본 50·최대 200). **제보자 회원 신원은 싣지 않는다**(D-42) |
+| PATCH | `/api/v1/admin/reports/{kind}/{id}` | 처리 상태 변경(`PENDING`·`RESOLVED`·`REJECTED`). `kind` 는 `CATALOG`·`SERVICE`. **원본 카탈로그는 바뀌지 않는다** — 가격 수정은 D-28 승인을 따로 탄다 |
 | POST | `/api/v1/admin/harvest/run` | 일일 수집 즉시 실행(정기: 매일 09:00 KST) |
 
 ### Phase 1
