@@ -65,9 +65,13 @@ public class BackofficeMetrics {
                 "appliedToday", count("""
                         SELECT count(*) FROM catalog_audit
                         WHERE outcome = 'APPLIED' AND created_at > now() - interval '24 hours'""")));
+        // 상품 제보(catalog_report) + 화면·기타 제보(service_report, D-41)를 합쳐 센다.
         out.put("reports", Map.of(
-                "pending", count("SELECT count(*) FROM catalog_report WHERE status = 'PENDING'"),
-                "total", count("SELECT count(*) FROM catalog_report")));
+                "pending", count("""
+                        SELECT (SELECT count(*) FROM catalog_report WHERE status = 'PENDING')
+                             + (SELECT count(*) FROM service_report WHERE status = 'PENDING')"""),
+                "total", count("""
+                        SELECT (SELECT count(*) FROM catalog_report) + (SELECT count(*) FROM service_report)""")));
         out.put("gaps", count("SELECT count(*) FROM catalog_candidate WHERE status = 'REQUESTED'"));
         out.put("funnel", funnel());
         out.put("endpoints", endpoints());
@@ -129,7 +133,9 @@ public class BackofficeMetrics {
                            (SELECT count(*) FROM app_user u
                              WHERE u.created_at >= day AND u.created_at < day + interval '1 day') AS signups,
                            (SELECT count(*) FROM catalog_report r
-                             WHERE r.created_at >= day AND r.created_at < day + interval '1 day') AS reports,
+                             WHERE r.created_at >= day AND r.created_at < day + interval '1 day')
+                           + (SELECT count(*) FROM service_report s
+                             WHERE s.created_at >= day AND s.created_at < day + interval '1 day') AS reports,
                            (SELECT count(*) FROM catalog_change_request c
                              WHERE c.created_at >= day AND c.created_at < day + interval '1 day') AS proposals,
                            (SELECT count(*) FROM catalog_audit a

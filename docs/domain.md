@@ -80,6 +80,7 @@
 | 수집 혜택 추출 | `catalog_benefits_from_matrix.py` | 요금제명 공식 표기 → `plan_benefit.csv`. 등급 표기가 있으면 `FREE`+`tier_id`, 없으면 `BUNDLE_INCLUDED`(표시만) |
 | 수집 매트릭스 변환 | `catalog_matrix_to_csv.py` | 팀 수집 매트릭스(35열) → `mobile_plan.csv`(12열). 매핑 불가 행은 사유별 개수로 보고하고 **지어내지 않는다** |
 | 정보 오류 제보 | `catalog_report` / `CatalogReportController` | 공개 접수·원본 자동 변경 없음·90일 파기 |
+| 제보 리워드 쿠폰 | `service_report.user_id` · `coupon_used_at` / `MyCouponController` | 제보 1건 = 쿠폰 1장이라 **코드가 곧 제보 id** — 코드 칼럼 없음. 로그인 제보만 회원 귀속(비로그인은 코드 보관). **오늘 해제하는 것 없음** — 분석은 무료이고 수익 모델은 범위 밖(D-01). 제보와 함께 90일 파기 |
 | 카탈로그 결손 | `catalog_candidate` / `CatalogCandidateRecorder` | **"아예 없다"** 를 센다(제보는 "있는데 틀렸다"). `REQUESTED` 기록·`requested_cnt`=수집 우선순위, **계산 미사용**(D-17). fail-soft·행 상한 10,000 |
 | 결손 수집 후보 검증 | `CandidateVerifier` | P2. 출처·형식/범위·2소스 일치 3단계. 결정적 규칙이며 AI는 판정하지 않는다 |
 | 카탈로그 시드 로더 | `CatalogSeedLoader` | `catalog` 내부, CSV 스냅샷 적재 |

@@ -116,6 +116,8 @@ AI의 `/parse`·`/narrate`·`/ocr`는 토큰 누락·불일치 시 401, 서버 �
 | GET | `/api/v1/catalog/services` | 구독 서비스·티어. 등급에 `currency`(KRW\|USD)·`taxIncluded`·`krwEstimate`·`krwRateDate` — 해외 결제는 환산 **표시만** (아래) |
 | GET | `/api/v1/catalog/plans/{id}/benefits` | 요금제별 혜택 |
 | POST | `/api/v1/catalog/reports` | 정보 오류 제보(비회원 허용·CSRF 필수), 접수만 수행 — D-18 사용자 요청 |
+| POST | `/api/v1/reports` | 상품 없는 제보 — 화면·기능 오류(`SYSTEM`)·기타(`OTHER`). 비회원 허용·CSRF 필수, 접수 + **쿠폰 1장 발급** — D-41·D-42 |
+| GET | `/api/v1/me/coupons` | 제보 리워드 쿠폰함 — **회원 전용**. 로그인 상태로 낸 제보만. 조회만 있고 사용 API 는 없다 — D-42 |
 | GET | `/api/v1/admin/catalog` | 카탈로그 원본(합본 CSV) 데이터셋 목록·행 수 — **운영자 전용**, D-24 |
 | GET | `/api/v1/admin/catalog/{dataset}` | 데이터셋 전체 행 |
 | POST | `/api/v1/admin/catalog/{dataset}` | 행 추가 **제안** — 202, 승인 전까지 반영 없음 (D-28) |
@@ -359,6 +361,14 @@ CSV에 없는 상품은 비활성화하며 기존 회원 FK를 보존한다. 신
 `CatalogCsvSync`는 승인 해시를 확인한 5종 전체 CSV를 단일 DB 트랜잭션으로 반영한다. 실패하면 이전 DB를 유지한다.
 `catalog_report`는 UUID, 대상 종류/ID, 오류 항목, 설명, 선택 출처 URL, 상태, 생성 시각을 저장한다.
 회원 ID·이메일·원문 IP를 수집하지 않으며 제보 본문은 90일 경과 후 정기 파기한다.
+
+### 제보 리워드 쿠폰 (V24, D-42)
+`service_report`에 `user_id`(비로그인은 NULL)와 `coupon_used_at`을 더한다. **제보 1건 = 쿠폰 1장**이라
+별도 표도, 별도 코드 칼럼도 두지 않는다 — **제보 id가 곧 쿠폰 코드**다.
+`user_id`는 `ON DELETE SET NULL`이다. 탈퇴하면 제보 본문은 남기고 귀속만 끊는다 — 본문은 우리 버그 기록이지
+회원의 개인정보가 아니다(설명란에 개인정보를 적지 말라고 받는다). 다른 표가 CASCADE인 것과 갈리는 지점이다.
+**이 쿠폰이 지금 해제하는 것은 없다.** 요금 분석은 무료이고 수익 모델은 범위 밖이다(D-01).
+그래서 사용 API를 만들지 않았다. 보유기간은 제보와 같아 90일에 함께 파기된다.
 
 ### 카탈로그 결손 기록 (V10)
 `catalog_candidate`는 추천에서 찾지 못한 서비스 ID·요금제 조건의 요청 횟수를 기록한다. 금액 계산에 쓰지 않는다.

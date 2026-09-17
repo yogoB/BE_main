@@ -46,6 +46,47 @@ D-18 변경: 우체국 연동을 제거했다. 스마트초이스와 `CostResult
 내장 `/` 화면의 요금제·추천·계산 카드에서 같은 흐름을 사용한다. 제보는 90일 경과 후 정기 파기한다.
 운영 절차: [CSV와 제보 관리](catalog-data.md).
 
+### 상품 없는 제보 — `POST /api/v1/reports` (D-41)
+
+화면·기능 오류처럼 특정 상품을 가리키지 않는 제보다. 인증·CSRF·비회원 규칙은 위와 같다.
+프론트의 "오류 제보" 플로팅 버튼이 상품 카테고리는 `/catalog/reports` 로, 나머지는 여기로 보낸다.
+
+```json
+{"category":"SYSTEM","description":"결과 화면에서 다음 버튼이 눌리지 않아요","pageUrl":"/results","sourceUrl":null}
+```
+
+| 필드 | 허용 값 |
+|---|---|
+| category | `SYSTEM`(화면·기능 오류), `OTHER`(기타) |
+| description | 공백만 불가, 1~2,000자. 개인정보를 요청하지 않는다 |
+| pageUrl | 선택. `/`로 시작하는 우리 화면 경로(최대 2,000자). 다른 사이트 주소는 400 |
+| sourceUrl | 선택. `/catalog/reports` 와 같은 HTTPS 규칙 |
+
+오류 코드는 `/catalog/reports` 와 같다(404 는 없다). `service_report` 표에 저장하고 90일 뒤 파기하며,
+백오피스 제보 지표는 두 표를 합쳐 센다.
+
+응답에는 **리워드 쿠폰 1장**이 함께 온다(D-42).
+
+```json
+{"data":{"id":"<uuid>","status":"PENDING","coupon":{"code":"<uuid>","status":"UNUSED"}},"warnings":[]}
+```
+
+`coupon.code` 는 `id` 와 같은 값이다 — 제보 1건 = 쿠폰 1장이라 코드를 따로 두지 않았다.
+**로그인 상태로 낸 제보만** 회원에 귀속된다. 비로그인 제보는 이 코드가 유일한 소유 증명이므로
+화면에서 보관을 안내한다.
+
+### 내 쿠폰함 — `GET /api/v1/me/coupons` (D-42)
+
+회원 전용. 로그인 상태로 낸 제보의 쿠폰만 최신순으로 돌려준다.
+
+```json
+{"data":[{"code":"<uuid>","status":"UNUSED","issuedAt":"2026-09-17T05:12:00Z","usedAt":null}],"warnings":[]}
+```
+
+`status` 는 `UNUSED` / `USED`. **사용 API 는 없다** — 요금 분석은 지금 무료라 이 쿠폰이 해제하는 것이
+아직 없기 때문이다(수익 모델은 범위 밖 — D-01). 보유기간은 제보와 같아 90일 뒤 함께 사라지고,
+탈퇴하면 귀속이 끊겨 목록에서 빠진다.
+
 ## 연결 설정
 
 | 항목 | 값 |

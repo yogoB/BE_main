@@ -41,6 +41,8 @@ public class RetentionService {
                         "detected_at < now() - (? * interval '1 month')", PrivacyPolicy.DETECTION_RETENTION_MONTHS),
                 new Target("auth_session", "auth_session", "expires_at <= now()"),
                 new Target("catalog_report", "catalog_report",
+                        "created_at < now() - (? * interval '1 day')", PrivacyPolicy.REPORT_RETENTION_DAYS),
+                new Target("service_report", "service_report",
                         "created_at < now() - (? * interval '1 day')", PrivacyPolicy.REPORT_RETENTION_DAYS));
     }
 
