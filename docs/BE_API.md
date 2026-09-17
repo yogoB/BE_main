@@ -170,7 +170,8 @@ AI 연결과 내부 인증은 BE가 담당하며 프론트에는 AI 주소·내�
 {
   "required": {
     "monthlyDataGb": 20,
-    "wantedServiceIds": [1, 5]
+    "wantedServiceIds": [1, 5],
+    "wantedTierIds": [2, 12]
   },
   "optional": {
     "currentCarrier": "SKT",
@@ -185,6 +186,7 @@ AI 연결과 내부 인증은 BE가 담당하며 프론트에는 AI 주소·내�
 |---|---|---|---|
 | `required.monthlyDataGb` | int (≥1) | ✅ | 월 데이터 사용량(GB) |
 | `required.wantedServiceIds` | long[] (≥1개) | ✅ | 원하는 구독 서비스 ID |
+| `required.wantedTierIds` | long[] | | 사용자가 고른 구독 등급 ID. **비우면 서버가 대표 등급**(스탠다드 우선, 광고형 제외)을 고른다 — 이 필드를 안 보내던 호출은 그대로 동작한다. 요청한 서비스에 속하지 않는 등급 ID 는 무시한다 |
 | `optional.currentCarrier` | string | | 현재 통신사 |
 | `optional.networkType` | `5G`\|`LTE`\|`3G` | | 망 종류(필터) |
 | `optional.contractType` | contractType | | 약정 유형 |
@@ -199,7 +201,7 @@ AI 연결과 내부 인증은 BE가 담당하며 프론트에는 AI 주소·내�
   "data": {
     "accuracy": "PARTIAL",
     "missingInputs": [
-      { "field": "hasFamilyBundle", "impact": "가족 결합 시 결합할인이 추가로 반영돼요", "howToFind": "통신사 마이페이지 > 결합 상품" }
+      { "field": "hasFamilyBundle", "impact": "가족 결합 여부를 알려주시면 추천 정확도 표시가 올라가요 — 결합할인 금액은 아직 반영하지 않아요", "howToFind": "통신사 마이페이지 > 결합 상품" }
     ],
     "results": [
       {

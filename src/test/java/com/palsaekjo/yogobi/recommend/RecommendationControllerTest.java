@@ -23,7 +23,7 @@ class RecommendationControllerTest {
     private final CostResult best = new CostResult(42, "넷플플랜", "SKT", 55000, 68500, 13500, 162000,
             List.of(new BreakdownLine("기본료", 55000, "OFFICIAL", null)));
     private final RecommendationRequest request = new RecommendationRequest(
-            new RecommendationRequest.Required(20, List.of(1L)), null);
+            new RecommendationRequest.Required(20, List.of(1L), null), null);
 
     @Test
     void attachesFirstResultNarrationFromNarrator() {

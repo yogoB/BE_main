@@ -100,7 +100,9 @@ public class AiGateway implements Narrator, CatalogVerifier {
                 throw new Unavailable();
             }
         }
-        return new RecommendationRequest(new RecommendationRequest.Required(gb.intValue(), ids), options);
+        // 챗봇은 등급까지 지정하지 않는다 — 자연어로 "넷플릭스" 라고 하지 "넷플릭스 프리미엄" 이라고 하는
+        // 경우는 다루지 않는다. null 이면 서버가 대표 등급을 고른다(필터 경로와 같은 기본값).
+        return new RecommendationRequest(new RecommendationRequest.Required(gb.intValue(), ids, null), options);
     }
 
     /** AI 설명 1건. 실패는 {@link Unavailable} 로 던진다 — 챗봇은 그때 자기 문구로 대체한다. */

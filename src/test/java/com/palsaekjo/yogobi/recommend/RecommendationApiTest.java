@@ -69,6 +69,41 @@ class RecommendationApiTest {
                 .andExpect(jsonPath("$.data.results[1].monthlyTotal").value(58500));
     }
 
+    /**
+     * 등급을 고르면 그 등급으로 계산한다. 지정 전에는 언제나 대표 등급(스탠다드 13,500)이라
+     * 프리미엄 가입자에게도 스탠다드 금액을 보여주고 있었다.
+     * 넷플릭스 프리미엄 17,000 → 웨이브플랜 45,000 + 17,000 = 62,000 (대표 등급이면 58,500).
+     */
+    @Test
+    void pickedTierIsUsedInsteadOfTheRepresentativeOne() throws Exception {
+        mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
+                {"required":{"monthlyDataGb":20,"wantedServiceIds":[1],"wantedTierIds":[3]},
+                 "optional":{"contractType":"NONE"}}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.results[0].monthlyTotal").value(55000))
+                .andExpect(jsonPath("$.data.results[1].monthlyTotal").value(62000));
+    }
+
+    /** 고르지 않은 서비스의 등급(웨이브 프리미엄 13)은 버린다 — 남의 등급으로 금액을 만들지 않는다. */
+    @Test
+    void tierOfAnUnwantedServiceIsIgnored() throws Exception {
+        mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
+                {"required":{"monthlyDataGb":20,"wantedServiceIds":[1],"wantedTierIds":[13]},
+                 "optional":{"contractType":"NONE"}}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.results[1].monthlyTotal").value(58500));
+    }
+
+    /** 등급을 안 보내면 예전과 똑같다 — 이 필드를 모르는 호출(챗봇 포함)이 그대로 동작해야 한다. */
+    @Test
+    void omittingTierIdsKeepsTheOldBehaviour() throws Exception {
+        mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
+                {"required":{"monthlyDataGb":20,"wantedServiceIds":[1],"wantedTierIds":[]},
+                 "optional":{"contractType":"NONE"}}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.results[1].monthlyTotal").value(58500));
+    }
+
     @Test
     void wantingWave_rankReverses() throws Exception {
         // 요금제 쌍은 그대로, 원하는 서비스만 웨이브로 → 순위 역전

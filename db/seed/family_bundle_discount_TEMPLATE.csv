@@ -1,0 +1,19 @@
+# 통신사 가족결합 할인표 — 채워서 family_bundle_discount.csv 로 저장하면 규칙이 붙는다.
+#
+# 진입 조건(D-18 · docs/catalog-data.md "AI 자료의 진입 조건"):
+#   - 이용 조건을 확인한 **공식 자료**에서만 채운다. 통신사 공식 상품 페이지 / 허락받은 데이터 파일.
+#   - 검색 결과 요약·모델의 기억은 증거가 아니다. source_url 은 사람이 열어 확인한 주소여야 한다.
+#   - 값을 모르면 **비워 둔다.** 지어낸 숫자보다 빈 칸이 낫다 — 빈 칸은 missingInputs 로 안내된다.
+#
+# 열 설명
+#   carrier        : mobile_plan 의 통신사 표기와 **정확히** 같아야 한다(예: SKT, KT, LG U+, KT엠모바일).
+#   bundle_name    : 공식 결합 상품명(예: 참 쉬운 가족결합). 화면 근거 문구로 그대로 쓴다.
+#   line_count     : 결합 회선 수. 정수. "5회선 이상"은 5 로 적고 비고에 남긴다.
+#   discount_krw   : 회선당 월 할인액(원, 정수). 정률이면 비우고 discount_rate 를 쓴다.
+#   discount_rate  : 정률 할인(예: 0.25). 정액이면 비운다. 둘 다 채우지 않는다.
+#   applies_to     : 할인이 붙는 대상 — LINE(내 회선 요금) 만 우선 지원한다.
+#   min_base_price : 이 할인을 받기 위한 최소 월정액(원). 없으면 비운다.
+#   note           : 조건(인터넷 결합 필요, 특정 요금제 이상 등). 계산에 쓰지 않고 근거 문구로 보여준다.
+#   source_url     : 공식 상품 페이지 주소(HTTPS).
+#   collected_at   : 확인한 날짜(YYYY-MM-DD).
+carrier,bundle_name,line_count,discount_krw,discount_rate,applies_to,min_base_price,note,source_url,collected_at

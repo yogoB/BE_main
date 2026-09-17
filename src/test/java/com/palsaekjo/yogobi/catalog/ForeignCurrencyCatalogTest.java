@@ -127,7 +127,7 @@ class ForeignCurrencyCatalogTest {
     @Test void recommendationExplainsExclusionWithoutRecordingAGap() {
         jdbc.update("DELETE FROM catalog_candidate");
         var response = recommendations.recommend(new RecommendationRequest(
-                new RecommendationRequest.Required(10, List.of(usdServiceId)), null));
+                new RecommendationRequest.Required(10, List.of(usdServiceId), null), null));
 
         assertThat(response.missingInputs()).anyMatch(m -> m.impact().contains("해외 결제"));
         assertThat(jdbc.queryForObject("SELECT count(*) FROM catalog_candidate", Integer.class)).isZero();

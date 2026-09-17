@@ -15,6 +15,7 @@ import com.palsaekjo.yogobi.pricing.domain.PricingContext;
 import com.palsaekjo.yogobi.pricing.domain.SubscriptionTier;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +43,33 @@ public class RecommendationService {
         this.crossCheck = crossCheck;
     }
 
+    /**
+     * 서비스마다 쓸 등급을 고른다. 사용자가 지정한 등급이 있으면 그것을, 없는 서비스는 대표 등급으로 채운다.
+     *
+     * <p>지정 전에는 언제나 대표 등급(스탠다드 우선)으로 계산했다. 프리미엄을 쓰는 사람에게 스탠다드
+     * 금액을 보여주고 있었다는 뜻이다 — 화면에서 등급을 고를 수 있게 되면서 그 값이 여기까지 온다.
+     *
+     * <p>요청한 서비스에 속하지 않는 등급 id 는 버린다. 고르지 않은 서비스의 등급으로 금액을 만들지 않는다.
+     */
+    private List<SubscriptionTier> chooseTiers(RecommendationRequest.Required required) {
+        List<SubscriptionTier> representative = catalog.findRepresentativeTiers(required.wantedServiceIds());
+        List<Long> picked = required.wantedTierIds();
+        if (picked == null || picked.isEmpty()) {
+            return representative;
+        }
+        Set<Long> services = new LinkedHashSet<>(required.wantedServiceIds());
+        Map<Long, SubscriptionTier> byService = new LinkedHashMap<>();
+        for (SubscriptionTier tier : representative) {
+            byService.put(tier.serviceId(), tier);
+        }
+        for (SubscriptionTier tier : catalog.findTiersByIds(picked)) {
+            if (services.contains(tier.serviceId())) {
+                byService.put(tier.serviceId(), tier);
+            }
+        }
+        return List.copyOf(byService.values());
+    }
+
     public RecommendationResponse recommend(RecommendationRequest request) {
         var required = request.required();
         if (required == null || required.monthlyDataGb() == null || required.monthlyDataGb() <= 0) {
@@ -52,7 +80,7 @@ public class RecommendationService {
         }
 
         // 카탈로그에 없는 서비스는 막지 않는다(G-12·D-17). 아는 것으로 계산하고 모르는 것은 안내·기록한다.
-        List<SubscriptionTier> tiers = catalog.findRepresentativeTiers(required.wantedServiceIds());
+        List<SubscriptionTier> tiers = chooseTiers(required);
         List<Long> excluded = unknown(required.wantedServiceIds(), tiers);
         // 그중 해외 결제 구독은 **결손이 아니다** — 수집할 게 아니라 사용자에게 실제 결제액을 물어야 하는 것이다.
         Map<Long, String> foreignPriced = catalog.findForeignPricedServices(excluded);
@@ -180,8 +208,11 @@ public class RecommendationService {
                     "통신사 고객센터 또는 마이페이지 > 약정 정보"));
         }
         if (o == null || o.hasFamilyBundle() == null) {
+            // 결합할인은 아직 금액에 반영하지 않는다(docs/domain.md §9 "가족 결합 여부 → 결합할인 미반영").
+            // 그런데 여기서는 "추가로 반영돼요" 라고 약속하고 있었다 — 오지 않을 할인을 예고하는 문구다.
+            // 규칙과 데이터가 들어오기 전까지는 실제로 달라지는 것(정확도 표시)만 적는다.
             missing.add(new MissingInput("hasFamilyBundle",
-                    "가족 결합 시 결합할인이 추가로 반영돼요",
+                    "가족 결합 여부를 알려주시면 추천 정확도 표시가 올라가요 — 결합할인 금액은 아직 반영하지 않아요",
                     "통신사 마이페이지 > 결합 상품"));
         }
         if (o == null || o.currentCarrier() == null) {
