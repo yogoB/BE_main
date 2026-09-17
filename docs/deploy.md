@@ -99,6 +99,10 @@ fly secrets set --app yogob-api \
 
 ### 3-2. 내레이터(`yogob-narrator`) — 공개 IP 없이 (2026-09-17)
 
+> **실행 완료 2026-09-17 21:5x.** 절차만 적혀 있고 실제로는 올라간 적이 없었다 — BE 의 D-45/D-46 을
+> 배포하자 `message`·`reasons`·`notices` 가 전부 비었다. 아래를 그대로 실행해 앱을 만들고 토큰을 맞췄다.
+> `fly ips list -a yogob-narrator` 는 private ingress 한 줄이다. 옛 `yogob-ai` 는 suspended 로 남겨 두었다.
+
 내레이터는 **인터넷에 노출하지 않는다.** BE 만 사설망으로 부른다(`docs/architecture.md` §2).
 공개 IP 를 할당하지 않고 **flycast**(Fly 프록시를 지나는 사설 IPv6) 하나만 둔다 —
 `.internal` 은 프록시를 우회하므로 멈춘 머신을 깨우지 못해 `auto_stop` 과 같이 쓸 수 없다.
