@@ -4,12 +4,13 @@
 
 > 스코프 주의: 이건 데모용 단일 배포다. CI/CD·k8s·오토스케일은 범위 밖(`AGENTS.md`).
 
-## 앱이 둘이다 — 이름을 겹치지 마라 (2026-09-16)
+## 앱이 셋이다 — 이름을 겹치지 마라 (2026-09-16 · AI 추가 2026-09-17)
 
-| 앱 | 레포 | 역할 |
-|---|---|---|
-| `yogob` | github.com/yogoB/Front | 정적 프론트 + **API 프록시**(nginx) |
-| **`yogob-api`** | 이 레포 | Spring BE |
+| 앱 | 레포 | 역할 | 공개 |
+|---|---|---|---|
+| `yogob` | github.com/yogoB/Front | React 프론트 + **API 프록시**(nginx) | 공개 |
+| **`yogob-api`** | 이 레포 | Spring BE | 공개 |
+| `yogob-ai` | github.com/yogoB/AI- | 설명 문장·추천 사유 | **사설 전용** |
 
 **브라우저에 노출되는 오리진은 `https://yogob.fly.dev` 하나다.** 프론트의 `nginx.conf`가
 `/api`·`/oauth2`·`/login/oauth2`를 `yogob-api`로 넘긴다. 같은 오리진이므로 CORS 설정도,
@@ -20,7 +21,8 @@
 
 `yogob-api`에 설정한 값: `POSTGRES_*`(`yogob-db` attach), `JWT_SECRET`(**표준 Base64여야 한다** —
 URL-safe 문자열을 넣으면 `JWT_SECRET must be Base64`로 기동에 실패한다), `AUTH_RETURN_URL`(프론트
-`account.html`), `YOGOBI_CORS_ALLOWED_ORIGINS`(프록시라 사실상 미사용).
+`account.html`), `YOGOBI_CORS_ALLOWED_ORIGINS`(프록시라 사실상 미사용),
+`AI_SERVER_URL`·`AI_INTERNAL_TOKEN`(아래 §3-2).
 
 ---
 
@@ -71,20 +73,20 @@ URL-safe 문자열을 넣으면 `JWT_SECRET must be Base64`로 기동에 실패�
 
 ```bash
 # (1) 앱 생성 — fly.toml 을 재사용한다. 지금은 배포하지 않는다.
-fly launch --no-deploy --copy-config --name yogobi-be --region nrt
+fly launch --no-deploy --copy-config --name yogob-api --region nrt
 
 # (2) PostgreSQL 생성 (Fly Postgres, 사설망 안에서 앱과 연결됨)
 fly postgres create --name yogobi-db --region nrt --initial-cluster-size 1 --vm-size shared-cpu-1x --volume-size 1
 
 # (3) 앱에 DB 연결 → DATABASE_URL 이 secret 으로 주입되고, 접속 정보가 출력된다
-fly postgres attach yogobi-db --app yogobi-be
+fly postgres attach yogobi-db --app yogob-api
 ```
 
 `attach` 출력의 `postgres://<user>:<password>@<host>:5432/<db>` 에서 값을 뽑아,
 앱이 읽는 `POSTGRES_*` 형태로 secret 을 세팅한다(우리 `application.properties`가 이 이름들을 쓴다):
 
 ```bash
-fly secrets set --app yogobi-be \
+fly secrets set --app yogob-api \
   POSTGRES_HOST=yogobi-db.internal \
   POSTGRES_PORT=5432 \
   POSTGRES_DB=<attach가 알려준 db> \
@@ -95,12 +97,56 @@ fly secrets set --app yogobi-be \
 > 대안: 코드 수정 없이 `SPRING_DATASOURCE_URL=jdbc:postgresql://yogobi-db.internal:5432/<db>` +
 > `SPRING_DATASOURCE_USERNAME` + `SPRING_DATASOURCE_PASSWORD` secret 으로 줘도 된다(Spring 완화 바인딩).
 
+### 3-2. AI 서버(`yogob-ai`) — 공개 IP 없이 (2026-09-17)
+
+AI 서버는 **인터넷에 노출하지 않는다.** BE 만 사설망으로 부른다(`docs/architecture.md` §2).
+공개 IP 를 할당하지 않고 **flycast**(Fly 프록시를 지나는 사설 IPv6) 하나만 둔다 —
+`.internal` 은 프록시를 우회하므로 멈춘 머신을 깨우지 못해 `auto_stop` 과 같이 쓸 수 없다.
+
+```bash
+cd ../AI-
+fly apps create yogob-ai --org personal
+fly ips allocate-v6 --private -a yogob-ai     # 공개 IP 는 할당하지 않는다
+fly deploy --ha=false
+fly ips list -a yogob-ai                      # private ingress 한 줄만 나와야 한다
+```
+
+두 서버가 **같은 내부 토큰**을 공유한다. 한 번 만들어 양쪽에 같은 값을 넣는다(값은 출력하지 않는다):
+
+```bash
+TOKEN="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
+fly secrets set AI_INTERNAL_TOKEN="$TOKEN" -a yogob-ai
+fly secrets set AI_INTERNAL_TOKEN="$TOKEN" AI_SERVER_URL=http://yogob-ai.flycast -a yogob-api
+unset TOKEN
+```
+
+- 포트는 붙이지 않는다. flycast 서비스가 80 → 8000 으로 넘긴다(`force_https = false` — 사설망엔 TLS 종단이 없다).
+- 순서가 중요하다: **AI 앱에 먼저** 넣는다. BE 가 먼저 주소를 알면 그동안 401 을 받아 설명이 빈다.
+- 두 앱의 `fly secrets list` 에서 `AI_INTERNAL_TOKEN` 의 DIGEST 가 같아야 한다. 다르면 값이 어긋난 것이다.
+- **`ANTHROPIC_API_KEY` 는 넣지 않아도 된다.** 설명 문장과 추천 사유는 결정론적 경로로 나온다(D-38·D-40).
+  모델 키는 운영자 경로(`/catalog/candidates`·카탈로그 추출 배치)에만 필요하다.
+
+확인:
+
+```bash
+fly logs -a yogob-ai --no-tail | grep 'POST /narrate'   # BE 호출이 찍힌다
+curl -sS -X POST https://yogob-api.fly.dev/api/v1/recommendations \
+  -H 'content-type: application/json' \
+  -d '{"required":{"monthlyDataGb":20,"wantedServiceIds":[1]}}'
+```
+→ `data.message` 가 문장이고 `data.reasons` 가 비어 있지 않으면 연결된 것이다.
+`warnings` 에 `YGB-EXT-001` 이 있으면 BE 가 AI 에 닿지 못한 것이다(추천 결과 자체는 정상).
+
+**콜드 스타트**: 머신이 멈춰 있어도 요청이 깨운다(실측: 정지 상태에서 추천 1건 왕복 **4.1초**, 성공).
+프록시가 연결을 잡고 기다리므로 `AiGateway` 의 connect 5초가 아니라 read 25초 안에서 끝난다.
+쉬다가 들어온 첫 요청만 느리다. 이게 `min_machines_running = 0` 의 대가이고, 그만큼 값이 싸다.
+
 ---
 
 ## 4. 배포
 
 ```bash
-fly deploy --app yogobi-be
+fly deploy --app yogob-api
 ```
 
 기동 시 자동으로:
@@ -111,8 +157,8 @@ fly deploy --app yogobi-be
 **데모로 실제 추천 결과까지 보이고 싶다면** 더미 시드를 켠다(D3/D4 실데이터 전까지):
 
 ```bash
-fly secrets set --app yogobi-be SPRING_PROFILES_ACTIVE=dev
-fly deploy --app yogobi-be
+fly secrets set --app yogob-api SPRING_PROFILES_ACTIVE=dev
+fly deploy --app yogob-api
 ```
 → `DevSeedLoader`가 `db/seed/dev/`의 더미 요금제 5·혜택 6을 적재해 recommendations가 결과를 낸다.
 
@@ -121,10 +167,10 @@ fly deploy --app yogobi-be
 ## 5. 배포 후 확인
 
 ```bash
-fly open --app yogobi-be                      # 브라우저로 https://yogobi-be.fly.dev
-curl https://yogobi-be.fly.dev/api/v1/catalog/services   # 200 + 서비스 6건
-fly logs --app yogobi-be                       # 기동·마이그레이션·시드 로그
-fly status --app yogobi-be
+fly open --app yogob-api                      # 브라우저로 https://yogob-api.fly.dev
+curl https://yogob-api.fly.dev/api/v1/catalog/services   # 200 + 서비스 6건
+fly logs --app yogob-api                       # 기동·마이그레이션·시드 로그
+fly status --app yogob-api
 ```
 
 `/api/v1/catalog/services`가 200이면 앱·DB·마이그레이션·시드까지 정상이다.
@@ -133,7 +179,7 @@ fly status --app yogobi-be
 
 ## 6. 스마트초이스 신청과의 관계
 
-- 신청 폼의 "웹 주소"에 `https://yogobi-be.fly.dev`(또는 프론트 URL)를 적으면 된다.
+- 신청 폼의 "웹 주소"에 `https://yogob-api.fly.dev`(또는 프론트 URL)를 적으면 된다.
 - 이 API는 **백엔드가 `authkey`로 서버 호출**하는 방식이라(`docs/data.md §2`) 도메인에 묶이지 않는다.
   나중에 도메인을 바꿔도 키는 그대로 동작한다. 폼 URL은 행정용이라 대개 포털에서 수정 가능.
 - 키는 **교차검증 전용 + fail-soft**다. 승인이 늦거나 URL이 바뀌어도 추천/배포는 안 막힌다.
@@ -145,12 +191,12 @@ fly status --app yogobi-be
 도메인을 사면, 앱을 재배포하지 않고 별칭만 추가한다:
 
 ```bash
-fly certs add api.yourdomain.com --app yogobi-be
-fly certs show api.yourdomain.com --app yogobi-be   # 넣어야 할 DNS 레코드 확인
+fly certs add api.yourdomain.com --app yogob-api
+fly certs show api.yourdomain.com --app yogob-api   # 넣어야 할 DNS 레코드 확인
 ```
 
 출력대로 도메인 등록업체에서 DNS 설정:
-- 서브도메인(`api.`) → **CNAME** → `yogobi-be.fly.dev`
+- 서브도메인(`api.`) → **CNAME** → `yogob-api.fly.dev`
 - 루트 도메인 → Fly가 주는 **A/AAAA** 레코드
 
 전파되면 인증서가 자동 발급되고 커스텀 도메인으로 접속된다. `*.fly.dev` URL도 계속 살아있다.
@@ -159,12 +205,13 @@ fly certs show api.yourdomain.com --app yogobi-be   # 넣어야 할 DNS 레코�
 
 ## 8. 운영 메모
 
-- **비밀값**: `POSTGRES_*`·`JWT_SECRET`(인증 구현 후)·`SMARTCHOICE_API_KEY`는 `fly secrets`로만 넣는다.
+- **비밀값**: `POSTGRES_*`·`JWT_SECRET`(인증 구현 후)·`SMARTCHOICE_API_KEY`·`AI_INTERNAL_TOKEN`·
+  `AI_SERVER_URL`은 `fly secrets`로만 넣는다.
   코드·`fly.toml`·git에 적지 않는다(`.dockerignore`가 `.env`를 차단).
 - **비용 절감**: `auto_stop_machines="stop"` + `min_machines_running=0`이라 트래픽 없으면 머신이 멈춘다.
   첫 요청은 콜드 스타트로 몇 초 걸릴 수 있다.
 - **마이그레이션**: 적용된 Flyway 파일은 수정 금지, 항상 새 `V{n}` 추가(`AGENTS.md`).
-- **롤백**: `fly releases --app yogobi-be` → `fly deploy --image <이전 이미지>` 또는 `fly apps restart`.
+- **롤백**: `fly releases --app yogob-api` → `fly deploy --image <이전 이미지>` 또는 `fly apps restart`.
 
 ---
 
