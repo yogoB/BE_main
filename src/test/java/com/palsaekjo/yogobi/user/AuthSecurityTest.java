@@ -264,6 +264,9 @@ class AuthSecurityTest {
                     .andExpect(status().is3xxRedirection());
         mvc.perform(get("/oauth2/authorization/google").header("X-Forwarded-For", "198.51.100.1"))
                 .andExpect(status().isTooManyRequests());
+        // 프론트 nginx 가 넘기는 X-Client-IP 는 발신지별 버킷이다(H-1) — 한 사람이 막혀도 다른 사람은 들어온다.
+        mvc.perform(get("/oauth2/authorization/google").header("X-Client-IP", "203.0.113.7"))
+                .andExpect(status().is3xxRedirection());
     }
 
     @Test void googleSignupAndLoginUseSubjectAndDoNotAutoMergeEmail() throws Exception {

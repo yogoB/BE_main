@@ -75,6 +75,20 @@ public class SecurityConfig {
     @Value("${yogobi.auth.ip-limit:2000}")
     private int ipLimit;
 
+    /**
+     * 레이트 리밋 버킷 키. 프론트 nginx 가 Fly 엣지에서 받은 진짜 발신지를 {@code X-Client-IP} 로 넘긴다
+     * (nginx 가 항상 덮어쓰므로 브라우저가 지어낸 값은 거기서 잘린다). 없으면 TCP peer — 프록시 뒤에서는
+     * 전 사용자가 한 값이라 그때는 {@code ipLimit} 이 서비스 전체의 방어선이 된다(H-1).
+     *
+     * <p>{@code X-Forwarded-For} 는 여전히 안 본다 — 누적 헤더라 첫 값을 사용자가 정한다.
+     * BE 가 공개 주소로도 열려 있어 직접 호출자는 {@code X-Client-IP} 를 지어낼 수 있지만, 그러면 <b>자기 버킷을
+     * 쪼갤 뿐</b> 남을 막지 못한다. 막으려는 것은 "남의 로그인을 막는 것" 이라 이 위협 모델에선 충분하다.
+     */
+    private static String clientKey(HttpServletRequest req) {
+        String forwarded = req.getHeader("X-Client-IP");
+        return forwarded == null || forwarded.isBlank() || forwarded.length() > 64 ? req.getRemoteAddr() : forwarded.strip();
+    }
+
     @Bean
     @org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication(type = org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication.Type.SERVLET)
     SecurityFilterChain security(HttpSecurity http, AuthTokens tokens, AuthRateLimit limits, GoogleLogin google,
@@ -118,7 +132,7 @@ public class SecurityConfig {
                             String path = req.getRequestURI();
                             if ((path.startsWith("/api/v1/auth/") && "POST".equals(req.getMethod()))
                                     || path.equals("/oauth2/authorization/google"))
-                                limits.check("ip:" + req.getRemoteAddr(), ipLimit); // Never trust caller-supplied X-Forwarded-For.
+                                limits.check("ip:" + clientKey(req), ipLimit);
                             if (path.equals("/oauth2/authorization/google")) google.requireEnabled();
                             chain.doFilter(req, res);
                         } catch (ApiException ex) { error(json, res, ex); }
