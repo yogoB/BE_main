@@ -35,6 +35,7 @@ public class RecommendationController {
         // 챗봇 경로와 같은 결과 카드를 공유하도록 1순위 설명을 붙인다(원칙 3·5-⑤).
         // message·reasons 둘 다 모델 키 없이 나온다. AI 장애면 둘 다 비고 금액은 그대로다.
         return ApiResponse.ok(result.withNarration(narrator.narrationFor(
-                result.results().get(0), result.missingInputs(), result.candidateCount())));
+                result.results().get(0), result.missingInputs(), result.candidateCount(),
+                result.current() == null ? null : result.current().cost().monthlyTotal())));
     }
 }

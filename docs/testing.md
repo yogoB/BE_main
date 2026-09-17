@@ -753,3 +753,20 @@ refresh 는 여전히 없다(D-48). 탈취 창이 길어지는 것은 DB 세션 
 
 **c 가 있는 이유**: `DevSeedLoader` 가 같은 `loadMobilePlans` 로 더미 몇 줄을 싣는다. 플래그 없이 넣었으면
 dev 프로파일에서 합본 1,700건이 전부 물러났을 것이다.
+
+
+## G-35. 변경 시점은 이번 흐름에서 고른 요금제로 판정한다 (2026-09-18)
+
+**검증**: `MeApiTest` (`switchTimingTakesCurrentPlanIdFromTheQueryFirst`)
+
+캘린더의 `/me/switch-timing` 은 `app_user.current_plan_id` 만 읽었다. 디테일 1단계에서 요금제를 고른 사람도
+마이페이지에 저장한 적이 없으면 400 이라, 브라우저 실측에서 호출이 **0회**였다(프론트가 조건을 열어도 실패 1회가 될 뿐).
+프론트가 입력값을 프로필에 묵시적으로 저장하는 안(b)은 버리고, BE 가 `currentPlanId` 를 선택으로 받아 저장값보다
+앞세운다(a). 흐름의 입력이 프로필을 덮어쓰지 않는다.
+
+| | 입력 | 정답 |
+|---|---|---|
+| a | 저장값 없음 · `currentPlanId=1`(55,000) · 대상 2(45,000) | **200**, `currentMonthlyCost` 55,000 · 절감 10,000 |
+| b | 저장값 3(99,000) · `currentPlanId=1` | 넘긴 값이 이긴다 — 55,000. **저장값은 그대로 3** |
+| c | 저장값 3 · 파라미터 없음 | 예전대로 99,000 |
+| d | 둘 다 없음 | 400 `currentPlan` (기존 `switchTimingRequiresCurrentPlanSet`) |

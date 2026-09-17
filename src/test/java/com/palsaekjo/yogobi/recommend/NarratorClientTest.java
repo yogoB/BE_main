@@ -58,7 +58,7 @@ class NarratorClientTest {
                 {"message":"월 55,000원이에요.","reasons":["넷플릭스가 포함돼 있어요."],
                  "notices":["가족결합 할인 11,000원은 SKT 요금제에만 반영했어요"]}""";
 
-        Narrator.Narration narration = client.narrationFor(COST, List.of(), 127);
+        Narrator.Narration narration = client.narrationFor(COST, List.of(), 127, null);
 
         assertThat(narration.message()).isEqualTo("월 55,000원이에요.");
         assertThat(narration.reasons()).containsExactly("넷플릭스가 포함돼 있어요.");
@@ -71,7 +71,7 @@ class NarratorClientTest {
         body = """
                 {"message":"월 55,000원이에요.","reasons":[]}""";
 
-        assertThat(client.narrationFor(COST, List.of(), 127).notices()).isEmpty();
+        assertThat(client.narrationFor(COST, List.of(), 127, null).notices()).isEmpty();
     }
 
     /**
@@ -83,7 +83,7 @@ class NarratorClientTest {
         body = """
                 {"message":"월 55,000원이에요.","reasons":[],"surprise":"?"}""";
 
-        assertThat(client.narrationFor(COST, List.of(), 127).message()).isNull();
+        assertThat(client.narrationFor(COST, List.of(), 127, null).message()).isNull();
     }
 
     /**
@@ -95,7 +95,7 @@ class NarratorClientTest {
         body = """
                 {"message":"월 55,000원이에요.","reasons":[],"surprise":"?"}""";
 
-        assertThatThrownBy(() -> client.narrate(COST, List.of(), 127))
+        assertThatThrownBy(() -> client.narrate(COST, List.of(), 127, null))
                 .isInstanceOf(NarratorClient.Unavailable.class)
                 .hasMessageContaining("surprise");
     }

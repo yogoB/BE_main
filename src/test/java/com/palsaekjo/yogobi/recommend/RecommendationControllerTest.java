@@ -3,6 +3,7 @@ package com.palsaekjo.yogobi.recommend;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -30,7 +31,7 @@ class RecommendationControllerTest {
         var missing = List.of(new MissingInput("hasFamilyBundle", "확인 필요", "마이페이지"));
         when(service.recommend(any()))
                 .thenReturn(new RecommendationResponse(Accuracy.PARTIAL, missing, List.of(best), 127, null));
-        when(narrator.narrationFor(eq(best), eq(missing), eq(127)))
+        when(narrator.narrationFor(eq(best), eq(missing), eq(127), isNull()))
                 .thenReturn(new Narrator.Narration("월 13,500원 절약할 수 있어요.", List.of("넷플릭스가 포함돼요."),
                         List.of("확인 필요 — 마이페이지")));
 
@@ -43,7 +44,7 @@ class RecommendationControllerTest {
         assertThat(response.data().results()).containsExactly(best);
         assertThat(response.data().candidateCount()).isEqualTo(127);
         // 후보 수는 CostResult 에 없다. 혜택도 할인도 없는 요금제에는 이게 유일한 근거라 따로 넘긴다.
-        verify(narrator).narrationFor(best, missing, 127);
+        verify(narrator).narrationFor(best, missing, 127, null);
     }
 
     @Test
@@ -51,7 +52,7 @@ class RecommendationControllerTest {
         when(service.recommend(any()))
                 .thenReturn(new RecommendationResponse(Accuracy.FULL, List.of(), List.of(best), 5, null));
         // narrationFor 가 장애를 빈 설명으로 흡수한다.
-        when(narrator.narrationFor(any(), any(), any())).thenReturn(Narrator.Narration.none());
+        when(narrator.narrationFor(any(), any(), any(), any())).thenReturn(Narrator.Narration.none());
 
         var response = controller.recommend(request, null);
 

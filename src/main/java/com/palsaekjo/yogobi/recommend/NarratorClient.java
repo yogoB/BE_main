@@ -35,7 +35,7 @@ public class NarratorClient implements Narrator, DetectionNarrator {
      */
     private static final Set<String> NARRATE_FIELDS = Set.of(
             "planId", "planName", "carrier", "monthlyTotal", "baseline",
-            "monthlySavings", "annualSavings", "breakdown", "missingInputs", "candidateCount");
+            "monthlySavings", "annualSavings", "breakdown", "missingInputs", "candidateCount", "currentMonthlyTotal");
 
     private static final Logger log = LoggerFactory.getLogger(NarratorClient.class);
 
@@ -57,9 +57,11 @@ public class NarratorClient implements Narrator, DetectionNarrator {
 
     /** AI 설명 1건. 실패는 {@link Unavailable} 로 던진다 — 챗봇은 그때 자기 문구로 대체한다. */
     public Narrator.Narration narrate(CostResult cost, List<MissingInput> missingInputs,
-                                      Integer candidateCount) {
+                                      Integer candidateCount, Long currentMonthlyTotal) {
         ObjectNode request = json.valueToTree(cost);
         request.set("missingInputs", json.valueToTree(missingInputs));
+        // 현재 요금제를 알 때만 싣는다. 없으면 필드 자체를 빼야 한다 — 내레이터가 "정가 기준" 문장으로 돌아간다.
+        if (currentMonthlyTotal != null) request.put("currentMonthlyTotal", currentMonthlyTotal);
         // 후보가 몇 개였는지는 CostResult 에 없다. 혜택도 할인도 없는 요금제에는
         // 이 값이 "왜 추천됐나"의 유일한 근거라 따로 싣는다.
         if (candidateCount != null && candidateCount > 0) {
@@ -83,9 +85,9 @@ public class NarratorClient implements Narrator, DetectionNarrator {
      */
     @Override
     public Narrator.Narration narrationFor(CostResult result, List<MissingInput> missingInputs,
-                                           Integer candidateCount) {
+                                           Integer candidateCount, Long currentMonthlyTotal) {
         try {
-            return narrate(result, missingInputs, candidateCount);
+            return narrate(result, missingInputs, candidateCount, currentMonthlyTotal);
         } catch (Unavailable e) {
             log.warn("추천 설명을 쓰지 못했다 — 금액은 그대로 나간다: {}", e.getMessage());
             return Narrator.Narration.none();

@@ -150,7 +150,7 @@ AI의 `/parse`·`/narrate`·`/ocr`는 토큰 누락·불일치 시 401, 서버 �
 ### Phase 2
 | Method | Path | 설명 |
 |---|---|---|
-| GET | `/api/v1/me/switch-timing` | 변경 시점 (회수기간) — 구현. `?targetPlanId&switchingCost&remainingContractMonths`, 현재 요금제(저장)+구독 대비 회수개월·SWITCH_NOW/WAIT/NO_BENEFIT |
+| GET | `/api/v1/me/switch-timing` | 변경 시점 (회수기간) — 구현. `?targetPlanId&switchingCost&remainingContractMonths&currentPlanId?`, 현재 요금제(`currentPlanId` > 저장값, G-35)+구독 대비 회수개월·SWITCH_NOW/WAIT/NO_BENEFIT |
 | GET | `/api/v1/me/alerts` | 종료 예정 목록 |
 
 ### 개인정보 (V5 — 구현)
@@ -257,7 +257,8 @@ narrate 오케스트레이션은 컨트롤러가 한다(`RecommendationControlle
 `recommend`가 `chat`의 `NarratorClient`에 직접 의존하면 순환이 되므로 포트 `recommend.Narrator`(구현: `NarratorClient`)로 역전한다.
 
 **`/narrate` 요청에 싣는 필드는 아래 10개뿐이다**(`NarratorClient.NARRATE_FIELDS`):
-`planId`·`planName`·`carrier`·`monthlyTotal`·`baseline`·`monthlySavings`·`annualSavings`·`breakdown`·`missingInputs`·`candidateCount`.
+`planId`·`planName`·`carrier`·`monthlyTotal`·`baseline`·`monthlySavings`·`annualSavings`·`breakdown`·`missingInputs`·`candidateCount`·`currentMonthlyTotal`(선택).
+`currentMonthlyTotal` 은 응답 `current.cost.monthlyTotal` 이며 `currentPlanId` 를 받았을 때만 싣는다 — 있으면 내레이터가 "지금보다" 기준으로 말하고 없으면 정가 기준이다(2026-09-18 사용자 승인. 히어로와 문장이 어긋나던 것을 맞춘다).
 `candidateCount`는 `CostResult`에 없어 컨트롤러가 따로 싣는다. **기준 카탈로그 1,706개 중 1,645개는
 제휴 혜택도 약정할인도 없어 절감액이 0이다** — 그런 요금제에는 "몇 개 중에서 골랐나"가 유일한 근거다.
 `CostResult`를 통째로 직렬화하면 AI가 쓰지 않는 필드까지 나간다 — 복구된 `priceCrossCheck`가 실제로 그랬다.
@@ -375,7 +376,8 @@ V4에서 `email_verified`(자체 가입은 검증 토큰 소비 시 TRUE), `cred
 `auth_email_token`(token_hash PK, purpose SIGNUP|RESET, email, user_id, credential_version, expires_at): 10분·단일 사용 본인 확인 토큰.
 이메일별 트랜잭션 잠금 후 소비해 동시 링크 정리의 교착을 방지한다.
 자격 증명 변경과 세션 발급은 회원 행/버전을 검사하며 재설정 전 로그인 결과의 뒤늦은 발급을 차단한다.
-`auth_rate_limit`(bucket PK, expires_at, attempts): IP 40·이메일 로그인 10·재인증 10·메일 3, 15분 창. 만료 행은 요청 시 정리.
+`auth_rate_limit`(bucket PK, expires_at, attempts): IP **2,000**(`yogobi.auth.ip-limit`)·이메일 로그인 10·재인증 10·메일 3, 15분 창. 만료 행은 요청 시 정리.
+IP 버킷은 프록시 뒤라 **전 사용자가 한 버킷**이다(H-1, 2026-09-18) — 40 이던 때는 정상 사용자 41명이면 전원 429 였다. 그래서 이 값은 개인이 아니라 서비스 전체의 폭주 방어선이다.
 
 ### 개인정보 (V5 마이그레이션)
 삭제권(파기): V2 개인 테이블(`user_subscription`·`payment_record`·`detection_result`) FK에 `ON DELETE CASCADE` 부여.
