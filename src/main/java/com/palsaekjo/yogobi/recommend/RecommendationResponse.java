@@ -27,6 +27,11 @@ public record RecommendationResponse(
      * 현재 요금제가 더 싸면 <b>음수 그대로</b> 나간다.
      */
     public record CurrentCost(CostResult cost, long monthlySavings, long annualSavings) {
+        /** 6개월 절감(D-51). 음수면 음수 그대로. */
+        @com.fasterxml.jackson.annotation.JsonProperty("semiannualSavings")
+        public long semiannualSavings() {
+            return monthlySavings * 6;
+        }
     }
 
     /** 후보를 찾지 못한 경로. 설명할 결과가 없다. */

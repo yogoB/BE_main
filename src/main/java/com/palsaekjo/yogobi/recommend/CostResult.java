@@ -1,8 +1,11 @@
 package com.palsaekjo.yogobi.recommend;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 
 /** 한 조합(요금제 + 원하는 티어)의 실질월비용 내역. 추천/계산기 응답이 공유한다. */
+@JsonIgnoreProperties(ignoreUnknown = true)   // 저장된 스냅숏에는 파생 필드(semiannualSavings)도 들어 있다
 public record CostResult(
         long planId,
         String planName,
@@ -21,6 +24,12 @@ public record CostResult(
                       long monthlySavings, long annualSavings, List<BreakdownLine> breakdown) {
         this(planId, planName, carrier, monthlyTotal, baseline, monthlySavings, annualSavings, breakdown,
                 PriceCrossCheck.Verdict.unverified());
+    }
+
+    /** 6개월 절감(결과 대시보드의 1·6·12개월 탭, D-51). 화면이 ×6 을 하지 않도록 여기서 준다(절대 원칙 2). */
+    @JsonProperty("semiannualSavings")
+    public long semiannualSavings() {
+        return monthlySavings * 6;
     }
 
     public CostResult withPriceCrossCheck(PriceCrossCheck.Verdict verdict) {

@@ -38,7 +38,8 @@ public final class PrivacyPolicy {
                 new Item("계정", List.of("email(Google 제공)", "google_sub", "name", "nickname"),
                         "회원 인증·본인 확인", "계약 이행", "탈퇴 시 즉시 파기"),
                 new Item("이용 현황",
-                        List.of("current_plan_id", "user_subscription", "payment_record(merchant_raw, amount, paid_at)"),
+                        List.of("current_plan_id", "user_subscription", "payment_record(merchant_raw, amount, paid_at)",
+                                "saved_result(저장한 결과 — 계산 요청과 금액 스냅숏)"),
                         "실질 지불 총액 계산·중복 결제 탐지", "정보주체 동의·계약 이행",
                         "결제내역 " + PAYMENT_RETENTION_MONTHS + "개월·탐지결과 " + DETECTION_RETENTION_MONTHS
                                 + "개월 후 파기, 탈퇴 시 즉시 파기. 법정 보존 의무가 확인된 증빙만 별도 보관"),
@@ -46,7 +47,7 @@ public final class PrivacyPolicy {
                         "확인된 법정 기록 보존 의무 이행", "개별 기록에 확인된 법령 근거",
                         "탈퇴와 무관하게 확정 만료일까지 분리 보관 후 파기. 회원 ID·이메일·인증 정보는 복사하지 않음"),
                 new Item("인증 세션", List.of("auth_session(SHA-256 지문)", "user_agent"),
-                        "로그인 유지·세션 관리", "계약 이행", "만료 15분·유휴 5분 후 파기"),
+                        "로그인 유지·세션 관리", "계약 이행", "만료 24시간·유휴 2시간 후 파기(D-48)"),
                 new Item("동의 증빙", List.of("user_consent"),
                         "수집·이용 동의 기록 보관", "법령상 의무", "탈퇴 시 파기"),
                 new Item("정보 오류 제보", List.of("대상 상품·오류 항목·설명·선택 출처 링크"),
