@@ -43,7 +43,7 @@ public class GoogleLogin {
             // Google sub 가 있으면 로그인, 없으면 가입이다 — 사용자에게는 같은 버튼 하나다(D-34).
             var member = members.googleLogin(google);
             tokens.issue(member.id(), member.credentialVersion(), request, response);
-            funnel.record(FunnelCounter.MEMBER_LOGIN);   // 가입·로그인이 같은 경로다(D-34)
+            funnel.record(FunnelCounter.MEMBER_LOGIN, FunnelCounter.actor(member.id()));   // 가입·로그인이 같은 경로다(D-34)
             invalidate(request);
             response.sendRedirect(returnUrl + "#auth=success");
         } catch (ApiException e) {

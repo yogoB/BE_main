@@ -43,11 +43,22 @@ public class NarratorClient implements Narrator, DetectionNarrator, SwitchTiming
     private final RestClient client;
     private final ObjectMapper json;
     private final String internalToken;
+    private final io.micrometer.core.instrument.MeterRegistry registry;
+    /** 마지막으로 내레이터가 200 을 준 시각. 운영 상태 패널의 "살아 있나" 한 줄(D-52). */
+    private final java.util.concurrent.atomic.AtomicReference<java.time.Instant> lastOk = new java.util.concurrent.atomic.AtomicReference<>();
 
+    /** 테스트·수동 조립용. 레지스트리는 인메모리다. */
+    public NarratorClient(ObjectMapper json, String baseUrl, String internalToken) {
+        this(json, baseUrl, internalToken, new io.micrometer.core.instrument.simple.SimpleMeterRegistry());
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
     public NarratorClient(ObjectMapper json, @Value("${NARRATOR_URL:http://localhost:8000}") String baseUrl,
-                     @Value("${NARRATOR_INTERNAL_TOKEN:}") String internalToken) {
+                     @Value("${NARRATOR_INTERNAL_TOKEN:}") String internalToken,
+                     io.micrometer.core.instrument.MeterRegistry registry) {
         this.json = json;
         this.internalToken = internalToken;
+        this.registry = registry;
         var factory = new JdkClientHttpRequestFactory(HttpClient.newBuilder()
                 .version(HttpClient.Version.HTTP_1_1) // Uvicorn은 h2c 업그레이드를 지원하지 않는다.
                 .connectTimeout(Duration.ofSeconds(5)).followRedirects(HttpClient.Redirect.NEVER).build());
@@ -95,6 +106,7 @@ public class NarratorClient implements Narrator, DetectionNarrator, SwitchTiming
             return narrate(result, missingInputs, candidateCount, current);
         } catch (Unavailable e) {
             log.warn("추천 설명을 쓰지 못했다 — 금액은 그대로 나간다: {}", e.getMessage());
+            count(e);
             return Narrator.Narration.none();
         }
     }
@@ -162,8 +174,26 @@ public class NarratorClient implements Narrator, DetectionNarrator, SwitchTiming
             return new DetectionNarrator.Explanation(List.copyOf(out), optional(result, "summary", 300));
         } catch (Unavailable e) {
             log.warn("탐지 설명을 쓰지 못했다 — 금액과 대상은 그대로 보인다: {}", e.getMessage());
+            count(e);
             return DetectionNarrator.fallback(findings, targetNames);
         }
+    }
+
+    /**
+     * 실패를 종류별로 센다(D-52 운영 상태). 이유 문장은 카디널리티가 높아 태그로 못 쓴다 — 앞머리로 다섯 종류만.
+     * 어제의 세 사고는 각각 contract(허용 목록)·connect(미배포)·http(500) 였다.
+     */
+    private void count(Unavailable e) {
+        String m = e.getMessage() == null ? "" : e.getMessage();
+        String kind = m.contains("계약에 없는") || m.contains("객체가 아니다") ? "contract"
+                : m.contains("부르지 못했다") ? "connect"
+                : m.contains("로 답했다") ? "http"
+                : m.contains("TOKEN") ? "token" : "response";
+        registry.counter("narration.unavailable", "kind", kind).increment();
+    }
+
+    public java.time.Instant lastOk() {
+        return lastOk.get();
     }
 
     private static String text(JsonNode node, String field, int maxLength) {
@@ -206,7 +236,19 @@ public class NarratorClient implements Narrator, DetectionNarrator, SwitchTiming
     private JsonNode post(String path, Object request) {
         if (internalToken.isEmpty() || internalToken.chars().anyMatch(c -> c <= 32 || c >= 127))
             throw new Unavailable("NARRATOR_INTERNAL_TOKEN 이 비었거나 형식이 아니다");
+        long started = System.nanoTime();
         try {
+            JsonNode body = exchange(path, request);
+            registry.timer("narration.latency").record(java.time.Duration.ofNanos(System.nanoTime() - started));
+            lastOk.set(java.time.Instant.now());
+            return body;
+        } catch (RestClientException e) {
+            throw new Unavailable(path + " 를 부르지 못했다: " + e.getMessage());
+        }
+    }
+
+    private JsonNode exchange(String path, Object request) {
+        {
             return client.post().uri(path).header(HttpHeaders.AUTHORIZATION, "Bearer " + internalToken)
                     .contentType(MediaType.APPLICATION_JSON).body(request)
                     .exchange((sent, response) -> {
@@ -216,8 +258,6 @@ public class NarratorClient implements Narrator, DetectionNarrator, SwitchTiming
                         if (body == null || !body.isObject()) throw new Unavailable(path + " 응답이 객체가 아니다");
                         return body;
                     });
-        } catch (RestClientException e) {
-            throw new Unavailable(path + " 를 부르지 못했다: " + e.getMessage());
         }
     }
 

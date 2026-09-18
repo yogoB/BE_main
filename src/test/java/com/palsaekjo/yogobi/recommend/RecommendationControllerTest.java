@@ -19,7 +19,9 @@ class RecommendationControllerTest {
     private final RecommendationService service = mock(RecommendationService.class);
     private final Narrator narrator = mock(Narrator.class);
     private final FunnelCounter funnel = mock(FunnelCounter.class);
-    private final RecommendationController controller = new RecommendationController(service, narrator, funnel);
+    private final RecommendationStats stats = mock(RecommendationStats.class);
+    private final RecommendationController controller = new RecommendationController(service, narrator, funnel, stats);
+    private final org.springframework.mock.web.MockHttpServletRequest http = new org.springframework.mock.web.MockHttpServletRequest();
 
     private final CostResult best = new CostResult(42, "넷플플랜", "SKT", 55000, 68500, 13500, 162000,
             List.of(new BreakdownLine("기본료", 55000, "OFFICIAL", null)));
@@ -35,7 +37,7 @@ class RecommendationControllerTest {
         when(service.recommend(any()))
                 .thenReturn(new RecommendationResponse(Accuracy.PARTIAL, missing, List.of(best), 127, current));
 
-        var response = controller.recommend(request, null);
+        var response = controller.recommend(request, null, http);
 
         assertThat(response.data().results()).containsExactly(best);
         assertThat(response.data().candidateCount()).isEqualTo(127);

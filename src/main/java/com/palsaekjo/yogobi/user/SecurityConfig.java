@@ -86,11 +86,9 @@ public class SecurityConfig {
      * 쪼갤 뿐</b> 남을 막지 못한다. 막으려는 것은 "남의 로그인을 막는 것" 이라 이 위협 모델에선 충분하다.
      */
     private static String clientKey(HttpServletRequest req) {
-        String forwarded = req.getHeader("X-Client-IP");
-        boolean usable = forwarded != null && !forwarded.isBlank() && forwarded.length() <= 64;
         // 헤더가 비어 오면 조용히 peer 로 떨어져 버킷이 다시 공유된다 — 그걸 볼 수 있어야 한다(DEBUG 로 한 번 확인).
-        log.debug("rate-limit key source={} header={}", usable ? "X-Client-IP" : "peer", forwarded);
-        return usable ? forwarded.strip() : req.getRemoteAddr();
+        log.debug("rate-limit key source={}", com.palsaekjo.yogobi.common.ClientAddress.forwarded(req) ? "X-Client-IP" : "peer");
+        return com.palsaekjo.yogobi.common.ClientAddress.of(req);
     }
 
     @Bean

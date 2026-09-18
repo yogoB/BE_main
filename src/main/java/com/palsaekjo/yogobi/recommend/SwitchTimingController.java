@@ -18,11 +18,14 @@ import org.springframework.web.bind.annotation.RestController;
 public class SwitchTimingController {
     private final SwitchTimingService switchTiming;
     private final ObjectProvider<SwitchTimingNarrator> narrator;
+    private final com.palsaekjo.yogobi.common.FunnelCounter funnel;
 
     public SwitchTimingController(SwitchTimingService switchTiming,
-                                  ObjectProvider<SwitchTimingNarrator> narrator) {
+                                  ObjectProvider<SwitchTimingNarrator> narrator,
+                                  com.palsaekjo.yogobi.common.FunnelCounter funnel) {
         this.switchTiming = switchTiming;
         this.narrator = narrator;
+        this.funnel = funnel;
     }
 
     /** 판정과 그 설명. 문구는 내레이터가 만든다(D-47) — 화면이 판정별 문장을 들고 있지 않는다. */
@@ -38,8 +41,11 @@ public class SwitchTimingController {
             // 사용자가 화면에 적은 약정 만료일. 서버는 이 날짜를 모르므로 받아서 문구에만 쓴다.
             @RequestParam(required = false) String expiryDate,
             Principal principal) {
+        long userId = Long.parseLong(principal.getName());
         SwitchTimingService.Response timing = switchTiming.evaluate(
-                Long.parseLong(principal.getName()), targetPlanId, switchingCost, remainingContractMonths, currentPlanId);
+                userId, targetPlanId, switchingCost, remainingContractMonths, currentPlanId);
+        funnel.record(com.palsaekjo.yogobi.common.FunnelCounter.CALENDAR_SHOWN,
+                com.palsaekjo.yogobi.common.FunnelCounter.actor(userId));   // 퍼널 4단계(D-52)
         SwitchTimingNarrator port = narrator.getIfAvailable();
         var wording = port == null ? SwitchTimingNarrator.fallback(timing.status())
                 : port.explain(timing, expiryDate);

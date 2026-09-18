@@ -2,6 +2,7 @@ package com.palsaekjo.yogobi.recommend;
 
 import com.palsaekjo.yogobi.common.ApiResponse;
 import com.palsaekjo.yogobi.common.FunnelCounter;
+import jakarta.servlet.http.HttpServletRequest;
 import java.security.Principal;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -15,11 +16,14 @@ public class RecommendationController {
     private final RecommendationService service;
     private final Narrator narrator;
     private final FunnelCounter funnel;
+    private final RecommendationStats stats;
 
-    public RecommendationController(RecommendationService service, Narrator narrator, FunnelCounter funnel) {
+    public RecommendationController(RecommendationService service, Narrator narrator, FunnelCounter funnel,
+                                    RecommendationStats stats) {
         this.service = service;
         this.narrator = narrator;
         this.funnel = funnel;
+        this.stats = stats;
     }
 
     /**
@@ -32,9 +36,12 @@ public class RecommendationController {
      */
     @PostMapping
     public ApiResponse<RecommendationResponse> recommend(@RequestBody RecommendationRequest request,
-                                                        Principal principal) {
+                                                        Principal principal, HttpServletRequest http) {
         RecommendationResponse result = service.recommend(request);
-        funnel.record(principal == null ? FunnelCounter.GATE_SHOWN : FunnelCounter.REPORT_SHOWN);
+        funnel.record(principal == null ? FunnelCounter.GATE_SHOWN : FunnelCounter.REPORT_SHOWN,
+                FunnelCounter.actor(principal, http));
+        if (!result.results().isEmpty())
+            stats.record(result.results().get(0).planId(), request.required().monthlyDataGb());
         return ApiResponse.ok(result);
     }
 
