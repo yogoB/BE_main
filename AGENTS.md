@@ -21,7 +21,7 @@ Java 21 · Spring Boot · PostgreSQL. AI 서버는 별도 레포: github.com/yog
 4. **모든 금액에 출처(Provenance)를 붙인다.**
    `OFFICIAL` / `DERIVED` / `USER_PROVIDED` / `ESTIMATED`.
 
-5. **사용자의 불편함을 덜어주는 웹앱.** 사용성은 취향이 아니라 검수 항목이다 (D-14).
+5. **사용자의 불편함을 덜어주는 웹앱.** 사용성은 취향이 아니라 검수 항목이다.
    "쓰기 편하게"는 검증할 수 없으므로 아래 다섯 줄로만 판정한다.
    - **모르면 막히는 화면을 만들지 않는다.** 모든 필수 입력에 "모름/건너뛰기" 경로가 있고,
      그 경로로도 결과까지 간다. 서버 절반은 이미 있다 — `MissingInput(field, impact, howToFind)`.
