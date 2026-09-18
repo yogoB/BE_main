@@ -42,7 +42,8 @@ public class SavedResultController {
         this.funnel = funnel;
     }
 
-    public record Saved(UUID id, Instant savedAt, CostResult cost) { }
+    /** {@code monthlySavingsVsCurrent} 는 지금 쓰는 요금제 대비 절감액. 모르면 null — 0 으로 적지 않는다(D-53). */
+    public record Saved(UUID id, Instant savedAt, CostResult cost, Long monthlySavingsVsCurrent) { }
     public record Deleted(boolean deleted) { }
 
     /** 본문은 계산기 요청과 같다({@code planId}·{@code tierIds}·{@code optional}). 없는 ID 는 계산기처럼 400·404 다. */
@@ -50,25 +51,52 @@ public class SavedResultController {
     public ApiResponse<Saved> save(@RequestBody CalculatorRequest request, Principal principal) throws Exception {
         long userId = Long.parseLong(principal.getName());
         CostResult cost = service.calculate(request).result();
+        Long vsCurrent = savingsVsCurrent(request, cost);
         Integer count = jdbc.queryForObject("SELECT count(*) FROM saved_result WHERE user_id = ?", Integer.class, userId);
         if (count != null && count >= MAX_PER_MEMBER)
             throw ApiException.conflict("저장한 결과는 " + MAX_PER_MEMBER + "개까지예요. 오래된 것을 지운 뒤 저장해 주세요.");
         funnel.record(com.palsaekjo.yogobi.common.FunnelCounter.RESULT_SAVED,
                 com.palsaekjo.yogobi.common.FunnelCounter.actor(userId));   // 퍼널 5단계(D-52)
         return ApiResponse.ok(jdbc.queryForObject("""
-                INSERT INTO saved_result(user_id, request, cost) VALUES (?, ?::jsonb, ?::jsonb)
+                INSERT INTO saved_result(user_id, request, cost, monthly_savings_vs_current)
+                VALUES (?, ?::jsonb, ?::jsonb, ?)
                 RETURNING id, saved_at
-                """, (rs, i) -> new Saved(rs.getObject("id", UUID.class), rs.getTimestamp("saved_at").toInstant(), cost),
-                userId, json.writeValueAsString(request), json.writeValueAsString(cost)));
+                """, (rs, i) -> new Saved(rs.getObject("id", UUID.class), rs.getTimestamp("saved_at").toInstant(),
+                        cost, vsCurrent),
+                userId, json.writeValueAsString(request), json.writeValueAsString(cost), vsCurrent));
+    }
+
+    /**
+     * 지금 쓰는 요금제 대비 절감액(D-53). 저장 요청에 {@code currentPlanId} 가 있을 때만 — 같은 계산기로
+     * 그 요금제도 계산해 차액을 낸다. 없으면 null 이다. <b>0 으로 적지 않는다</b>: "절감이 없다"와
+     * "모른다"는 다르고, 랜딩 표본은 후자를 빼야 한다.
+     *
+     * <p>정가 대비({@code cost.monthlySavings})를 쓰지 않는 이유: 알뜰폰은 정가 할인이 없어 대부분 0 이라
+     * 사용자가 화면에서 본 숫자("지금보다 매달 N원")와 다르다.
+     */
+    private Long savingsVsCurrent(CalculatorRequest request, CostResult cost) {
+        Long currentPlanId = request.optional() == null ? null : request.optional().currentPlanId();
+        if (currentPlanId == null || currentPlanId.equals(request.planId())) {
+            return null;
+        }
+        try {
+            CostResult current = service.calculate(
+                    new CalculatorRequest(currentPlanId, request.tierIds(), request.optional())).result();
+            return current.monthlyTotal() - cost.monthlyTotal();
+        } catch (ApiException e) {
+            return null;   // 지금 요금제가 카탈로그에서 내려갔을 수 있다 — 저장 자체를 막지 않는다.
+        }
     }
 
     /** 최신순. 스냅숏 그대로 — 다시 계산하지 않는다. */
     @GetMapping
     public ApiResponse<List<Saved>> list(Principal principal) {
         return ApiResponse.ok(jdbc.query("""
-                SELECT id, saved_at, cost FROM saved_result WHERE user_id = ? ORDER BY saved_at DESC
+                SELECT id, saved_at, cost, monthly_savings_vs_current FROM saved_result
+                WHERE user_id = ? ORDER BY saved_at DESC
                 """, (rs, i) -> new Saved(rs.getObject("id", UUID.class), rs.getTimestamp("saved_at").toInstant(),
-                        read(rs.getString("cost"))), Long.parseLong(principal.getName())));
+                        read(rs.getString("cost")), (Long) rs.getObject("monthly_savings_vs_current")),
+                Long.parseLong(principal.getName())));
     }
 
     /** 남의 것은 없는 것과 같다 — 404 하나로 존재 여부를 알리지 않는다. */

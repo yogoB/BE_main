@@ -102,7 +102,7 @@ public class SecurityConfig {
                 .requestCache(c -> c.disable()).formLogin(c -> c.disable()).httpBasic(c -> c.disable()).logout(c -> c.disable())
                 .csrf(c -> c.ignoringRequestMatchers("/api/v1/recommendations", "/api/v1/recommendations/narrate", "/api/v1/calculator"))
                 .authorizeHttpRequests(a -> a
-                        .requestMatchers(HttpMethod.GET, "/", "/index.html", "/account.html", "/account.js", "/catalog-report.js", "/favicon.ico", "/api/v1/catalog/**", "/api/v1/auth/csrf", "/api/v1/privacy-policy").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/", "/index.html", "/account.html", "/account.js", "/catalog-report.js", "/favicon.ico", "/api/v1/catalog/**", "/api/v1/auth/csrf", "/api/v1/privacy-policy", "/api/v1/stats/savings").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/recommendations", "/api/v1/recommendations/narrate", "/api/v1/calculator",
                                 "/api/v1/catalog/reports", "/api/v1/reports",
                                 // 백오피스 로그인만 공개다(D-32). 나머지 /admin/** 은 아래에서 ADMIN 전용.

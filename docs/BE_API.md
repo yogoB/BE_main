@@ -494,13 +494,32 @@ JWT 절대 수명 24시간·유휴 제한 2시간(refresh 없음, D-48). 상태�
   업로드 항목에 승인번호가 없어 이 5개가 자연키다 — 같은 날 같은 금액의 별개 결제는 중복으로 흡수된다(알려진 한계).
 - 법정 보존 사본은 자동 생성하지 않는다.
 
+### 4-9. 절감액 표본 — `GET /api/v1/stats/savings` (D-53, 공개)
+
+랜딩의 "이용자들이 진단에서 확인한 절감액". **금액만** 나간다 — 계정·요금제·시각은 싣지 않는다.
+
+```json
+{ "data": { "samples": [12000, 23400, 51010], "sampleCount": 7,
+            "basis": "CURRENT_PLAN", "updatedAt": "2026-09-18T02:00:00Z" }, "warnings": [] }
+```
+
+| 규칙 | 값 |
+|---|---|
+| 표본 단위 | **계정당 최신 저장 1건** — 한 사람이 여러 번 저장해도 한 번 |
+| 기준(`basis`) | `CURRENT_PLAN` — 저장 당시 **지금 쓰는 요금제 대비** 절감액. 정가 대비가 아니다(알뜰폰은 대부분 0) |
+| 제외 | `currentPlanId` 없이 저장한 건(모름 ≠ 0), 절감액 0 이하 |
+| 노출 임계 | `sampleCount < 5` 면 `samples: []`. 화면은 숫자 블록을 숨긴다 |
+| 개수·캐시 | 최근 30건, 60초 캐시 |
+
+**우리가 아는 것은 "진단에서 확인한 절감액"이지 실제로 옮겼는지가 아니다.** 화면 문구도 그렇게 적는다.
+
 ### 5-3b. 저장한 결과 — `/api/v1/me/saved-results` (D-51)
 
 회원 전용·CSRF 필요. **금액은 저장 시점에 BE 가 계산기로 다시 만들어 스냅숏**으로 둔다 — 화면 숫자를 되돌려 보내지 않는다(절대 원칙 2·4).
 
 | 메서드 | 경로 | 본문 / 응답 |
 |---|---|---|
-| POST | `/api/v1/me/saved-results` | 본문 = 계산기 요청 `{planId, tierIds(1개 이상), optional}` → `{ id, savedAt, cost: CostResult }`. 없는 ID 는 계산기와 같은 400·404. 회원당 50개 초과는 409 |
+| POST | `/api/v1/me/saved-results` | 본문 = 계산기 요청 `{planId, tierIds(1개 이상), optional}` → `{ id, savedAt, cost: CostResult, monthlySavingsVsCurrent }`. 뒤 값은 `optional.currentPlanId` 가 있을 때만(없으면 `null` — 0 으로 적지 않는다, D-53). 없는 ID 는 계산기와 같은 400·404. 회원당 50개 초과는 409 |
 | GET | `/api/v1/me/saved-results` | `[ { id, savedAt, cost } ]` 최신순. 스냅숏 그대로(재계산 안 함) |
 | DELETE | `/api/v1/me/saved-results/{id}` | `{ deleted: true }`. 남의 것·없는 것은 404 `YGB-RES-404` |
 

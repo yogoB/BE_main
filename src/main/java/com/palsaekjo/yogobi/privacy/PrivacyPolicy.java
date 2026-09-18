@@ -40,6 +40,7 @@ public final class PrivacyPolicy {
                 new Item("이용 현황",
                         List.of("current_plan_id", "user_subscription", "payment_record(merchant_raw, amount, paid_at)",
                                 "saved_result(저장한 결과 — 계산 요청과 금액 스냅숏)"),
+                        // 저장한 결과의 절감액은 랜딩 통계(금액만, 계정당 1건, 5건 미만 비노출)에 쓰인다 — D-53.
                         "실질 지불 총액 계산·중복 결제 탐지", "정보주체 동의·계약 이행",
                         "결제내역 " + PAYMENT_RETENTION_MONTHS + "개월·탐지결과 " + DETECTION_RETENTION_MONTHS
                                 + "개월 후 파기, 탈퇴 시 즉시 파기. 법정 보존 의무가 확인된 증빙만 별도 보관"),

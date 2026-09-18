@@ -1,0 +1,71 @@
+package com.palsaekjo.yogobi.recommend;
+
+import com.palsaekjo.yogobi.common.ApiResponse;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+/**
+ * 랜딩의 "이용자들이 진단에서 확인한 절감액"(D-53). 공개 경로 — 인증도 CSRF 도 없다.
+ *
+ * <p><b>금액만 나간다.</b> 계정·요금제·시각은 싣지 않는다. 표본은 <b>계정당 최신 1건</b>이고
+ * (한 사람이 여러 번 저장해도 한 번만 센다), 지금 쓰는 요금제 대비 절감액을 <b>실제로 계산해 둔 건</b>만 쓴다 —
+ * 정가 대비 값은 알뜰폰에서 대부분 0 이라 화면에 0 만 늘어놓게 된다.
+ *
+ * <p>표본이 {@link #MIN_SAMPLES} 미만이면 <b>빈 배열</b>을 준다. 한두 건이면 특정 이용자의 금액이
+ * 랜딩에 그대로 뜨는 셈이다. 화면은 이때 숫자 블록을 숨긴다(가짜 숫자를 넣지 않는다).
+ *
+ * <p>우리가 아는 것은 "진단에서 확인한 절감액"이지 실제로 옮겼는지가 아니다. 화면 문구도 그렇게 적는다.
+ */
+@RestController
+@RequestMapping("/api/v1/stats")
+public class SavingsStatsController {
+    /** 이보다 적으면 노출하지 않는다. */
+    static final int MIN_SAMPLES = 5;
+    /** 랜딩이 순환 표시하는 개수. 더 줘도 화면이 쓰지 않는다. */
+    private static final int MAX_SAMPLES = 30;
+    private final JdbcTemplate jdbc;
+    /** 방문마다 집계하지 않는다. 짧게 잡아 새 표본이 곧 반영되게 한다. 0 이면 매번 집계(테스트). */
+    private final Duration cache;
+    private volatile Savings cached;
+    private volatile Instant cachedAt = Instant.EPOCH;
+
+    public SavingsStatsController(JdbcTemplate jdbc,
+                                  @org.springframework.beans.factory.annotation.Value("${yogobi.stats.cache-seconds:60}") long cacheSeconds) {
+        this.jdbc = jdbc;
+        this.cache = Duration.ofSeconds(cacheSeconds);
+    }
+
+    /** {@code basis} 는 이 금액이 무엇 대비인지다 — 화면 문구가 기준을 적을 수 있어야 한다(절대 원칙 4). */
+    public record Savings(List<Long> samples, int sampleCount, String basis, Instant updatedAt) { }
+
+    @GetMapping("/savings")
+    public ApiResponse<Savings> savings() {
+        Savings snapshot = cached;
+        if (snapshot == null || cachedAt.isBefore(Instant.now().minus(cache))) {
+            snapshot = collect();
+            cached = snapshot;
+            cachedAt = Instant.now();
+        }
+        return ApiResponse.ok(snapshot);
+    }
+
+    private Savings collect() {
+        // 계정당 최신 1건. 0 이하(더 내는 조합)는 "절감액 표본"이 아니므로 뺀다.
+        List<Long> samples = jdbc.queryForList("""
+                SELECT monthly_savings_vs_current FROM (
+                    SELECT DISTINCT ON (user_id) user_id, saved_at, monthly_savings_vs_current
+                    FROM saved_result WHERE monthly_savings_vs_current IS NOT NULL
+                    ORDER BY user_id, saved_at DESC
+                ) latest
+                WHERE monthly_savings_vs_current > 0
+                ORDER BY saved_at DESC LIMIT ?
+                """, Long.class, MAX_SAMPLES);
+        int count = samples.size();
+        return new Savings(count < MIN_SAMPLES ? List.of() : samples, count, "CURRENT_PLAN", Instant.now());
+    }
+}
