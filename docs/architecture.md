@@ -142,6 +142,7 @@ AI의 `/parse`·`/narrate`·`/ocr`는 토큰 누락·불일치 시 401, 서버 �
 | POST | `/api/v1/me/nickname` | 닉네임 변경 — `{nickname}` (D-22) |
 | GET | `/api/v1/me` | 인증된 현재 회원 조회 |
 | GET/DELETE | `/api/v1/me/sessions` `/{id}` | 로그인 세션 목록 · 개별 세션 폐기 |
+| POST | `/api/v1/catalog/gaps` | **공개**(인증·CSRF 없음). 화면에서 못 찾은 것을 결손으로 남긴다(D-56). `{kind, queryText}` → 언제나 `{recorded:true}` — 존재 여부를 알려주지 않는다. 발신지당 15분 60회(`yogobi.catalog.gap-limit`), 1~200자, 기존 10,000행 상한·fail-soft |
 | GET/PATCH | `/api/v1/admin/gaps` `/{id}` | 결손 처리 흐름(D-52 ④). 요청 많은 순, 기본은 할 일(REQUESTED·IN_PROGRESS). PATCH `{status, note?}` → `admin_action` 기록 |
 | PATCH | `/api/v1/admin/reports/{kind}/{id}` | 제보 상태 + **처리 메모** `{status, note?}`(D-52 ⑤). 목록에 `note`·`updatedAt`·`targetId` 추가 |
 | GET | `/api/v1/admin/audit` | 감사 통합 타임라인(D-52 ⑧): `catalog_audit` + `admin_action`(제보·결손 상태, 수동 작업, 파기) 최신순 |
