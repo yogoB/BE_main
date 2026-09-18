@@ -2,10 +2,7 @@ package com.palsaekjo.yogobi.recommend;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -14,7 +11,10 @@ import com.palsaekjo.yogobi.common.FunnelCounter;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
-/** 필터 경로가 1순위 설명(message·reasons)을 응답에 싣는지 — AI 장애·카탈로그 결손 시 빈 설명·정상 응답. */
+/**
+ * 결과와 설명은 따로 간다(D-50). 추천은 내레이터를 부르지 않고, 설명은 같은 본문으로 /narrate 가 준다.
+ * 하루에 설명 경로 사고가 넷이었고 그때마다 결과 화면이 같이 흔들렸다.
+ */
 class RecommendationControllerTest {
     private final RecommendationService service = mock(RecommendationService.class);
     private final Narrator narrator = mock(Narrator.class);
@@ -25,52 +25,65 @@ class RecommendationControllerTest {
             List.of(new BreakdownLine("기본료", 55000, "OFFICIAL", null)));
     private final RecommendationRequest request = new RecommendationRequest(
             new RecommendationRequest.Required(20, List.of(1L), null), null);
+    private final List<MissingInput> missing = List.of(new MissingInput("hasFamilyBundle", "확인 필요", "마이페이지"));
+    private final RecommendationResponse.CurrentCost current = new RecommendationResponse.CurrentCost(
+            new CostResult(7, "지금", "SKT", 70390, 70390, 0, 0, List.of()), 15390, 184680);
 
+    /** 추천은 계산만 돌려준다 — 내레이터에 닿지 않는다. 설명 자리는 비어 나간다. */
     @Test
-    void attachesFirstResultNarrationFromNarrator() {
-        var missing = List.of(new MissingInput("hasFamilyBundle", "확인 필요", "마이페이지"));
+    void recommendDoesNotCallTheNarrator() {
         when(service.recommend(any()))
-                .thenReturn(new RecommendationResponse(Accuracy.PARTIAL, missing, List.of(best), 127, null));
-        when(narrator.narrationFor(eq(best), eq(missing), eq(127), isNull()))
-                .thenReturn(new Narrator.Narration("월 13,500원 절약할 수 있어요.", List.of("넷플릭스가 포함돼요."),
-                        List.of("확인 필요 — 마이페이지")));
+                .thenReturn(new RecommendationResponse(Accuracy.PARTIAL, missing, List.of(best), 127, current));
 
         var response = controller.recommend(request, null);
 
-        assertThat(response.data().reasons()).containsExactly("넷플릭스가 포함돼요.");
-        assertThat(response.data().message()).isEqualTo("월 13,500원 절약할 수 있어요.");
-        // 화면 ⓘ 안내도 서버가 만든다(D-46) — 화면이 missingInputs 로 다시 조립하지 않는다.
-        assertThat(response.data().notices()).containsExactly("확인 필요 — 마이페이지");
         assertThat(response.data().results()).containsExactly(best);
         assertThat(response.data().candidateCount()).isEqualTo(127);
-        // 후보 수는 CostResult 에 없다. 혜택도 할인도 없는 요금제에는 이게 유일한 근거라 따로 넘긴다.
-        verify(narrator).narrationFor(best, missing, 127, null);
+        assertThat(response.data().current()).isEqualTo(current);
+        assertThat(response.data().message()).isNull();
+        assertThat(response.data().reasons()).isEmpty();
+        assertThat(response.data().notices()).isEmpty();
+        verifyNoInteractions(narrator);
     }
 
+    /** 같은 본문으로 /narrate 를 부르면 1순위 설명이 온다. current 도 그대로 내레이터에 넘어간다. */
     @Test
-    void aiUnavailableYieldsEmptyNarrationButKeepsResults() {
+    void narrateExplainsTheFirstResultWithCurrent() {
+        when(service.recommend(any()))
+                .thenReturn(new RecommendationResponse(Accuracy.PARTIAL, missing, List.of(best), 127, current));
+        when(narrator.narrationFor(best, missing, 127, current))
+                .thenReturn(new Narrator.Narration("지금보다 월 15,390원 덜 내요.", List.of("넷플릭스가 포함돼요."),
+                        List.of("확인 필요 — 마이페이지")));
+
+        var narration = controller.narrate(request).data();
+
+        assertThat(narration.message()).isEqualTo("지금보다 월 15,390원 덜 내요.");
+        assertThat(narration.reasons()).containsExactly("넷플릭스가 포함돼요.");
+        assertThat(narration.notices()).containsExactly("확인 필요 — 마이페이지");
+    }
+
+    /** 내레이터 장애는 빈 설명이다 — 200 이고 결과 경로는 애초에 무관하다. */
+    @Test
+    void narratorFailureYieldsEmptyNarration() {
         when(service.recommend(any()))
                 .thenReturn(new RecommendationResponse(Accuracy.FULL, List.of(), List.of(best), 5, null));
-        // narrationFor 가 장애를 빈 설명으로 흡수한다.
         when(narrator.narrationFor(any(), any(), any(), any())).thenReturn(Narrator.Narration.none());
 
-        var response = controller.recommend(request, null);
+        var narration = controller.narrate(request).data();
 
-        assertThat(response.data().reasons()).isEmpty();
-        assertThat(response.data().message()).isNull();
-        assertThat(response.data().results()).containsExactly(best);
+        assertThat(narration.message()).isNull();
+        assertThat(narration.reasons()).isEmpty();
     }
 
+    /** 후보가 없으면 설명할 것도 없다. 내레이터를 부르지 않는다. */
     @Test
     void noCandidateSkipsNarratorEntirely() {
         when(service.recommend(any())).thenReturn(new RecommendationResponse(Accuracy.PARTIAL, List.of(), List.of()));
 
-        var response = controller.recommend(request, null);
+        var narration = controller.narrate(request).data();
 
-        assertThat(response.data().reasons()).isEmpty();
-        assertThat(response.data().message()).isNull();
-        assertThat(response.data().results()).isEmpty();
-        assertThat(response.data().candidateCount()).isNull();
+        assertThat(narration.message()).isNull();
+        assertThat(narration.reasons()).isEmpty();
         verifyNoInteractions(narrator);
     }
 }

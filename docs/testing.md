@@ -770,3 +770,16 @@ dev 프로파일에서 합본 1,700건이 전부 물러났을 것이다.
 | b | 저장값 3(99,000) · `currentPlanId=1` | 넘긴 값이 이긴다 — 55,000. **저장값은 그대로 3** |
 | c | 저장값 3 · 파라미터 없음 | 예전대로 99,000 |
 | d | 둘 다 없음 | 400 `currentPlan` (기존 `switchTimingRequiresCurrentPlanSet`) |
+
+
+## G-36. 결과와 설명은 따로 간다 (2026-09-18, D-50)
+
+**검증**: `RecommendationControllerTest` · `RecommendationApiTest` (`narrateIsPublicAndCsrfExemptLikeRecommendations`)
+
+| | 호출 | 정답 |
+|---|---|---|
+| a | `POST /recommendations` | 내레이터를 **부르지 않는다**. `message` null · `reasons` · `notices` 빈 배열. results·current·candidateCount 는 그대로 |
+| b | `POST /recommendations/narrate` 같은 본문 | 1순위 설명 `{message, reasons, notices}`. `current` 가 내레이터에 넘어간다 |
+| c | 내레이터 장애 | 200 + 빈 설명. 결과 경로는 애초에 무관 |
+| d | 후보 없음 | 빈 설명, 내레이터를 부르지 않는다 |
+| e | 비회원 · CSRF 토큰 없음 | `/narrate` 도 200 — 추천과 같은 공개 경로 |

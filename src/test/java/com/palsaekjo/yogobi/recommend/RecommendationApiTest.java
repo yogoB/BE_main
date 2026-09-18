@@ -403,6 +403,23 @@ class RecommendationApiTest {
                 .andExpect(jsonPath("$.data.current.monthlySavings").value(-21500));
     }
 
+    /** D-50 — /narrate 는 추천과 같은 공개 경로다. 비회원·CSRF 토큰 없이 200, 설명 모양(message·reasons·notices)으로 온다. */
+    @Test
+    void narrateIsPublicAndCsrfExemptLikeRecommendations() throws Exception {
+        mvc.perform(post("/api/v1/recommendations/narrate").contentType(MediaType.APPLICATION_JSON).content("""
+                {"required":{"monthlyDataGb":20,"wantedServiceIds":[1]},"optional":{"contractType":"NONE"}}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.reasons").isArray())
+                .andExpect(jsonPath("$.data.notices").isArray());
+        // 추천 본체는 이제 설명을 싣지 않는다.
+        mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
+                {"required":{"monthlyDataGb":20,"wantedServiceIds":[1]},"optional":{"contractType":"NONE"}}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.results[0].planName").value("넷플플랜"))
+                .andExpect(jsonPath("$.data.message").doesNotExist())
+                .andExpect(jsonPath("$.data.reasons").isEmpty());
+    }
+
     private void assertGap(String kind, String queryText, int expectedCount) {
         assertThat(jdbc.queryForObject(
                 "SELECT requested_cnt FROM catalog_candidate WHERE kind=? AND query_text=?",
