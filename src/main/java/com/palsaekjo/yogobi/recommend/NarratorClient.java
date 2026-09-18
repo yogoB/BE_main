@@ -46,6 +46,12 @@ public class NarratorClient implements Narrator, DetectionNarrator, SwitchTiming
     private final io.micrometer.core.instrument.MeterRegistry registry;
     /** 마지막으로 내레이터가 200 을 준 시각. 운영 상태 패널의 "살아 있나" 한 줄(D-52). */
     private final java.util.concurrent.atomic.AtomicReference<java.time.Instant> lastOk = new java.util.concurrent.atomic.AtomicReference<>();
+    /**
+     * 프로세스가 켜진 뒤의 최대 왕복 시간(ms). micrometer 의 {@code Timer.max()} 는 <b>최근 창</b>(기본 2분) 값이라
+     * 호출이 뜸하면 0 으로 삭아 내려간다 — 대시보드에 "평균 2,145ms · 최대 0ms" 가 찍혔다(2026-09-18).
+     * 평균·건수는 누적인데 최대만 창이라 나란히 두면 거짓말이 된다. 그래서 여기서 따로 든다.
+     */
+    private final java.util.concurrent.atomic.AtomicLong maxMs = new java.util.concurrent.atomic.AtomicLong();
 
     /** 테스트·수동 조립용. 레지스트리는 인메모리다. */
     public NarratorClient(ObjectMapper json, String baseUrl, String internalToken) {
@@ -192,6 +198,11 @@ public class NarratorClient implements Narrator, DetectionNarrator, SwitchTiming
         registry.counter("narration.unavailable", "kind", kind).increment();
     }
 
+    /** 켜진 뒤 최대 왕복(ms). 호출이 없었으면 0. */
+    public long maxMs() {
+        return maxMs.get();
+    }
+
     public java.time.Instant lastOk() {
         return lastOk.get();
     }
@@ -239,7 +250,9 @@ public class NarratorClient implements Narrator, DetectionNarrator, SwitchTiming
         long started = System.nanoTime();
         try {
             JsonNode body = exchange(path, request);
-            registry.timer("narration.latency").record(java.time.Duration.ofNanos(System.nanoTime() - started));
+            long elapsed = System.nanoTime() - started;
+            registry.timer("narration.latency").record(java.time.Duration.ofNanos(elapsed));
+            maxMs.accumulateAndGet(elapsed / 1_000_000, Math::max);
             lastOk.set(java.time.Instant.now());
             return body;
         } catch (RestClientException e) {

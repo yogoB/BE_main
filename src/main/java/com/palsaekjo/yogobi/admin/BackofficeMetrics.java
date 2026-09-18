@@ -75,7 +75,9 @@ public class BackofficeMetrics {
                              + (SELECT count(*) FROM service_report WHERE status = 'PENDING')"""),
                 "total", count("""
                         SELECT (SELECT count(*) FROM catalog_report) + (SELECT count(*) FROM service_report)""")));
-        out.put("gaps", count("SELECT count(*) FROM catalog_candidate WHERE status = 'REQUESTED'"));
+        // 결손 "대기" 는 아직 손대지 않은 것 + 진행 중인 것이다 — /admin/gaps 기본 목록과 같은 범위여야
+        // 뱃지와 목록 건수가 어긋나지 않는다(2026-09-18).
+        out.put("gaps", count("SELECT count(*) FROM catalog_candidate WHERE status IN ('REQUESTED', 'IN_PROGRESS')"));
         out.put("funnel", funnel());
         out.put("endpoints", endpoints());
         out.put("health", health());
@@ -102,7 +104,9 @@ public class BackofficeMetrics {
         out.put("narrationFailuresByKind", failures);
         out.put("narrationCalls", latency == null ? 0 : latency.count());
         out.put("narrationAvgMs", latency == null ? null : Math.round(latency.mean(java.util.concurrent.TimeUnit.MILLISECONDS)));
-        out.put("narrationMaxMs", latency == null ? null : Math.round(latency.max(java.util.concurrent.TimeUnit.MILLISECONDS)));
+        // micrometer 의 Timer.max() 는 최근 2분 창이라 뜸하면 0 이다 — 누적 평균과 나란히 두면 거짓말이 된다.
+        // 클라이언트가 켜진 뒤 최대값을 따로 들고 있으므로 그것을 쓴다(2026-09-18).
+        out.put("narrationMaxMs", narrator == null ? null : narrator.maxMs());
         out.put("narratorLastOkAt", narrator == null ? null : narrator.lastOk());
         out.put("recommendationsToday", count("SELECT coalesce(sum(count), 0) FROM recommendation_daily WHERE day = CURRENT_DATE"));
         // 사람 수 대비 횟수. 1 에 가까우면 정상, 크게 벌어지면 결과 화면이 반복 호출하고 있다는 뜻이다(9/17 사고의 모양).
