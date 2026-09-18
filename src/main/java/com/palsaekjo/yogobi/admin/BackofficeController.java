@@ -13,10 +13,12 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.security.Principal;
 import java.util.Map;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -36,10 +38,15 @@ public class BackofficeController {
     private final SmartChoiceSweepService sweep;
     private final ExchangeRates rates;
     private final RetentionService retention;
+    private final AdminActions actions;
+    private final JdbcTemplate jdbc;
 
     public BackofficeController(AdminAccount admin, AuthTokens tokens, BackofficeMetrics metrics,
                                 CatalogDailyHarvest harvest, SmartChoiceSweepService sweep,
-                                ExchangeRates rates, RetentionService retention) {
+                                ExchangeRates rates, RetentionService retention,
+                                AdminActions actions, JdbcTemplate jdbc) {
+        this.actions = actions;
+        this.jdbc = jdbc;
         this.admin = admin;
         this.tokens = tokens;
         this.metrics = metrics;
@@ -79,8 +86,10 @@ public class BackofficeController {
 
     /** ② 수집을 지금 한 번 돌린다(정기 실행은 매일 09:00 KST). 데모·긴급 보정용. */
     @PostMapping("/harvest/run")
-    public ApiResponse<Map<String, Object>> runHarvest() {
-        return ApiResponse.ok(harvest.harvest());
+    public ApiResponse<Map<String, Object>> runHarvest(Principal principal) {
+        var out = harvest.harvest();
+        actions.record(Long.parseLong(principal.getName()), "JOB_HARVEST", null, String.valueOf(out));
+        return ApiResponse.ok(out);
     }
 
     /**
@@ -93,14 +102,18 @@ public class BackofficeController {
      * 발화하지 않는다. 그래서 이 수동 경로가 실질적인 실행 수단이다.
      */
     @PostMapping("/smartchoice/sweep")
-    public ApiResponse<Map<String, Object>> runSweep() {
-        return ApiResponse.ok(sweep.sweep());
+    public ApiResponse<Map<String, Object>> runSweep(Principal principal) {
+        var out = sweep.sweep();
+        actions.record(Long.parseLong(principal.getName()), "JOB_SMARTCHOICE", null, String.valueOf(out));
+        return ApiResponse.ok(out);
     }
 
     /** 환율을 지금 갱신한다(정기 실행은 09:15 KST). 실패해도 이전 값이 남는다 — 응답의 updated 로 구분한다. */
     @PostMapping("/fx/refresh")
-    public ApiResponse<Map<String, Object>> refreshFx() {
-        return ApiResponse.ok(rates.refreshNow());
+    public ApiResponse<Map<String, Object>> refreshFx(Principal principal) {
+        var out = rates.refreshNow();
+        actions.record(Long.parseLong(principal.getName()), "JOB_FX", null, String.valueOf(out));
+        return ApiResponse.ok(out);
     }
 
     /**
@@ -120,10 +133,32 @@ public class BackofficeController {
      * 무엇이 지워졌는지 유형별 건수로 돌려주므로 운영자가 기록으로 남길 수 있다.
      */
     @PostMapping("/retention/purge")
-    public ApiResponse<Map<String, Integer>> runRetention(@RequestBody JsonNode body) {
+    public ApiResponse<Map<String, Integer>> runRetention(@RequestBody JsonNode body, Principal principal) {
         if (!"파기".equals(body.path("confirm").asText(null))) {
             throw ApiException.requiredMissing("confirm", "되돌릴 수 없는 작업이에요. 확인 문구를 입력해 주세요.");
         }
-        return ApiResponse.ok(retention.purge());
+        var out = retention.purge();
+        actions.record(Long.parseLong(principal.getName()), "JOB_PURGE", null, String.valueOf(out));
+        return ApiResponse.ok(out);
+    }
+
+    /**
+     * 감사 타임라인(D-52 ⑧). 카탈로그 변경(`catalog_audit`)과 그 밖의 운영 행위(`admin_action`)를 한 줄로 본다.
+     * 운영자는 로그인 아이디(이메일)로 보인다 — 운영자끼리의 기록이라 신원 은닉 대상이 아니다.
+     */
+    @GetMapping("/audit")
+    public ApiResponse<java.util.List<Map<String, Object>>> audit(@RequestParam(defaultValue = "100") int limit) {
+        int capped = Math.max(1, Math.min(limit, 500));
+        return ApiResponse.ok(jdbc.queryForList("""
+                SELECT * FROM (
+                    SELECT a.created_at AS at, u.email AS actor, 'CATALOG_' || a.action AS action,
+                           a.dataset || ':' || a.row_key AS target,
+                           CASE WHEN a.outcome = 'APPLIED' THEN NULL ELSE a.outcome || ' ' || coalesce(a.detail, '') END AS detail
+                    FROM catalog_audit a LEFT JOIN app_user u ON u.id = a.actor_id
+                    UNION ALL
+                    SELECT b.created_at, u.email, b.action, b.target, b.detail
+                    FROM admin_action b LEFT JOIN app_user u ON u.id = b.actor_id
+                ) t ORDER BY at DESC LIMIT ?
+                """, capped));
     }
 }

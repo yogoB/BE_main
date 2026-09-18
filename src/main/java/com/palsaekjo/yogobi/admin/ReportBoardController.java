@@ -40,9 +40,11 @@ public class ReportBoardController {
     private static final int MAX_LIMIT = 200;
 
     private final JdbcTemplate jdbc;
+    private final AdminActions actions;
 
-    public ReportBoardController(JdbcTemplate jdbc) {
+    public ReportBoardController(JdbcTemplate jdbc, AdminActions actions) {
         this.jdbc = jdbc;
+        this.actions = actions;
     }
 
     /**
@@ -51,8 +53,8 @@ public class ReportBoardController {
      * {@code target} 은 카탈로그 제보가 지명한 상품 이름이고, 화면 제보는 대신 {@code pageUrl} 이 있다.
      */
     public record Report(String kind, UUID id, String status, Instant createdAt, String detail,
-                         String targetType, String target, String description,
-                         String pageUrl, String sourceUrl) { }
+                         String targetType, Long targetId, String target, String description,
+                         String pageUrl, String sourceUrl, String note, Instant updatedAt) { }
 
     @GetMapping
     public ApiResponse<List<Report>> list(@RequestParam(required = false) String status,
@@ -65,8 +67,8 @@ public class ReportBoardController {
         String sql = """
                 SELECT * FROM (
                     SELECT 'CATALOG' AS kind, r.id, r.status, r.created_at, r.field AS detail,
-                           r.target_type, COALESCE(mp.name, ss.name, st.name, bp.name) AS target,
-                           r.description, NULL::varchar AS page_url, r.source_url
+                           r.target_type, r.target_id, COALESCE(mp.name, ss.name, st.name, bp.name) AS target,
+                           r.description, NULL::varchar AS page_url, r.source_url, r.note, r.updated_at
                     FROM catalog_report r
                     LEFT JOIN mobile_plan mp ON r.target_type = 'MOBILE_PLAN' AND mp.id = r.target_id
                     LEFT JOIN subscription_service ss ON r.target_type = 'SUBSCRIPTION_SERVICE' AND ss.id = r.target_id
@@ -74,7 +76,7 @@ public class ReportBoardController {
                     LEFT JOIN bundle_product bp ON r.target_type = 'BUNDLE_PRODUCT' AND bp.id = r.target_id
                     UNION ALL
                     SELECT 'SERVICE', s.id, s.status, s.created_at, s.category,
-                           NULL::text, NULL::varchar, s.description, s.page_url, s.source_url
+                           NULL::text, NULL::bigint, NULL::varchar, s.description, s.page_url, s.source_url, s.note, s.updated_at
                     FROM service_report s
                 ) AS reports
                 WHERE (CAST(? AS text) IS NULL OR status = CAST(? AS text))
@@ -84,8 +86,10 @@ public class ReportBoardController {
         return ApiResponse.ok(jdbc.query(sql, (rs, row) -> new Report(
                 rs.getString("kind"), rs.getObject("id", UUID.class), rs.getString("status"),
                 rs.getTimestamp("created_at").toInstant(), rs.getString("detail"),
-                rs.getString("target_type"), rs.getString("target"), rs.getString("description"),
-                rs.getString("page_url"), rs.getString("source_url")), status, status, capped));
+                rs.getString("target_type"), rs.getObject("target_id", Long.class), rs.getString("target"),
+                rs.getString("description"), rs.getString("page_url"), rs.getString("source_url"),
+                rs.getString("note"), rs.getTimestamp("updated_at") == null ? null : rs.getTimestamp("updated_at").toInstant()),
+                status, status, capped));
     }
 
     /**
@@ -94,15 +98,21 @@ public class ReportBoardController {
      */
     @PatchMapping("/{kind}/{id}")
     public ApiResponse<Map<String, Object>> updateStatus(@PathVariable String kind, @PathVariable UUID id,
-                                                         @RequestBody JsonNode body) {
+                                                         @RequestBody JsonNode body, java.security.Principal principal) {
         String table = TABLES.get(kind);
         if (table == null) throw ApiException.requiredMissing("kind", "제보 종류를 확인해 주세요.");
         String status = body.path("status").asText(null);
         if (status == null || !STATUSES.contains(status)) {
             throw ApiException.requiredMissing("status", "처리 상태를 확인해 주세요.");
         }
-        int updated = jdbc.update("UPDATE " + table + " SET status = ? WHERE id = ?", status, id);
+        // 처리 메모(D-52 ⑤). 보내지 않으면 그대로, 빈 문자열이면 지운다.
+        String note = body.hasNonNull("note") ? body.get("note").asText() : null;
+        if (note != null && note.length() > 1000) throw ApiException.requiredMissing("note", "메모는 1,000자까지예요.");
+        int updated = body.hasNonNull("note")
+                ? jdbc.update("UPDATE " + table + " SET status = ?, note = NULLIF(?, ''), updated_at = now() WHERE id = ?", status, note, id)
+                : jdbc.update("UPDATE " + table + " SET status = ?, updated_at = now() WHERE id = ?", status, id);
         if (updated == 0) throw new ApiException("YGB-REQ-404", 404, "제보를 찾을 수 없어요.", "id");
+        actions.record(Long.parseLong(principal.getName()), "REPORT_" + status, kind + ":" + id, note);
         return ApiResponse.ok(Map.of("id", id, "status", status));
     }
 }

@@ -644,3 +644,29 @@ JWT 절대 수명 24시간·유휴 제한 2시간(refresh 없음, D-48). 상태�
 | GET | `/api/v1/admin/catalog/audit` | 원본 변경 이력(최신순, `?limit=1~500`) — 행위자·시각·전/후 행·결과 (D-27) |
 
 전체 호출 흐름은 [시퀀스 다이어그램](diagrams/index.html)에서 확인한다.
+
+
+## 백오피스 고도화 (D-52, 2026-09-18) — 전부 `/api/v1/admin/**` ADMIN 전용
+
+| 메서드 | 경로 | 내용 |
+|---|---|---|
+| GET | `/admin/gaps?status=&limit=` | 결손 목록. 상태 없으면 할 일(REQUESTED·IN_PROGRESS)만, `requestedCount` 내림차순. 행: `{id, kind, queryText, status, requestedCount, lastRequestedAt, note, updatedAt}` |
+| PATCH | `/admin/gaps/{id}` | `{status: REQUESTED\|IN_PROGRESS\|PENDING\|VERIFIED\|REJECTED, note?}` — `note` 없으면 그대로, 빈 문자열이면 지움 |
+| PATCH | `/admin/reports/{kind}/{id}` | 기존 + `note?`(1,000자). 목록 행에 `note`·`updatedAt`·`targetId` 추가 |
+| GET | `/admin/audit?limit=` | `[{at, actor(이메일), action, target, detail}]` 최신순. action 은 `CATALOG_CREATE/UPDATE/DELETE`·`REPORT_<상태>`·`GAP_<상태>`·`JOB_HARVEST/SMARTCHOICE/FX/PURGE` |
+| GET | `/admin/dashboard` | 아래 블록이 추가됨 |
+
+`dashboard` 추가 블록:
+
+```jsonc
+"health": { "narrationFailures": 0, "narrationFailuresByKind": {"contract":0,"connect":0,"http":0,"token":0,"response":0},
+            "narrationCalls": 12, "narrationAvgMs": 380, "narrationMaxMs": 3800, "narratorLastOkAt": "…",
+            "recommendationsToday": 41, "reportShownToday": 41, "reportViewersToday": 9 },   // 횟수 ≫ 사람이면 반복 호출 의심
+"quality": { "carrierNameVariants": {"count":0,"sample":[]}, "duplicateTierNames": {…}, "samePriceTiers": {…},
+             "placeholderPlans": {…}, "plansWithoutSource": {…}, "mnoNetworkGaps": {"count":1,"sample":["KT · LTE 0건"]} },
+"stats":   { "windowDays": 7, "topRecommended": [{carrier, plan, count}], "dataGbHistogram": [{dataGb, count}],
+             "topSaved": [{carrier, plan, count}], "savedTotal": 3 },
+"funnel":  { …기존…, "unique": {gateShown, memberLogin, reportShown, calendarShown, resultSaved},
+             "uniqueDaily": [{date, …}], "contaminatedUntil": "2026-09-18" }   // 횟수 열은 그날까지 무한 호출로 부풀어 있음
+```
+카운터·타이머(`narration.*`)는 프로세스 수명이다 — 재시작하면 0. 나머지는 DB.

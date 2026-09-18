@@ -796,3 +796,18 @@ dev 프로파일에서 합본 1,700건이 전부 물러났을 것이다.
 | c | `GET` 본인 | 최신순 1건, 스냅숏 그대로 |
 | d | `GET`·`DELETE` 다른 회원 | 목록 0건 · 삭제 **404** — 존재 여부를 알리지 않는다 |
 | e | 비회원 | 401 |
+
+
+## G-38. 백오피스 고도화 (2026-09-18, D-52)
+
+**검증**: `BackofficeBoardApiTest`
+
+| | 상황 | 정답 |
+|---|---|---|
+| a | 결손 3건(REQUESTED 7회·REQUESTED 2회·VERIFIED 40회) | 기본 목록은 할 일 2건, 요청 많은 순. 상태 필터로 VERIFIED 1건. 모르는 상태는 400 |
+| b | 결손 PATCH `IN_PROGRESS` + 메모 | 행이 바뀌고 `/admin/audit` 맨 위에 `GAP_IN_PROGRESS`·`gap:<id>`·운영자 아이디 |
+| c | 제보 PATCH `RESOLVED` + 메모 | 목록에 `note`·`updatedAt`, `admin_action` 에 `REPORT_RESOLVED` 1건 |
+| d | 999999MB 더미 요금제가 활성 | `quality.placeholderPlans.count` 1, 표본에 이름. `health`·`stats`·`funnel.unique`·`contaminatedUntil` 존재 |
+| e | 같은 사람이 리포트를 하루 10번 봄 + 다른 사람 1번 | `funnel_daily` 11(횟수) · `funnel_event` 2(사람 수) |
+
+**e 가 핵심이다.** 9/17~18 결과 화면 무한 호출로 횟수는 156회/10초씩 부풀었다. 사람 수는 그 사고가 다시 나도 안 부푼다.
