@@ -248,7 +248,7 @@ AI 연결과 내부 인증은 BE가 담당하며 프론트에는 AI 주소·내�
 | `results[]` | object[] | 실질월비용 오름차순 상위 5개 |
 | `results[].monthlyTotal` | long(원) | 실질 월 총비용(유일한 비교 기준) |
 | `results[].baseline` | long(원) | 할인 없이 정가 합 |
-| `results[].monthlySavings` / `annualSavings` | long(원) | `baseline - monthlyTotal` / ×12 |
+| `results[].monthlySavings` / `semiannualSavings` / `annualSavings` | long(원) | `baseline - monthlyTotal` / ×6 / ×12. `current` 에도 같은 세 값이 있다(D-51) |
 | `results[].breakdown[]` | object[] | 항목별 내역. `amount` 할인은 음수. `provenance`·`note` |
 | `current` | object\|null | 지금 쓰는 요금제로 **같은 구독을 유지했을 때**의 금액(G-30). `currentPlanId` 를 줬고 카탈로그에 있을 때만 |
 | `current.cost` | object | `results[]` 와 같은 모양. 후보와 같은 계산기·같은 컨텍스트로 낸 값이다 |
@@ -493,6 +493,18 @@ JWT 절대 수명 24시간·유휴 제한 2시간(refresh 없음, D-48). 상태�
   같은 파일을 다시 올리면 `{ "imported": 0, "recognized": 0, "unrecognized": [] }` 이고 저장된 건수는 그대로다.
   업로드 항목에 승인번호가 없어 이 5개가 자연키다 — 같은 날 같은 금액의 별개 결제는 중복으로 흡수된다(알려진 한계).
 - 법정 보존 사본은 자동 생성하지 않는다.
+
+### 5-3b. 저장한 결과 — `/api/v1/me/saved-results` (D-51)
+
+회원 전용·CSRF 필요. **금액은 저장 시점에 BE 가 계산기로 다시 만들어 스냅숏**으로 둔다 — 화면 숫자를 되돌려 보내지 않는다(절대 원칙 2·4).
+
+| 메서드 | 경로 | 본문 / 응답 |
+|---|---|---|
+| POST | `/api/v1/me/saved-results` | 본문 = 계산기 요청 `{planId, tierIds(1개 이상), optional}` → `{ id, savedAt, cost: CostResult }`. 없는 ID 는 계산기와 같은 400·404. 회원당 50개 초과는 409 |
+| GET | `/api/v1/me/saved-results` | `[ { id, savedAt, cost } ]` 최신순. 스냅숏 그대로(재계산 안 함) |
+| DELETE | `/api/v1/me/saved-results/{id}` | `{ deleted: true }`. 남의 것·없는 것은 404 `YGB-RES-404` |
+
+탈퇴 시 회원 행과 함께 삭제된다(D-11 분석본 파기). 처리방침 "이용 현황" 항목에 포함.
 
 ### 5-4. 변경 시점(회수기간) — `GET /api/v1/me/switch-timing`
 

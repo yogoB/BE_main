@@ -181,6 +181,37 @@ class MeApiTest {
                 .andExpect(jsonPath("$.data.timing.currentMonthlyCost").value(99000));
     }
 
+    /** G-37 — 저장한 결과: 스냅숏은 BE 가 계산한다. 목록은 최신순, 남의 것은 404, 비회원은 401. */
+    @Test void savedResultsAreSnapshotsComputedByTheServer() throws Exception {
+        jdbc.execute("INSERT INTO carrier(id,name,carrier_type) VALUES (1,'SKT','MNO')");
+        jdbc.execute("""
+                INSERT INTO mobile_plan(id,carrier_id,name,network_type,base_price,data_mb,voice_min,sms_cnt,source_url,collected_at)
+                VALUES (1,1,'넷플플랜','FIVE_G',55000,100000,999999,9999,'http://seed','2026-09-14')""");
+        Browser a = new Browser(); signup("alice@example.com", a);
+        Browser b = new Browser(); signup("bob@example.com", b);
+
+        // 화면 숫자는 보내지 않는다 — 계산 요청만. 55,000 + 넷플릭스 스탠다드 13,500 = 68,500 은 서버가 만든다.
+        var saved = a.send(post("/api/v1/me/saved-results").contentType("application/json")
+                .content("{\"planId\":1,\"tierIds\":[2],\"optional\":{\"contractType\":\"NONE\"}}"));
+        assertThat(saved.getResponse().getStatus()).isEqualTo(200);
+        var body = JSON.readTree(saved.getResponse().getContentAsString()).path("data");
+        assertThat(body.path("cost").path("monthlyTotal").asLong()).isEqualTo(68500);
+        assertThat(body.path("cost").path("semiannualSavings").asLong()).isEqualTo(0);   // 정가 대비 절감 0 → 6개월도 0
+        String id = body.path("id").asText();
+
+        mvc.perform(get("/api/v1/me/saved-results").cookie(a.cookies)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].id").value(id))
+                .andExpect(jsonPath("$.data[0].cost.planName").value("넷플플랜"));
+        // 남의 목록에는 없고, 남이 지울 수도 없다.
+        mvc.perform(get("/api/v1/me/saved-results").cookie(b.cookies)).andExpect(jsonPath("$.data.length()").value(0));
+        assertThat(b.send(delete("/api/v1/me/saved-results/" + id)).getResponse().getStatus()).isEqualTo(404);
+        assertThat(a.send(delete("/api/v1/me/saved-results/" + id)).getResponse().getStatus()).isEqualTo(200);
+        mvc.perform(get("/api/v1/me/saved-results").cookie(a.cookies)).andExpect(jsonPath("$.data.length()").value(0));
+        // 비회원은 401.
+        mvc.perform(get("/api/v1/me/saved-results")).andExpect(status().isUnauthorized());
+    }
+
     @Test void switchTimingRequiresCurrentPlanSet() throws Exception {
         Browser a = new Browser(); signup("alice@example.com", a);
         mvc.perform(get("/api/v1/me/switch-timing").cookie(a.cookies).param("targetPlanId", "1"))

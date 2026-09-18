@@ -783,3 +783,16 @@ dev 프로파일에서 합본 1,700건이 전부 물러났을 것이다.
 | c | 내레이터 장애 | 200 + 빈 설명. 결과 경로는 애초에 무관 |
 | d | 후보 없음 | 빈 설명, 내레이터를 부르지 않는다 |
 | e | 비회원 · CSRF 토큰 없음 | `/narrate` 도 200 — 추천과 같은 공개 경로 |
+
+
+## G-37. 저장한 결과는 서버가 계산한 스냅숏이다 (2026-09-18, D-51)
+
+**검증**: `MeApiTest` (`savedResultsAreSnapshotsComputedByTheServer`)
+
+| | 입력 | 정답 |
+|---|---|---|
+| a | `POST /me/saved-results {planId:1, tierIds:[2]}` | `cost.monthlyTotal` **68,500** — 화면이 보낸 숫자가 아니라 서버가 55,000 + 13,500 으로 만든 값 |
+| b | 같은 응답 | `semiannualSavings` = `monthlySavings` × 6 (정가 대비 0 이면 0) |
+| c | `GET` 본인 | 최신순 1건, 스냅숏 그대로 |
+| d | `GET`·`DELETE` 다른 회원 | 목록 0건 · 삭제 **404** — 존재 여부를 알리지 않는다 |
+| e | 비회원 | 401 |

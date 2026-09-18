@@ -142,6 +142,7 @@ AI의 `/parse`·`/narrate`·`/ocr`는 토큰 누락·불일치 시 401, 서버 �
 | POST | `/api/v1/me/nickname` | 닉네임 변경 — `{nickname}` (D-22) |
 | GET | `/api/v1/me` | 인증된 현재 회원 조회 |
 | GET/DELETE | `/api/v1/me/sessions` `/{id}` | 로그인 세션 목록 · 개별 세션 폐기 |
+| POST/GET/DELETE | `/api/v1/me/saved-results` `/{id}` | 결과 저장(D-51). 본문은 계산기 요청(`planId`·`tierIds`·`optional`) — **금액은 저장 시점에 BE 가 다시 계산해 스냅숏**으로 둔다. 응답 `{id, savedAt, cost}`, 목록 최신순, 회원당 50개(초과 409), 남의 것은 404, 탈퇴 시 CASCADE |
 | GET/POST/DELETE | `/api/v1/me/subscriptions` `/{id}` | 내 구독 (구현) |
 | POST | `/api/v1/me/current-plan` | 현재 요금제 설정 (구현) |
 | POST | `/api/v1/me/payments/import` | 결제내역 업로드 |
@@ -245,6 +246,7 @@ Google 전용 계정은 동일 Google `sub` 재인증으로 자체 비밀번호�
 가족결합 할인은 `USER_PROVIDED` 다(G-28). 내레이터는 값을 열거로 묶지 않는다 — 2026-09-18 에 `USER_PROVIDED` 가
 빠져 있어 결합 사용자 전원의 설명이 422 로 비었다.
 `baseline`은 아무 할인 없이 정가로만 냈을 때다. 절감액 표시의 기준선.
+`semiannualSavings`(= `monthlySavings` × 6)는 `CostResult`·`current` 둘 다에 있다(D-51, 결과 대시보드의 1·6·12개월 탭). 화면이 곱하지 않도록 BE 가 준다. `/narrate` 요청에는 싣지 않는다.
 `current`는 **지금 쓰는 요금제로 같은 구독을 유지했을 때**의 금액이다(G-30). 후보와 같은 계산기·같은 컨텍스트로 내므로
 `results[0]`과 나란히 놓고 빼도 되는 두 금액이며, 그 뺄셈도 여기서 해서 보낸다 — 화면은 금액을 만들지 않는다(원칙 2).
 `familyBundleDiscountKrw`는 **현재 통신사의 요금제에만** 반영한다(G-29). 통신사를 옮기면 결합이 풀려 사라질 할인이라,
