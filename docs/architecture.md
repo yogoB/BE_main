@@ -226,6 +226,9 @@ Google 전용 계정은 동일 Google `sub` 재인증으로 자체 비밀번호�
     "monthlySavings": 11000,                              // current − results[0]. 지금이 더 싸면 음수 그대로
     "annualSavings": 132000
   },
+  "minimalChange": { "planId": 7, "planName": "5G 슬림+", "carrier": "SKT", "…": "results 와 같은 모양" },
+                                                          // D-55: 번호이동 없이 요금제만 바꾸는 선택지(현재 통신사 안 최저).
+                                                          // 현재 통신사를 모르거나 그 통신사에 후보가 없으면 null
   "candidateCount": 127,                                  // 정렬 대상 후보 수. results 는 상위 N개만
   "message": null, "reasons": [], "notices": []           // D-50: 추천 본체는 설명을 싣지 않는다 — 아래 /narrate
 }
@@ -252,6 +255,8 @@ Google 전용 계정은 동일 Google `sub` 재인증으로 자체 비밀번호�
 빠져 있어 결합 사용자 전원의 설명이 422 로 비었다.
 `baseline`은 아무 할인 없이 정가로만 냈을 때다. 절감액 표시의 기준선.
 `semiannualSavings`(= `monthlySavings` × 6)는 `CostResult`·`current` 둘 다에 있다(D-51, 결과 대시보드의 1·6·12개월 탭). 화면이 곱하지 않도록 BE 가 준다. `/narrate` 요청에는 싣지 않는다.
+`minimalChange`는 **번호이동 없이 요금제만 바꿀 때** 가장 싼 조합이다(D-55). 화면의 '변경 최소' 열이 이것이고,
+`results[0]`(전체 최저가)과 같을 수 있다 — 지금 통신사가 이미 가장 싸다는 뜻이다. 현재 통신사는 `current` 와 같은 규칙으로 정한다.
 `current`는 **지금 쓰는 요금제로 같은 구독을 유지했을 때**의 금액이다(G-30). 후보와 같은 계산기·같은 컨텍스트로 내므로
 `results[0]`과 나란히 놓고 빼도 되는 두 금액이며, 그 뺄셈도 여기서 해서 보낸다 — 화면은 금액을 만들지 않는다(원칙 2).
 `familyBundleDiscountKrw`는 **현재 통신사의 요금제에만** 반영한다(G-29). 통신사를 옮기면 결합이 풀려 사라질 할인이라,

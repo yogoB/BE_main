@@ -420,6 +420,44 @@ class RecommendationApiTest {
                 .andExpect(jsonPath("$.data.reasons").isEmpty());
     }
 
+    /**
+     * G-41 — '변경 최소'는 번호이동 없이 요금제만 바꾸는 선택지다(D-55). 웨이브를 원하면 전체 1순위는
+     * KT 웨이브플랜(45,000)이지만, SKT 사용자에게는 SKT 안에서 가장 싼 넷플플랜(55,000 + 웨이브 10,900)이
+     * '변경 최소'다. 운영에서 두 열이 같은 알뜰폰으로 나와 열을 나눈 뜻이 사라졌던 것을 고친다.
+     */
+    @Test
+    void g41_minimalChangeStaysWithTheCurrentCarrier() throws Exception {
+        mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
+                {"required":{"monthlyDataGb":20,"wantedServiceIds":[4]},
+                 "optional":{"contractType":"NONE","currentCarrier":"SKT"}}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.results[0].planName").value("웨이브플랜"))     // 전체 1순위는 KT
+                .andExpect(jsonPath("$.data.results[0].monthlyTotal").value(45000))
+                .andExpect(jsonPath("$.data.minimalChange.planName").value("넷플플랜"))    // 번호이동 없이면 SKT
+                .andExpect(jsonPath("$.data.minimalChange.carrier").value("SKT"))
+                .andExpect(jsonPath("$.data.minimalChange.monthlyTotal").value(65900));
+    }
+
+    /** G-41 b — 지금 통신사가 이미 가장 싸면 '변경 최소'와 1순위가 같다. 그것도 답이다. */
+    @Test
+    void g41b_minimalChangeCanEqualTheCheapest() throws Exception {
+        mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
+                {"required":{"monthlyDataGb":20,"wantedServiceIds":[4]},
+                 "optional":{"contractType":"NONE","currentCarrier":"KT"}}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.minimalChange.planName").value("웨이브플랜"))
+                .andExpect(jsonPath("$.data.minimalChange.monthlyTotal").value(45000));
+    }
+
+    /** G-41 c — 현재 통신사를 모르면 null 이다. 어느 통신사에 머무는 것인지 모르면 '변경 최소'도 없다. */
+    @Test
+    void g41c_withoutACarrierThereIsNoMinimalChange() throws Exception {
+        mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
+                {"required":{"monthlyDataGb":20,"wantedServiceIds":[4]},"optional":{"contractType":"NONE"}}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.minimalChange").doesNotExist());
+    }
+
     private void assertGap(String kind, String queryText, int expectedCount) {
         assertThat(jdbc.queryForObject(
                 "SELECT requested_cnt FROM catalog_candidate WHERE kind=? AND query_text=?",

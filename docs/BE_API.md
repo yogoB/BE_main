@@ -250,6 +250,7 @@ AI 연결과 내부 인증은 BE가 담당하며 프론트에는 AI 주소·내�
 | `results[].baseline` | long(원) | 할인 없이 정가 합 |
 | `results[].monthlySavings` / `semiannualSavings` / `annualSavings` | long(원) | `baseline - monthlyTotal` / ×6 / ×12. `current` 에도 같은 세 값이 있다(D-51) |
 | `results[].breakdown[]` | object[] | 항목별 내역. `amount` 할인은 음수. `provenance`·`note` |
+| `minimalChange` | object\|null | **번호이동 없이 요금제만 바꿀 때** 가장 싼 조합(D-55). `results[]` 와 같은 모양. 현재 통신사를 모르거나 그 통신사에 후보가 없으면 `null`. `results[0]` 과 같을 수 있다 |
 | `current` | object\|null | 지금 쓰는 요금제로 **같은 구독을 유지했을 때**의 금액(G-30). `currentPlanId` 를 줬고 카탈로그에 있을 때만 |
 | `current.cost` | object | `results[]` 와 같은 모양. 후보와 같은 계산기·같은 컨텍스트로 낸 값이다 |
 | `current.monthlySavings` / `annualSavings` | long(원) | `current.cost.monthlyTotal - results[0].monthlyTotal` / ×12. **지금이 더 싸면 음수 그대로** — 화면이 빼지 않도록 여기서 준다(원칙 2) |

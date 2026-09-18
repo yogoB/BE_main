@@ -35,7 +35,7 @@ class RecommendationControllerTest {
     @Test
     void recommendDoesNotCallTheNarrator() {
         when(service.recommend(any()))
-                .thenReturn(new RecommendationResponse(Accuracy.PARTIAL, missing, List.of(best), 127, current));
+                .thenReturn(new RecommendationResponse(Accuracy.PARTIAL, missing, List.of(best), 127, current, null));
 
         var response = controller.recommend(request, null, http);
 
@@ -52,7 +52,7 @@ class RecommendationControllerTest {
     @Test
     void narrateExplainsTheFirstResultWithCurrent() {
         when(service.recommend(any()))
-                .thenReturn(new RecommendationResponse(Accuracy.PARTIAL, missing, List.of(best), 127, current));
+                .thenReturn(new RecommendationResponse(Accuracy.PARTIAL, missing, List.of(best), 127, current, null));
         when(narrator.narrationFor(best, missing, 127, current))
                 .thenReturn(new Narrator.Narration("지금보다 월 15,390원 덜 내요.", List.of("넷플릭스가 포함돼요."),
                         List.of("확인 필요 — 마이페이지")));
@@ -68,7 +68,7 @@ class RecommendationControllerTest {
     @Test
     void narratorFailureYieldsEmptyNarration() {
         when(service.recommend(any()))
-                .thenReturn(new RecommendationResponse(Accuracy.FULL, List.of(), List.of(best), 5, null));
+                .thenReturn(new RecommendationResponse(Accuracy.FULL, List.of(), List.of(best), 5, null, null));
         when(narrator.narrationFor(any(), any(), any(), any())).thenReturn(Narrator.Narration.none());
 
         var narration = controller.narrate(request).data();

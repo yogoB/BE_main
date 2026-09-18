@@ -17,7 +17,13 @@ public record RecommendationResponse(
         /** 결과 화면 상단 ⓘ 안내 0~10줄. 내레이터가 missingInputs 로 만든다(D-46). 장애 시 빈 목록. */
         List<String> notices,
         /** 지금 쓰는 요금제의 금액. {@code optional.currentPlanId} 를 줬고 카탈로그에 있을 때만(G-30). */
-        CurrentCost current
+        CurrentCost current,
+        /**
+         * 번호이동 없이 요금제만 바꾸는 선택지 — <b>지금 통신사 안에서 가장 싼 조합</b>(D-55).
+         * 현재 통신사를 모르거나 그 통신사에 후보가 없으면 null. 전체 1순위와 같을 수 있다
+         * (지금 통신사가 이미 가장 싸다는 뜻이고, 그것도 답이다).
+         */
+        CostResult minimalChange
 ) {
     /**
      * 지금 쓰는 요금제로 <b>같은 구독을 유지했을 때</b>의 실질월비용과, 1순위 추천 대비 절감액.
@@ -36,17 +42,17 @@ public record RecommendationResponse(
 
     /** 후보를 찾지 못한 경로. 설명할 결과가 없다. */
     public RecommendationResponse(Accuracy accuracy, List<MissingInput> missingInputs, List<CostResult> results) {
-        this(accuracy, missingInputs, results, List.of(), null, null, List.of(), null);
+        this(accuracy, missingInputs, results, List.of(), null, null, List.of(), null, null);
     }
 
     /** 계산 경로는 설명 없이 만든다 — 컨트롤러가 채운다({@link #withNarration}). */
     public RecommendationResponse(Accuracy accuracy, List<MissingInput> missingInputs,
-            List<CostResult> results, int candidateCount, CurrentCost current) {
-        this(accuracy, missingInputs, results, List.of(), null, candidateCount, List.of(), current);
+            List<CostResult> results, int candidateCount, CurrentCost current, CostResult minimalChange) {
+        this(accuracy, missingInputs, results, List.of(), null, candidateCount, List.of(), current, minimalChange);
     }
 
     public RecommendationResponse withNarration(Narrator.Narration narration) {
         return new RecommendationResponse(accuracy, missingInputs, results,
-                narration.reasons(), narration.message(), candidateCount, narration.notices(), current);
+                narration.reasons(), narration.message(), candidateCount, narration.notices(), current, minimalChange);
     }
 }

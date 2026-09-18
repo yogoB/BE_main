@@ -123,15 +123,28 @@ public class RecommendationService {
         // 통신사를 옮기면 결합이 풀린다. 그 후보에는 할인액을 빼고 계산한다(G-29) — 결합 여부 자체는
         // 그대로 둔다. 금액에서 빠지는 것은 할인액뿐이고, hasFamilyBundle 은 accuracy 판정에 쓰인다.
         var ctxWithoutBundle = new PricingContext(contractType, hasFamilyBundle, null, 0, bundles);
-        // 같은 계산 결과로 정렬하고 상위 N개만 응답으로 변환한다.
-        List<CostResult> results = candidates.stream()
+        // 같은 계산 결과로 정렬한다. 상위 N개가 응답이고, 같은 목록에서 '변경 최소'도 고른다(G-41).
+        var ranked = candidates.stream()
                 .map(c -> Map.entry(c, calculator.calculate(c.plan(), wanted,
                         sameCarrier(c.carrier(), currentCarrier) ? ctx : ctxWithoutBundle)))
                 .sorted(Comparator.comparingLong(e -> e.getValue().effectiveMonthlyCost()))
+                .toList();
+        List<CostResult> results = ranked.stream()
                 .limit(TOP_N)
                 // 대조는 정렬이 끝난 뒤에 붙인다 — 검증값이 순위·금액에 끼어들 여지를 없앤다(D-03·D-20).
                 .map(e -> toResult(e.getKey(), e.getValue()).withPriceCrossCheck(crossCheck.check(e.getKey())))
                 .toList();
+        /*
+         * 번호이동 없이 요금제만 바꾸는 선택지(D-55). 지금 통신사 안에서 가장 싼 조합이다.
+         * 전체 1순위가 다른 통신사면 화면의 '변경 최소' 열이 '최저가' 열과 같은 요금제가 돼 두 열을 나눈
+         * 뜻이 사라진다 — 운영에서 SKT 사용자에게 두 열이 똑같이 알뜰폰으로 나왔다(2026-09-18).
+         * 현재 통신사를 모르면 null 이다. 지어내지 않는다.
+         */
+        CostResult minimalChange = currentCarrier == null ? null : ranked.stream()
+                .filter(e -> sameCarrier(e.getKey().carrier(), currentCarrier))
+                .findFirst()
+                .map(e -> toResult(e.getKey(), e.getValue()).withPriceCrossCheck(crossCheck.check(e.getKey())))
+                .orElse(null);
 
         // 현재 요금제는 지금 통신사의 요금제다 — 결합 할인이 붙어 있는 쪽이라 ctx 를 그대로 쓴다(G-30 f).
         var current = currentPlan
@@ -144,7 +157,7 @@ public class RecommendationService {
         addFamilyBundleCarrierNotice(missing, familyDiscount, currentCarrier, results);
         addUnknownCurrentPlanNotice(missing, optional, currentPlan);
         Accuracy accuracy = missing.isEmpty() ? Accuracy.FULL : Accuracy.PARTIAL;
-        return new RecommendationResponse(accuracy, missing, results, candidates.size(), current);
+        return new RecommendationResponse(accuracy, missing, results, candidates.size(), current, minimalChange);
     }
 
     /** 현재 요금제를 1순위와 나란히 놓는다. 절감액은 여기서 만든다 — 화면이 두 금액을 빼지 않도록(원칙 2). */
