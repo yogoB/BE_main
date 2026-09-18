@@ -83,6 +83,72 @@ public class BackofficeMetrics {
         out.put("health", health());
         out.put("quality", quality());
         out.put("stats", stats());
+        out.put("savings", savings());
+        return out;
+    }
+
+    /**
+     * 우리 서비스가 찾아 준 절감액(D-54). <b>진단 기준이다</b> — 사용자가 실제로 요금제를 옮겼는지는 모른다.
+     * 화면 문구도 "진단에서 확인한 절감액"으로 적는다(D-53 과 같은 선).
+     *
+     * <p>표본은 <b>계정당 최신 저장 1건</b>이다. 한 사람이 여러 번 저장해도 한 번 센다 — 아니면
+     * 많이 눌러 본 사람이 합계를 끌어올린다. 기준은 "지금 쓰는 요금제 대비"이고
+     * ({@code monthly_savings_vs_current}), 그 값이 없는 저장 건은 <b>0 으로 세지 않고 뺀다</b>(모름 ≠ 0).
+     *
+     * <p>대표값은 <b>중앙값</b>이다. 평균은 한 명의 큰 금액에 끌려가고, 이 표본은 아직 작다.
+     * 연 환산은 월 × 12 이며 이름에 {@code Estimate} 를 남긴다 — 1년치 실측이 아니다.
+     */
+    private Map<String, Object> savings() {
+        var out = new LinkedHashMap<String, Object>();
+        out.put("basis", "CURRENT_PLAN");
+        try {
+            Map<String, Object> core = jdbc.queryForMap("""
+                    WITH latest AS (
+                        SELECT DISTINCT ON (user_id) user_id, saved_at, monthly_savings_vs_current AS amount
+                        FROM saved_result WHERE monthly_savings_vs_current IS NOT NULL
+                        ORDER BY user_id, saved_at DESC
+                    )
+                    SELECT count(*) AS "members",
+                           count(*) FILTER (WHERE amount > 0) AS "improved",
+                           coalesce(sum(amount) FILTER (WHERE amount > 0), 0) AS "monthlyTotal",
+                           coalesce(round(percentile_cont(0.5) WITHIN GROUP (
+                               ORDER BY CASE WHEN amount > 0 THEN amount END)), 0) AS "monthlyMedian",
+                           coalesce(round(avg(amount) FILTER (WHERE amount > 0)), 0) AS "monthlyAverage",
+                           coalesce(max(amount), 0) AS "monthlyMax"
+                    FROM latest
+                    """);
+            out.putAll(core);
+            long monthlyTotal = ((Number) core.get("monthlyTotal")).longValue();
+            out.put("annualTotalEstimate", monthlyTotal * 12);   // 월 × 12. 1년치 실측이 아니다
+            out.put("histogram", rows("""
+                    WITH latest AS (
+                        SELECT DISTINCT ON (user_id) user_id, saved_at, monthly_savings_vs_current AS amount
+                        FROM saved_result WHERE monthly_savings_vs_current IS NOT NULL
+                        ORDER BY user_id, saved_at DESC
+                    ), bucketed AS (
+                        SELECT CASE WHEN amount < 10000 THEN '1만 미만'
+                                    WHEN amount < 30000 THEN '1~3만'
+                                    WHEN amount < 50000 THEN '3~5만'
+                                    WHEN amount < 100000 THEN '5~10만'
+                                    ELSE '10만 이상' END AS bucket,
+                               CASE WHEN amount < 10000 THEN 1 WHEN amount < 30000 THEN 2
+                                    WHEN amount < 50000 THEN 3 WHEN amount < 100000 THEN 4 ELSE 5 END AS ord
+                        FROM latest WHERE amount > 0
+                    )
+                    SELECT bucket, count(*) AS count FROM bucketed GROUP BY bucket, ord ORDER BY ord
+                    """));
+            out.put("daily", rows("""
+                    SELECT to_char(d.day, 'YYYY-MM-DD') AS date,
+                           count(s.id) AS "savedCount",
+                           coalesce(sum(s.monthly_savings_vs_current) FILTER (WHERE s.monthly_savings_vs_current > 0), 0) AS "monthlySum"
+                      FROM generate_series((CURRENT_DATE - 13)::timestamp, CURRENT_DATE::timestamp, interval '1 day') AS d(day)
+                      LEFT JOIN saved_result s ON s.saved_at >= d.day AND s.saved_at < d.day + interval '1 day'
+                     GROUP BY d.day ORDER BY d.day
+                    """));
+        } catch (DataAccessException e) {
+            log.warn("절감액 집계 실패: {}", e.getMessage());
+            out.put("unavailable", true);
+        }
         return out;
     }
 

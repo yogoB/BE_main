@@ -125,6 +125,43 @@ class BackofficeBoardApiTest {
         jdbc.update("DELETE FROM mobile_plan WHERE name = '5G 더미팩'");
     }
 
+    /**
+     * G-40 — 절감액 트레킹(D-54). 계정당 최신 1건, 대표값은 중앙값, 음수·null 은 합계에서 빠진다.
+     * 표본: 12,000 / 30,000 / 51,010(같은 계정이 재저장) / -3,000 / null.
+     */
+    @Test
+    void savingsTracksOnePerAccountAndUsesMedian() throws Exception {
+        jdbc.update("DELETE FROM saved_result");
+        jdbc.update("DELETE FROM app_user WHERE email LIKE 'saver%@example.com'");
+        saveFor("saver1@example.com", 12000L, "2026-09-17 10:00+09");
+        saveFor("saver2@example.com", 30000L, "2026-09-17 11:00+09");
+        saveFor("saver3@example.com", 9000L, "2026-09-17 12:00+09");    // 같은 계정의 옛 저장
+        saveFor("saver3@example.com", 51010L, "2026-09-18 09:00+09");   // 최신이 이긴다
+        saveFor("saver4@example.com", -3000L, "2026-09-18 09:30+09");   // 지금이 더 싼 사람
+        saveFor("saver5@example.com", null, "2026-09-18 09:40+09");     // 현재 요금제를 모르는 저장
+
+        send(get("/api/v1/admin/dashboard"), loginAsAdmin()).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.savings.basis").value("CURRENT_PLAN"))
+                .andExpect(jsonPath("$.data.savings.members").value(4))        // null 저장은 표본이 아니다
+                .andExpect(jsonPath("$.data.savings.improved").value(3))       // 음수 제외
+                .andExpect(jsonPath("$.data.savings.monthlyTotal").value(93010))       // 12,000+30,000+51,010
+                .andExpect(jsonPath("$.data.savings.monthlyMedian").value(30000))
+                .andExpect(jsonPath("$.data.savings.monthlyMax").value(51010))
+                .andExpect(jsonPath("$.data.savings.annualTotalEstimate").value(1116120))
+                .andExpect(jsonPath("$.data.savings.histogram.length()").value(3))
+                .andExpect(jsonPath("$.data.savings.daily.length()").value(14));
+    }
+
+    private void saveFor(String email, Long amount, String savedAt) {
+        Long userId = jdbc.query("SELECT id FROM app_user WHERE email = ?", (rs, i) -> rs.getLong(1), email)
+                .stream().findFirst().orElse(null);
+        if (userId == null) userId = com.palsaekjo.yogobi.user.TestMembers.create(jdbc, email);
+        jdbc.update("""
+                INSERT INTO saved_result(user_id, request, cost, monthly_savings_vs_current, saved_at)
+                VALUES (?, '{}'::jsonb, '{"planId":1,"planName":"X","carrier":"SKT","monthlyTotal":1,"baseline":1}'::jsonb, ?, ?::timestamptz)
+                """, userId, amount, savedAt);
+    }
+
     /** G-38 e — 같은 사람이 하루에 열 번 봐도 사람 수는 1, 횟수는 10. 무한 호출 사고가 다시 나도 사람 수는 안 부푼다. */
     @Test
     void funnelCountsPeopleOncePerDay() {
