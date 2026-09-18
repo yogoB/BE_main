@@ -24,7 +24,7 @@ import org.springframework.web.client.RestClientException;
 
 /** AI 서버 호출과 응답 검증. 금액은 CostResult를 그대로 전달한다. */
 @Component
-public class NarratorClient implements Narrator, DetectionNarrator {
+public class NarratorClient implements Narrator, DetectionNarrator, SwitchTimingNarrator {
     /**
      * `/narrate` 요청에 실어 보내는 계약 필드(architecture.md §3). <b>이 목록이 곧 계약이다.</b>
      *
@@ -179,6 +179,28 @@ public class NarratorClient implements Narrator, DetectionNarrator {
         if (!value.isTextual() || value.textValue().length() > maxLength
                 || value.textValue().indexOf('\n') >= 0) throw new Unavailable();
         return value.textValue();
+    }
+
+    /** 변경 시점 문구(D-47). 닿지 않으면 배지만 남기고 설명을 비운다. */
+    @Override
+    public SwitchTimingNarrator.Wording explain(SwitchTimingService.Response timing, String expiryDate) {
+        var body = json.createObjectNode()
+                .put("status", timing.status())
+                .put("remainingContractMonths", timing.remainingContractMonths())
+                .put("monthlySavings", timing.monthlySavings())
+                .put("switchingCost", timing.switchingCost());
+        if (timing.paybackMonths() == null) body.putNull("paybackMonths");
+        else body.put("paybackMonths", timing.paybackMonths());
+        if (expiryDate == null || expiryDate.isBlank()) body.putNull("expiryDate");
+        else body.put("expiryDate", expiryDate);
+        try {
+            JsonNode result = post("/narrate/switch-timing", body);
+            requireObject(result, "headline", "note");
+            return new SwitchTimingNarrator.Wording(text(result, "headline", 200),
+                    optional(result, "note", 300));
+        } catch (Unavailable e) {
+            return SwitchTimingNarrator.fallback(timing.status());
+        }
     }
 
     private JsonNode post(String path, Object request) {

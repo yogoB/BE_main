@@ -146,11 +146,13 @@ class MeApiTest {
         mvc.perform(get("/api/v1/me/switch-timing").cookie(a.cookies)
                         .param("targetPlanId", "2").param("switchingCost", "60000").param("remainingContractMonths", "10"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.currentMonthlyCost").value(68500))
-                .andExpect(jsonPath("$.data.targetMonthlyCost").value(58500))
-                .andExpect(jsonPath("$.data.monthlySavings").value(10000))
-                .andExpect(jsonPath("$.data.paybackMonths").value(6))
-                .andExpect(jsonPath("$.data.status").value("SWITCH_NOW"));
+                .andExpect(jsonPath("$.data.timing.currentMonthlyCost").value(68500))
+                .andExpect(jsonPath("$.data.timing.targetMonthlyCost").value(58500))
+                .andExpect(jsonPath("$.data.timing.monthlySavings").value(10000))
+                .andExpect(jsonPath("$.data.timing.paybackMonths").value(6))
+                .andExpect(jsonPath("$.data.timing.status").value("SWITCH_NOW"))
+                // 문구는 내레이터가 만든다(D-47). 닿지 않아도 배지는 남는다.
+                .andExpect(jsonPath("$.data.headline").value("지금이 최적 실행 시점"));
     }
 
     /** G-35 — 이번 흐름에서 고른 요금제(currentPlanId)가 저장값보다 앞선다. 프로필은 그대로다. */
@@ -165,18 +167,18 @@ class MeApiTest {
         // 저장한 적이 없어도 흐름의 입력만으로 판정이 나온다.
         mvc.perform(get("/api/v1/me/switch-timing").cookie(a.cookies).param("targetPlanId", "2").param("currentPlanId", "1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.currentMonthlyCost").value(55000))
-                .andExpect(jsonPath("$.data.monthlySavings").value(10000));
+                .andExpect(jsonPath("$.data.timing.currentMonthlyCost").value(55000))
+                .andExpect(jsonPath("$.data.timing.monthlySavings").value(10000));
         // 저장값(99,000)이 있어도 넘긴 값(55,000)이 이긴다. 저장값은 바뀌지 않는다.
         jdbc.update("UPDATE app_user SET current_plan_id=3 WHERE id=?", id);
         mvc.perform(get("/api/v1/me/switch-timing").cookie(a.cookies).param("targetPlanId", "2").param("currentPlanId", "1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.currentMonthlyCost").value(55000));
+                .andExpect(jsonPath("$.data.timing.currentMonthlyCost").value(55000));
         assertThat(jdbc.queryForObject("SELECT current_plan_id FROM app_user WHERE id=?", Long.class, id)).isEqualTo(3L);
         // 넘기지 않으면 예전대로 저장값이다.
         mvc.perform(get("/api/v1/me/switch-timing").cookie(a.cookies).param("targetPlanId", "2"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.currentMonthlyCost").value(99000));
+                .andExpect(jsonPath("$.data.timing.currentMonthlyCost").value(99000));
     }
 
     @Test void switchTimingRequiresCurrentPlanSet() throws Exception {
@@ -195,7 +197,7 @@ class MeApiTest {
         jdbc.update("UPDATE app_user SET current_plan_id=1 WHERE id=?", id);
         mvc.perform(get("/api/v1/me/switch-timing").cookie(member.cookies).param("targetPlanId", "2"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.monthlySavings").value(10000)); // 구독이 없는 회원도 비교 가능
+                .andExpect(jsonPath("$.data.timing.monthlySavings").value(10000)); // 구독이 없는 회원도 비교 가능
         for (var bad : Map.of("switchingCost", "-1", "remainingContractMonths", "-1").entrySet()) {
             mvc.perform(get("/api/v1/me/switch-timing").cookie(member.cookies).param("targetPlanId", "2")
                             .param(bad.getKey(), bad.getValue()))
