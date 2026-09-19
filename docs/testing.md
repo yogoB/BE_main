@@ -981,3 +981,36 @@ V27 부터 채워져 그 전 건은 비어 있고, 그 뒤 건도 그때의 카�
 같은 URL 이 두 곳에 따로 사는 구조라, 우리가 카탈로그에서 주소를 고치면 저쪽은 옛 페이지를 계속 읽는다.
 그때 **엉뚱한 페이지의 가격이 제안으로 올라온다** — 조용한 실패 중 가장 나쁜 종류다.
 
+
+## G-49. /narrate 로 나가는 필드 집합을 고정한다 (2026-09-20, 점검)
+
+**검증**: `NarratorClientTest` (`sendsExactlyTheContractFields`)
+
+내레이터의 요청 모델은 `extra="forbid"` 다. 계약 밖 필드가 **하나만** 섞여도 422 이고, 그 실패는
+`Unavailable` 로 흡수돼 **설명이 통째로 사라진 채 서버는 200 을 준다.** 같은 사고가 세 번 났다 —
+`priceCrossCheck`(D-38) · `ageLimit` · `USER_PROVIDED`. 화면 증상은 매번 "설명이 안 나온다" 하나였다.
+
+막는 장치는 `NARRATE_FIELDS` 허용목록과 `request.retain(...)` 인데, **그 둘이 살아 있는지 보는 테스트가
+없었다.** 옛 챗봇 컨트롤러 테스트가 하던 일인데 그 패키지가 D-44 로 사라지면서 방어선도 같이 사라졌고, 그것을
+아무도 몰랐다(2026-09-20 점검에서 발견).
+
+| | 확인 | 정답 |
+|---|---|---|
+| a | 나가는 키 집합 | `planId · planName · carrier · monthlyTotal · baseline · monthlySavings · annualSavings · breakdown · missingInputs · candidateCount` **정확히 그것뿐** |
+| b | `priceCrossCheck` · `semiannualSavings` | **안 나간다.** `CostResult` 에는 있지만 계약에는 없다 |
+| c | 기대값 만드는 법 | **이름을 손으로 적는다.** `valueToTree(cost)` 로 만들면 필드가 늘 때 기대값도 같이 늘어 영원히 통과한다 |
+
+
+## G-50. 공개 경로는 목록 길이를 본다 (2026-09-20, 점검)
+
+**검증**: `RecommendationApiTest` (`rejectsAbsurdlyLongIdLists`)
+
+`/recommendations`·`/calculator` 는 인증도 CSRF 도 없다. 길이를 안 보면 id 를 만 개 실은 한 요청이
+그대로 `IN (...)` 파라미터 만 개가 된다. 카탈로그 전체가 서비스 36개·등급 124개라 상한 200 은
+정상 사용자에게 닿지 않는다.
+
+| | 요청 | 정답 |
+|---|---|---|
+| a | `wantedServiceIds` 201개 | **400** · `field: wantedServiceIds` |
+| b | 3개 | **200.** 없는 id 를 막지 않는 규칙(G-12)은 그대로다 |
+

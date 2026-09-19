@@ -77,6 +77,18 @@ public class SecurityConfig {
     private int ipLimit;
 
     /**
+     * 공개 계산 경로(추천·설명·계산기)의 15분 상한. <b>인증도 CSRF 도 없는 경로이고 한 번에 후보
+     * 1,000건을 훑는다</b> — 막지 않으면 루프 하나가 서비스를 세운다. 실제로 2026-09-18 에 프론트의
+     * 이펙트 의존성 사고로 10초에 156건이 들어왔다(그 버그는 고쳤지만, 다음 루프를 못 막을 이유는 없다).
+     *
+     * <p>넉넉히 잡는다 — 이 상한은 정상 사용자를 자르는 선이 아니라 폭주를 멈추는 선이다.
+     * 한 사람이 흐름을 끝까지 두 번 도는 데 스무 건이면 충분하다. {@code X-Client-IP} 가 없으면
+     * 버킷이 다시 공유되므로(H-1) 그때는 서비스 전체의 방어선이 된다.
+     */
+    @Value("${yogobi.recommend.ip-limit:600}")
+    private int calcLimit;
+
+    /**
      * 레이트 리밋 버킷 키. 프론트 nginx 가 Fly 엣지에서 받은 진짜 발신지를 {@code X-Client-IP} 로 넘긴다
      * (nginx 가 항상 덮어쓰므로 브라우저가 지어낸 값은 거기서 잘린다). 없으면 TCP peer — 프록시 뒤에서는
      * 전 사용자가 한 값이라 그때는 {@code ipLimit} 이 서비스 전체의 방어선이 된다(H-1).
@@ -103,7 +115,10 @@ public class SecurityConfig {
                 .csrf(c -> c.ignoringRequestMatchers("/api/v1/recommendations", "/api/v1/recommendations/narrate",
                         "/api/v1/calculator", "/api/v1/catalog/gaps"))
                 .authorizeHttpRequests(a -> a
-                        .requestMatchers(HttpMethod.GET, "/", "/index.html", "/account.html", "/account.js", "/catalog-report.js", "/favicon.ico", "/api/v1/catalog/**", "/api/v1/auth/csrf", "/api/v1/privacy-policy", "/api/v1/stats/savings").permitAll()
+                        // BE 가 내주던 화면 넷(`/`·`index.html`·`account.html`·`account.js`·`catalog-report.js`)은 지웠다
+                        // (2026-09-20). 프론트가 따로 배포되고, 그 페이지들은 D-34 로 사라진 비밀번호
+                        // 가입·로그인 폼을 API 도메인에서 계속 그리고 있었다 — 눌러도 되는 게 없는 화면이다.
+                        .requestMatchers(HttpMethod.GET, "/favicon.ico", "/api/v1/catalog/**", "/api/v1/auth/csrf", "/api/v1/privacy-policy", "/api/v1/stats/savings").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/recommendations", "/api/v1/recommendations/narrate", "/api/v1/calculator",
                                 // 화면에서 못 찾은 것을 결손으로 남기는 공개 경로(D-56). 응답은 언제나 같다.
                                 "/api/v1/catalog/gaps",
@@ -138,6 +153,11 @@ public class SecurityConfig {
                             if ((path.startsWith("/api/v1/auth/") && "POST".equals(req.getMethod()))
                                     || path.equals("/oauth2/authorization/google"))
                                 limits.check("ip:" + clientKey(req), ipLimit);
+                            if ("POST".equals(req.getMethod())
+                                    && (path.equals("/api/v1/recommendations")
+                                        || path.equals("/api/v1/recommendations/narrate")
+                                        || path.equals("/api/v1/calculator")))
+                                limits.check("calc:" + clientKey(req), calcLimit);
                             if (path.equals("/oauth2/authorization/google")) google.requireEnabled();
                             chain.doFilter(req, res);
                         } catch (ApiException ex) { error(json, res, ex); }

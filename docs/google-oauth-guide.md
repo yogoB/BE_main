@@ -12,9 +12,9 @@
 |---|---|---|
 | 로그인 시작 | `http://localhost:8080/oauth2/authorization/google` | 브라우저/프론트 |
 | Google 콜백 | `http://localhost:8080/login/oauth2/code/google` | Google Console + `GOOGLE_REDIRECT_URI` |
-| 로그인 후 화면 | `http://localhost:8080/account.html` | `AUTH_RETURN_URL` |
+| 로그인 후 화면 | `http://localhost:5173/` (프론트 dev 서버) | `AUTH_RETURN_URL` |
 
-Google Console에는 두 번째 **Google 콜백** 주소를 등록한다. `account.html`은 콜백이 아니다. 경로 앞에 `/api/v1`을 붙이거나 마지막 `/`, query, fragment를 추가하지 않는다. `localhost`와 `127.0.0.1`도 서로 다른 호스트이므로 섞지 않는다.
+Google Console에는 두 번째 **Google 콜백** 주소를 등록한다. 로그인 후 돌아갈 화면은 콜백이 아니다. 경로 앞에 `/api/v1`을 붙이거나 마지막 `/`, query, fragment를 추가하지 않는다. `localhost`와 `127.0.0.1`도 서로 다른 호스트이므로 섞지 않는다.
 
 이 로그인은 OAuth 2.0 Authorization Code 흐름과 OpenID Connect를 사용한다. Spring Security가 state, nonce, PKCE, code 교환, ID token 서명·발급자·대상을 검사하며, 회원은 Google의 변경되지 않는 `sub` 값으로 식별한다.
 
@@ -79,7 +79,7 @@ GOOGLE_REDIRECT_URI=http://localhost:8080/login/oauth2/code/google
 
 AUTH_SECURE_COOKIES=false
 AUTH_SESSION_COOKIE_NAME=YGB_SESSION
-AUTH_RETURN_URL=http://localhost:8080/account.html
+AUTH_RETURN_URL=http://localhost:5173/
 YOGOBI_CORS_ALLOWED_ORIGINS=http://localhost:8080
 
 ```
@@ -109,10 +109,10 @@ docker compose up -d --wait
 
 기본 포트는 8080이며 Flyway V1~V6가 자동 적용된다. 포트 5432가 이미 사용 중이면 기존 `.env`의 `POSTGRES_PORT` 값을 현재 Compose 포트와 맞춘다. DB 볼륨을 삭제할 필요는 없다.
 
-1. 브라우저에서 `http://localhost:8080/account.html`을 연다.
+1. 브라우저에서 프론트 dev 서버(`http://localhost:5173/`)를 연다.
 2. **Google로 계속하기**를 누른다.
 3. Google 계정을 선택하고 계속한다.
-4. 다시 `/account.html`로 돌아와 로그인 완료 안내와 이메일이 보이는지 확인한다.
+4. 다시 프론트로 돌아와 로그인 완료 안내와 이메일이 보이는지 확인한다.
 5. 같은 브라우저에서 `http://localhost:8080/api/v1/me`를 열어 HTTP 200과 아래 핵심 값을 확인한다.
 
    ```json
@@ -172,7 +172,7 @@ GOOGLE_REDIRECT_URI=https://app.example.com/login/oauth2/code/google
 JWT_SECRET=운영_전용_독립_Base64_키
 AUTH_SECURE_COOKIES=true
 AUTH_SESSION_COOKIE_NAME=__Host-YGB_SESSION
-AUTH_RETURN_URL=https://app.example.com/account.html
+AUTH_RETURN_URL=https://app.example.com/
 YOGOBI_CORS_ALLOWED_ORIGINS=https://app.example.com
 ```
 
@@ -181,7 +181,7 @@ Google Console의 운영 클라이언트에도 같은 HTTPS 콜백을 정확히 
 - `/oauth2/authorization/google`
 - `/login/oauth2/code/google`
 - `/api/v1/**`
-- 내장 화면을 쓸 때 `/account.html`, `/account.js`
+- (BE 내장 화면 `/account.html`·`/account.js` 는 2026-09-20 에 지웠다 — D-34 로 사라진 비밀번호 폼이었다)
 
 처음에는 프론트와 BE를 같은 오리진이나 같은 사이트의 HTTPS 도메인으로 둔다. 서로 무관한 사이트에서는 현재 SameSite=Lax 쿠키가 API 요청에 전송되지 않을 수 있으며 CORS만으로 해결되지 않는다.
 

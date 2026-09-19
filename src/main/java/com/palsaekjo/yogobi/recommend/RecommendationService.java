@@ -85,6 +85,8 @@ public class RecommendationService {
         if (required.wantedServiceIds() == null || required.wantedServiceIds().isEmpty()) {
             throw ApiException.requiredMissing("wantedServiceIds", "원하는 서비스를 하나 이상 선택하세요.");
         }
+        requireSane(required.wantedServiceIds(), "wantedServiceIds");
+        requireSane(required.wantedTierIds(), "wantedTierIds");
 
         // 카탈로그에 없는 서비스는 막지 않는다(G-12·D-17). 아는 것으로 계산하고 모르는 것은 안내·기록한다.
         List<SubscriptionTier> tiers = chooseTiers(required);
@@ -223,6 +225,18 @@ public class RecommendationService {
         }
     }
 
+    /**
+     * 목록 길이 상한. 추천·계산기는 <b>인증도 CSRF 도 없는 공개 경로</b>라, 길이를 안 보면 id 를 만 개
+     * 실은 한 요청이 그대로 {@code IN (...)} 파라미터 만 개가 된다. 카탈로그 전체가 서비스 36개·등급 124개니
+     * 이 상한은 정상 사용자에게 닿지 않는다 — 신뢰 경계에서 길이를 보는 것뿐이다.
+     */
+    private static final int MAX_IDS = 200;
+
+    private static void requireSane(List<Long> ids, String field) {
+        if (ids != null && ids.size() > MAX_IDS)
+            throw ApiException.requiredMissing(field, "한 번에 " + MAX_IDS + "개까지 보낼 수 있어요.");
+    }
+
     /** 특정 조합(요금제 + 티어들)의 총비용. 후보 탐색·정렬 없이 1회 계산한다. */
     public CalculatorResponse calculate(CalculatorRequest request) {
         if (request.planId() == null) {
@@ -231,6 +245,7 @@ public class RecommendationService {
         if (request.tierIds() == null || request.tierIds().isEmpty()) {
             throw ApiException.requiredMissing("tierIds", "구독 등급을 하나 이상 지정하세요.");
         }
+        requireSane(request.tierIds(), "tierIds");
         var candidate = catalog.findPlanById(request.planId())
                 .orElseThrow(() -> ApiException.planNotFound("요금제를 찾을 수 없습니다: " + request.planId()));
 

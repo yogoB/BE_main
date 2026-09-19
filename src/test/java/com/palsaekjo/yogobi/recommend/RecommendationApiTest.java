@@ -71,6 +71,25 @@ class RecommendationApiTest {
     }
 
     /**
+     * G-50 — 공개 경로의 목록 길이 상한. 인증도 CSRF 도 없는 자리라, 길이를 안 보면 id 를 만 개 실은
+     * 한 요청이 그대로 {@code IN (...)} 파라미터 만 개가 된다. 카탈로그 전체가 서비스 36개라
+     * 이 상한(200)은 정상 사용자에게 닿지 않는다.
+     */
+    @Test
+    void rejectsAbsurdlyLongIdLists() throws Exception {
+        String ids = java.util.stream.IntStream.rangeClosed(1, 201)
+                .mapToObj(Integer::toString).collect(java.util.stream.Collectors.joining(","));
+        mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
+                {"required":{"monthlyDataGb":20,"wantedServiceIds":[%s]},"optional":{}}""".formatted(ids)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.field").value("wantedServiceIds"));
+        // 상한 안쪽은 그대로 통과한다 — 없는 서비스 id 는 막지 않고 안내로 돌려주는 규칙(G-12)도 그대로다.
+        mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
+                {"required":{"monthlyDataGb":20,"wantedServiceIds":[1,2,3]},"optional":{}}"""))
+                .andExpect(status().isOk());
+    }
+
+    /**
      * 등급을 고르면 그 등급으로 계산한다. 지정 전에는 언제나 대표 등급(스탠다드 13,500)이라
      * 프리미엄 가입자에게도 스탠다드 금액을 보여주고 있었다.
      * 넷플릭스 프리미엄 17,000 → 웨이브플랜 45,000 + 17,000 = 62,000 (대표 등급이면 58,500).

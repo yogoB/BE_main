@@ -20,8 +20,8 @@
 2026-09-16에 실제로 프론트 배포가 BE를 덮어 API가 전부 404가 됐다. 이름 분리가 그 재발 방지책이다.
 
 `yogob-api`에 설정한 값: `POSTGRES_*`(`yogob-db` attach), `JWT_SECRET`(**표준 Base64여야 한다** —
-URL-safe 문자열을 넣으면 `JWT_SECRET must be Base64`로 기동에 실패한다), `AUTH_RETURN_URL`(프론트
-`account.html`), `YOGOBI_CORS_ALLOWED_ORIGINS`(프록시라 사실상 미사용),
+URL-safe 문자열을 넣으면 `JWT_SECRET must be Base64`로 기동에 실패한다), `AUTH_RETURN_URL`(로그인 뒤
+돌아갈 프론트 주소), `YOGOBI_CORS_ALLOWED_ORIGINS`(프록시라 사실상 미사용),
 `NARRATOR_URL`·`NARRATOR_INTERNAL_TOKEN`(아래 §3-2).
 
 ---

@@ -2,6 +2,7 @@ package com.palsaekjo.yogobi.catalog;
 
 import com.palsaekjo.yogobi.common.ApiException;
 import com.palsaekjo.yogobi.common.ApiResponse;
+import com.palsaekjo.yogobi.common.ClientAddress;
 import com.palsaekjo.yogobi.user.AuthRateLimit;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
@@ -52,7 +53,9 @@ public class CatalogReportController {
                 throw ApiException.requiredMissing("sourceUrl", "인증정보·검색조건 없는 HTTPS 출처 링크를 입력하세요.");
             }
         }
-        limits.check("catalog-report:" + request.getRemoteAddr(), 5);
+        // 발신지는 ClientAddress 로 읽는다. getRemoteAddr() 은 프론트 nginx·Fly 프록시 뒤에서
+        // <b>전 사용자에게 같은 값</b>이라, 15분에 5건이 서비스 전체의 상한이 됐다(H-1 과 같은 사고).
+        limits.check("catalog-report:" + ClientAddress.of(request), 5);
         // table은 서버의 고정 allowlist 값이다. 사용자 문자열을 SQL 식별자로 사용하지 않는다.
         if (jdbc.queryForObject("SELECT count(*) FROM " + table + " WHERE id = ?", Integer.class, body.targetId()) == 0)
             throw ApiException.planNotFound("제보할 상품을 찾을 수 없습니다.");

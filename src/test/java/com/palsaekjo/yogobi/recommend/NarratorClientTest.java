@@ -85,6 +85,35 @@ class NarratorClientTest {
         assertThat(received).doesNotContain("currentMonthlyTotal").doesNotContain("currentMonthlySavings");
     }
 
+    /**
+     * G-49 — <b>나가는 필드 집합을 여기서 고정한다.</b> 내레이터의 요청 모델은 {@code extra="forbid"} 라
+     * 계약 밖 필드가 하나만 섞여도 422 이고, 그 실패는 {@link NarratorClient.Unavailable} 로 흡수돼
+     * <b>설명이 통째로 사라진 채 서버는 200 을 준다.</b> 이 사고가 세 번 났다
+     * ({@code priceCrossCheck}·{@code ageLimit}·{@code USER_PROVIDED}).
+     *
+     * <p>막는 장치는 {@code NARRATE_FIELDS} 허용목록과 {@code request.retain(...)} 인데,
+     * <b>그 둘이 살아 있는지 보는 테스트가 없었다</b>(옛 {@code ChatControllerTest} 가 하던 일인데
+     * 그 패키지는 D-44 로 사라졌다). 리팩터링 중 retain 이 빠지거나 DTO 를 통째로 직렬화하는 코드가
+     * 생기면 그날로 재발한다 — 기대값을 코드와 같은 방식으로 만들지 않고 <b>이름을 손으로 적는다.</b>
+     */
+    @Test
+    void sendsExactlyTheContractFields() throws Exception {
+        body = """
+                {"message":"월 55,000원이에요.","reasons":[]}""";
+        var cost = COST.withPriceCrossCheck(PriceCrossCheck.Verdict.unverified());
+
+        client.narrationFor(cost, List.of(new MissingInput("hasFamilyBundle", "확인 필요", "마이페이지")), 127, null);
+
+        var sent = new ObjectMapper().readTree(received);
+        var fields = new java.util.ArrayList<String>();
+        sent.fieldNames().forEachRemaining(fields::add);
+        assertThat(fields).containsExactlyInAnyOrder(
+                "planId", "planName", "carrier", "monthlyTotal", "baseline",
+                "monthlySavings", "annualSavings", "breakdown", "missingInputs", "candidateCount");
+        // CostResult 에 있지만 계약에는 없는 것들. 늘어나면 여기서 먼저 걸린다.
+        assertThat(received).doesNotContain("priceCrossCheck").doesNotContain("semiannualSavings");
+    }
+
     /** G-31 b — 셋 중 둘만 와도 받는다. 안내가 없는 결과가 정상이기 때문이다. */
     @Test
     void acceptsAResponseWithoutNotices() {

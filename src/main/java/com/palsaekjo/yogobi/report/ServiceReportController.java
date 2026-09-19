@@ -2,6 +2,7 @@ package com.palsaekjo.yogobi.report;
 
 import com.palsaekjo.yogobi.common.ApiException;
 import com.palsaekjo.yogobi.common.ApiResponse;
+import com.palsaekjo.yogobi.common.ClientAddress;
 import com.palsaekjo.yogobi.user.AuthRateLimit;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
@@ -64,7 +65,9 @@ public class ServiceReportController {
                 throw ApiException.requiredMissing("sourceUrl", "인증정보·검색조건 없는 HTTPS 출처 링크를 입력하세요.");
             }
         }
-        limits.check("service-report:" + request.getRemoteAddr(), 5);
+        // 발신지는 ClientAddress 로 읽는다. getRemoteAddr() 은 프론트 nginx·Fly 프록시 뒤에서
+        // <b>전 사용자에게 같은 값</b>이라, 15분에 5건이 서비스 전체의 상한이 됐다(H-1 과 같은 사고).
+        limits.check("service-report:" + ClientAddress.of(request), 5);
         UUID id = UUID.randomUUID();
         // 비회원도 쓰는 경로다 — principal 은 로그인 상태에서만 채워진다(null 이면 익명 제보).
         Long userId = principal == null ? null : Long.valueOf(principal.getName());
