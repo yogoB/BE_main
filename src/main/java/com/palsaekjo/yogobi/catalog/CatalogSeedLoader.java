@@ -77,6 +77,14 @@ public class CatalogSeedLoader implements ApplicationRunner {
                         DELETE FROM bundle_item WHERE bundle_id IN (SELECT id FROM seed_bundle_product);
                         INSERT INTO bundle_item (bundle_id, tier_id)
                         SELECT id, unnest(string_to_array(tier_ids, ','))::BIGINT FROM seed_bundle_product;
+                        -- 합본에서 사라진 행은 물러난다. 업서트만 하면 <b>지워도 운영에 영원히 남는다</b> —
+                        -- 요금제는 G-34 로 이미 고쳤는데(loadMobilePlans 의 retireMissing) 구독 쪽은 빠져 있었다.
+                        -- 2026-09-20: 연간 총액(174,000)이 월 단가 표에 섞인 등급을 CSV 에서 지웠는데
+                        -- 운영 응답에 그대로 살아 있었다. 지우는 것은 삭제가 아니라 active=false 다 —
+                        -- 이미 그 등급을 고른 회원의 참조는 남는다.
+                        UPDATE subscription_service SET active = FALSE WHERE active AND id NOT IN (SELECT id FROM seed_subscription_service);
+                        UPDATE subscription_tier SET active = FALSE WHERE active AND id NOT IN (SELECT id FROM seed_subscription_tier);
+                        UPDATE bundle_product SET active = FALSE WHERE active AND id NOT IN (SELECT id FROM seed_bundle_product);
                         -- 가맹점 별칭(data.md §6, G-10). 소량 고정 참조데이터라 서비스 적재 직후 인라인 시드(패턴은 대문자·한글 원문).
                         INSERT INTO merchant_alias (service_id, pattern, match_type) VALUES
                             (1,'NETFLIX','CONTAINS'),(1,'넷플릭스','CONTAINS'),

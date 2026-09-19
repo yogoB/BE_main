@@ -89,6 +89,33 @@ class CatalogSeedLoaderTest {
                 .isEqualTo(maxTierId + 2);   // 위에서 한 번 당겼으므로 그다음 값
     }
 
+    /**
+     * G-53 — 합본에서 사라진 구독 등급은 <b>물러난다</b>. 업서트만 하면 CSV 에서 지워도 운영에 영원히 남는다.
+     * 2026-09-20 에 실제로 그랬다: 연간 총액(174,000)이 월 단가 표에 섞인 등급을 지웠는데 배포 뒤에도
+     * 운영 응답에 그대로 있었다. 요금제는 G-34 로 이미 고쳐 두고 구독 쪽만 빠져 있었다.
+     *
+     * <p>삭제가 아니라 {@code active=false} 다 — 이미 그 등급을 고른 회원의 참조가 끊기면 안 된다.
+     */
+    @Test
+    void tiersMissingFromTheSeedAreRetiredNotDeleted() throws Exception {
+        var parts = CombinedCatalogCsv.bundled();
+        String all = parts.get("subscription_tier").getContentAsString(StandardCharsets.UTF_8);
+        String victim = all.lines().filter(line -> line.startsWith("2,")).findFirst().orElseThrow();
+        var without = csv(all.replace(victim + "\n", ""));
+
+        loader.load(parts.get("subscription_service"), without, parts.get("bundle_product"));
+
+        assertThat(jdbc.queryForObject("SELECT active FROM subscription_tier WHERE id = 2", Boolean.class))
+                .isFalse();                                   // 물러났다
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM subscription_tier WHERE id = 2", Integer.class))
+                .isEqualTo(1);                                // 지워지지는 않았다
+        assertThat(jdbc.queryForObject("SELECT active FROM subscription_tier WHERE id = 1", Boolean.class))
+                .isTrue();                                    // 남은 행은 그대로다
+
+        loader.run(null);                                     // 되돌린다 — 다음 테스트에 영향 주지 않게
+        assertThat(jdbc.queryForObject("SELECT active FROM subscription_tier WHERE id = 2", Boolean.class)).isTrue();
+    }
+
     private void assertSnapshot() throws IOException {
         // 건수를 박아두면 시드가 늘 때마다 깨진다(2026-09-16 서비스 6→22·등급 17→89). 파일 행수와 맞춘다.
         assertThat(jdbc.queryForObject("SELECT count(*) FROM subscription_service", Integer.class))
