@@ -1,5 +1,6 @@
 package com.palsaekjo.yogobi.recommend;
 
+import com.palsaekjo.yogobi.catalog.CatalogReader.CurrentPlanExclusion;
 import com.palsaekjo.yogobi.catalog.CatalogCandidateRecorder;
 import com.palsaekjo.yogobi.catalog.CatalogCandidateRecorder.Kind;
 import com.palsaekjo.yogobi.catalog.CatalogReader;
@@ -166,7 +167,7 @@ public class RecommendationService {
 
     /** 현재 요금제를 1순위와 나란히 놓는다. 절감액은 여기서 만든다 — 화면이 두 금액을 빼지 않도록(원칙 2). */
     private static RecommendationResponse.CurrentCost currentCost(CostResult cost, List<CostResult> results,
-            com.palsaekjo.yogobi.catalog.CatalogReader.CurrentPlanExclusion excluded) {
+            CurrentPlanExclusion excluded) {
         long monthly = cost.monthlyTotal() - results.get(0).monthlyTotal();
         return new RecommendationResponse.CurrentCost(cost, monthly, monthly * 12, excluded);
     }

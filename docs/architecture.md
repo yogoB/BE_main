@@ -5,25 +5,63 @@
 
 ---
 
-## 1. 패키지
+## 1. 시스템 구성 · 패키지
+
+### 1-1. 시스템 구성
+
+```mermaid
+flowchart LR
+    U["사용자 브라우저"] --> F["프론트 (yogob)<br/>React · Vite · nginx"]
+    F -->|"REST /api/v1/**"| B["BE_main (yogob-api)<br/>Java 21 · Spring Boot"]
+    B -->|"flycast 사설망<br/>POST /narrate · /operations/**"| N["내레이터 (yogob-narrator)<br/>Python · FastAPI"]
+    B --> D[("PostgreSQL (yogob-db)")]
+    B -.->|"배치·승인 경로에서만"| X["외부: 스마트초이스 · 통신사 공식 목록 · 환율"]
+    N -.->|"공식 페이지 읽기<br/>D-60"| Y["구독사 공식 지면"]
+    G["Google OAuth"] <--> B
+
+    classDef ours fill:#dbeafe,stroke:#1d4ed8
+    classDef ext fill:#f3f4f6,stroke:#9ca3af,stroke-dasharray:3 3
+    class F,B,N,D ours
+    class X,Y,G ext
+```
+
+- **BE_main 이 내레이터를 호출한다. 반대 방향은 없다.** 내레이터가 죽어도 결과·계산은 그대로 나간다(D-50).
+- **금액은 BE_main 의 `pricing` 만 만든다.** 프론트도 내레이터도 숫자를 만들지 않는다(절대 원칙 2).
+- **점선은 사용자 요청 경로가 아니다.** 외부 호출은 배치와 운영자 승인 절차에서만 일어난다(D-05·D-17).
+
+### 1-2. 패키지
 
 ```
 com.palsaekjo.yogobi
-├── pricing/          MVP  순수 도메인 — Spring 의존 금지
-│   ├── domain/            Money, CostBreakdown, ValuedAmount, PricingContext
+├── pricing/           순수 도메인 — Spring 의존 금지. 금액 계산의 유일한 주체
+│   ├── domain/            Money · CostBreakdown · ValuedAmount · PricingContext
 │   └── rule/              DiscountRule 구현체
-├── catalog/          MVP  요금제·서비스·혜택 마스터 (읽기 전용)
-├── recommend/        MVP  조합 탐색 + 추천 API
-├── user/             P1   인증(JWT), 프로필
-├── subscription/     P1   내 구독, 미사용 판정
+├── catalog/           요금제·구독·혜택 마스터 + 합본 CSV 적재·검수·제안
+├── recommend/         조합 탐색 · 추천/계산기 API · 내레이터 클라이언트 · 절감액 표본
+├── user/              Google 로그인 · 세션 · 레이트 리밋 · 운영자 계정
+├── subscription/      내 구독 · 결제내역 적재
 │   └── port/              PaymentHistoryProvider
-├── detection/        P1   중복 결제 탐지
-├── chat/             P1   내레이터 게이트웨이
-├── alert/            P2   알림 스케줄러 (스텁까지만)
-└── common/                예외, 응답 래퍼, 설정
+├── detection/         중복 결제 탐지
+├── privacy/           처리방침 · 동의 · 보존기간 파기
+├── report/            사용자 제보 · 리워드 쿠폰
+├── admin/             백오피스 — 대시보드 · 검수 보드 · 일일 수집 배치
+└── common/            예외 · 응답 래퍼 · 퍼널 카운터 · 발신지 판별
 ```
 
-의존 방향은 `AGENTS.md` 참조. 역방향이 생기면 설계가 틀린 것이다.
+`chat/`(챗봇)과 `alert/`(알림)은 **없다** — D-44 로 챗봇을 만들지 않기로 했고 알림은 P2 미구현이다.
+
+### 1-3. 의존 방향 (단방향, 위반 금지)
+
+```mermaid
+flowchart TD
+    A["user · subscription · detection<br/>recommend · admin · report · privacy"] --> P["pricing<br/><i>아무것도 의존하지 않는다</i>"]
+    P --> C["common"]
+    A --> C
+```
+
+`pricing` 에 Spring 애노테이션·엔티티·리포지토리를 넣지 않는다. 외부 정보가 필요하면
+`PricingContext` 에 담아 인자로 넘긴다. **역방향이 생기면 설계가 틀린 것이다.**
+
 
 ### 핵심 인터페이스
 
@@ -405,6 +443,9 @@ AI는 요청의 `breakdown`·`missingInputs`에 **실제로 있는 금액만** �
 ---
 
 ## 4. DB 스키마
+
+> **전체 ERD 는 [`docs/erd.md`](erd.md) 에 있다**(테이블 29개, 영역별 다이어그램).
+> 아래는 단계별 도입 이력이라 지금 모양과 다를 수 있다 — 현재 스키마는 ERD 와 마이그레이션이 옳다.
 
 ### MVP
 | 테이블 | 주요 컬럼 |

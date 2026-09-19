@@ -1,5 +1,6 @@
 package com.palsaekjo.yogobi.recommend;
 
+import com.palsaekjo.yogobi.catalog.CatalogReader.CurrentPlanExclusion;
 import com.palsaekjo.yogobi.common.Accuracy;
 import java.util.List;
 
@@ -33,7 +34,7 @@ public record RecommendationResponse(
      * 현재 요금제가 더 싸면 <b>음수 그대로</b> 나간다.
      */
     public record CurrentCost(CostResult cost, long monthlySavings, long annualSavings,
-                             com.palsaekjo.yogobi.catalog.CatalogReader.CurrentPlanExclusion excluded) {
+                             CurrentPlanExclusion excluded) {
         /**
          * {@code excluded} 는 지금 요금제가 <b>후보에서 빠진 이유</b>다(D-61). 후보였으면 null 이고
          * 화면은 그때 이유를 말하지 않는다. '변경 최소'가 지금보다 비싸거나 null 인 이유가 여기 있다(G-51).

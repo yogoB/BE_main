@@ -1,5 +1,6 @@
 package com.palsaekjo.yogobi.recommend;
 
+import com.palsaekjo.yogobi.common.FunnelCounter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.palsaekjo.yogobi.common.ApiException;
 import com.palsaekjo.yogobi.common.ApiResponse;
@@ -32,10 +33,10 @@ public class SavedResultController {
     private final RecommendationService service;
     private final JdbcTemplate jdbc;
     private final ObjectMapper json;
-    private final com.palsaekjo.yogobi.common.FunnelCounter funnel;
+    private final FunnelCounter funnel;
 
     public SavedResultController(RecommendationService service, JdbcTemplate jdbc, ObjectMapper json,
-                                 com.palsaekjo.yogobi.common.FunnelCounter funnel) {
+                                 FunnelCounter funnel) {
         this.service = service;
         this.jdbc = jdbc;
         this.json = json;
@@ -55,8 +56,8 @@ public class SavedResultController {
         Integer count = jdbc.queryForObject("SELECT count(*) FROM saved_result WHERE user_id = ?", Integer.class, userId);
         if (count != null && count >= MAX_PER_MEMBER)
             throw ApiException.conflict("저장한 결과는 " + MAX_PER_MEMBER + "개까지예요. 오래된 것을 지운 뒤 저장해 주세요.");
-        funnel.record(com.palsaekjo.yogobi.common.FunnelCounter.RESULT_SAVED,
-                com.palsaekjo.yogobi.common.FunnelCounter.actor(userId));   // 퍼널 5단계(D-52)
+        funnel.record(FunnelCounter.RESULT_SAVED,
+                FunnelCounter.actor(userId));   // 퍼널 5단계(D-52)
         return ApiResponse.ok(jdbc.queryForObject("""
                 INSERT INTO saved_result(user_id, request, cost, monthly_savings_vs_current)
                 VALUES (?, ?::jsonb, ?::jsonb, ?)

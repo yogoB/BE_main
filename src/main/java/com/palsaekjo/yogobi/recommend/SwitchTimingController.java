@@ -1,5 +1,6 @@
 package com.palsaekjo.yogobi.recommend;
 
+import com.palsaekjo.yogobi.common.FunnelCounter;
 import com.palsaekjo.yogobi.common.ApiResponse;
 import java.security.Principal;
 import org.springframework.beans.factory.ObjectProvider;
@@ -18,11 +19,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class SwitchTimingController {
     private final SwitchTimingService switchTiming;
     private final ObjectProvider<SwitchTimingNarrator> narrator;
-    private final com.palsaekjo.yogobi.common.FunnelCounter funnel;
+    private final FunnelCounter funnel;
 
     public SwitchTimingController(SwitchTimingService switchTiming,
                                   ObjectProvider<SwitchTimingNarrator> narrator,
-                                  com.palsaekjo.yogobi.common.FunnelCounter funnel) {
+                                  FunnelCounter funnel) {
         this.switchTiming = switchTiming;
         this.narrator = narrator;
         this.funnel = funnel;
@@ -44,8 +45,8 @@ public class SwitchTimingController {
         long userId = Long.parseLong(principal.getName());
         SwitchTimingService.Response timing = switchTiming.evaluate(
                 userId, targetPlanId, switchingCost, remainingContractMonths, currentPlanId);
-        funnel.record(com.palsaekjo.yogobi.common.FunnelCounter.CALENDAR_SHOWN,
-                com.palsaekjo.yogobi.common.FunnelCounter.actor(userId));   // 퍼널 4단계(D-52)
+        funnel.record(FunnelCounter.CALENDAR_SHOWN,
+                FunnelCounter.actor(userId));   // 퍼널 4단계(D-52)
         SwitchTimingNarrator port = narrator.getIfAvailable();
         var wording = port == null ? SwitchTimingNarrator.fallback(timing.status())
                 : port.explain(timing, expiryDate);

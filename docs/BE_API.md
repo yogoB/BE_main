@@ -1,6 +1,7 @@
 # 요고비 BE API 명세서
 
-> 현재 코드 기준(2026-09-15) 정리본. 계약 원본은 `docs/architecture.md §3`(사람 관리). 이 문서는 프론트 연동용 참고본이다.
+> 현재 코드 기준 **2026-09-20** 정리본(BE v66). 계약 원본은 `docs/architecture.md §3`(사람 관리)이고
+> 이 문서는 프론트 연동용 참고본이다. 구조·ERD 는 [`architecture.md`](architecture.md)·[`erd.md`](erd.md).
 
 ## 기본 정보
 
@@ -250,10 +251,16 @@ AI 연결과 내부 인증은 BE가 담당하며 프론트에는 AI 주소·내�
 | `results[].baseline` | long(원) | 할인 없이 정가 합 |
 | `results[].monthlySavings` / `semiannualSavings` / `annualSavings` | long(원) | `baseline - monthlyTotal` / ×6 / ×12. `current` 에도 같은 세 값이 있다(D-51) |
 | `results[].breakdown[]` | object[] | 항목별 내역. `amount` 할인은 음수. `provenance`·`note` |
+| `results[].breakdown[].note` | string\|null | 꼬리표. `"제휴 혜택 적용"` · `"번들 적용"`(2026-09-20). **묶음은 음수 줄을 만들지 않는다** — 등급 여러 줄이 한 줄로 바뀌므로 음수만 보면 "할인 없음"으로 읽힌다 |
 | `minimalChange` | object\|null | **번호이동 없이 요금제만 바꿀 때** 가장 싼 조합(D-55). `results[]` 와 같은 모양. 현재 통신사를 모르거나 그 통신사에 후보가 없으면 `null`. `results[0]` 과 같을 수 있다 |
 | `current` | object\|null | 지금 쓰는 요금제로 **같은 구독을 유지했을 때**의 금액(G-30). `currentPlanId` 를 줬고 카탈로그에 있을 때만 |
 | `current.cost` | object | `results[]` 와 같은 모양. 후보와 같은 계산기·같은 컨텍스트로 낸 값이다 |
-| `current.monthlySavings` / `annualSavings` | long(원) | `current.cost.monthlyTotal - results[0].monthlyTotal` / ×12. **지금이 더 싸면 음수 그대로** — 화면이 빼지 않도록 여기서 준다(원칙 2) |
+| `current.monthlySavings` / `annualSavings` / `semiannualSavings` | long(원) | `current.cost.monthlyTotal - results[0].monthlyTotal` / ×12 / ×6. **지금이 더 싸면 음수 그대로** — 화면이 빼지 않도록 여기서 준다(원칙 2). **1순위 기준이다** — `minimalChange` 기준이 아니다 |
+| `current.excluded` | object\|null | **지금 요금제가 후보에서 빠진 이유**(D-61, 2026-09-20). 후보였으면 `null`. `minimalChange` 가 `null` 이거나 지금보다 비싼 이유가 여기 있다(G-51) |
+| `current.excluded.reason` | string | `INACTIVE` · `DATA` · `NETWORK` · `ELIGIBILITY`. 판정 순서는 후보 질의의 WHERE 절과 같다 |
+| `current.excluded.planDataMb` / `requiredDataMb` | long | 비교한 두 값. `reason` 이 `DATA` 가 아니어도 사실로서 실린다 |
+| `current.excluded.planNetwork` / `requiredNetwork` | string\|null | 같은 뜻. 사용자가 망을 안 골랐으면 `requiredNetwork` 는 `null` |
+| `current.excluded.ageLimit` | string\|null | 가입 자격 표기 원문. **`reason` 이 `ELIGIBILITY` 일 때만 쓴다** — 제한 없는 요금제도 `"ALL"`·`"다이렉트"` 로 온다 |
 | `candidateCount` | int | 정렬 대상이 된 후보 요금제 수. `results`에는 그중 상위 5개만 담긴다. 후보가 없으면 `null` |
 | `message` · `reasons[]` · `notices[]` | — | **D-50(2026-09-18): 추천 본체에서는 항상 `null`·`[]`·`[]`.** 아래 `POST /api/v1/recommendations/narrate` 가 준다 |
 | `message` | string | (narrate) 1순위 조합을 설명하는 3~5문장. **내레이터의 결정론적 템플릿이라 모델 키가 없어도 나온다.** AI에 닿지 못하면 `null`이고 화면은 자체 최소 문구로 대체한다 |
@@ -662,8 +669,18 @@ JWT 절대 수명 24시간·유휴 제한 2시간(refresh 없음, D-48). 상태�
 |---|---|---|
 | POST | `/api/v1/admin/login` | 운영자 로그인 `{id,password}`. 실패는 401 하나로만 답한다 (D-32) |
 | GET | `/api/v1/admin/session` | 관리자 여부 확인 |
-| GET | `/api/v1/admin/dashboard` | 사용 지표 — 회원·카탈로그·검수·제보·엔드포인트 + `funnel`(D-36 게이트 퍼널 14일: `gateShown`·`reportShown`·`memberLogin` 실측, `gateDropEstimate` 는 뺄셈) |
+| GET | `/api/v1/admin/dashboard` | 사용 지표. 블록 다섯 — `health`(내레이터 실패 종류별·지연·마지막 성공) · `quality`(카탈로그 품질 7종, 아래) · `funnel`(D-36 게이트 퍼널 14일, **사람 수와 횟수를 나눠 센다**) · `savings`(찾아 준 절감액, D-54·D-59) · 통계 |
 | POST | `/api/v1/admin/harvest/run` | 일일 수집 즉시 실행 (정기: 매일 09:00 KST) |
+
+**`quality` 블록 7종** — 각 항목은 `{count, sample[]}` 이다.
+
+| 키 | 무엇을 잡나 |
+|---|---|
+| `carrierNameVariants` | 같은 통신사가 표기만 다르게 두 줄 |
+| `duplicateTierNames` · `samePriceTiers` | 한 서비스 안의 중복 등급 |
+| `placeholderPlans` · `plansWithoutSource` | 출처가 URL 이 아니거나 가격이 0 인 행 |
+| `mnoNetworkGaps` | MNO 의 망별 후보가 3건 미만("0건"만 보면 "1건뿐"이 안 보인다) |
+| `nonMonthlyTiers` | **월 단가가 아닌 구독 등급**(G-54). 신호는 둘 — 등급 **이름**의 기간 표기, 같은 서비스 중앙값의 10배 초과. **비고는 보지 않는다**(우리가 쓴 설명문이라 기간 낱말이 섞인다) |
 | POST | `/api/v1/admin/smartchoice/sweep` | 스마트초이스 스냅샷 스윕 즉시 실행 |
 | POST | `/api/v1/admin/fx/refresh` | 환율 즉시 갱신(정기: 09:15 KST). 실패해도 이전 값 유지 — 응답 `updated` 로 구분 |
 | GET | `/api/v1/admin/reports` | **제보 게시판** — `catalog_report`+`service_report` 합본 최신순. `?status=PENDING` · `?limit=`(기본 50·최대 200). **제보자 회원 신원은 싣지 않는다**(D-42) |
