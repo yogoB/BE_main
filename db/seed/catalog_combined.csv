@@ -1873,6 +1873,9 @@ id,service_id,name,price,concurrent_streams,quality,note,currency,tax_included
 122,36,Premium,14900,,,게임 200종 이상 · 클라우드 월 10시간,KRW,true
 123,36,Ultimate,19000,,,게임 400종 이상 · 클라우드 월 15시간,KRW,true
 124,36,PC 전용,15500,,,PC 게임 300종 이상,KRW,true
+125,22,Personal,12500,,,1명 · 1TB · 연 결제 시 125000원,KRW,true
+126,22,Family,15500,,,1~6명 · 사용자당 1TB(최대 6TB) · 연 결제 시 155000원,KRW,true
+127,22,Premium,29000,,,Family 전체 + 고급 Copilot · 연 결제 시 290000원,KRW,true
 #@ plan_benefit
 carrier,plan_name,service_id,tier_id,benefit_type,discount_value,is_exclusive,exclusive_group,valid_from,valid_to,source_url,collected_at
 SKT,베스트 Max(넷플릭스),1,,BUNDLE_INCLUDED,,false,,,,https://m.tworld.co.kr/product/renewal/mobileplan/list,2026-09-08
