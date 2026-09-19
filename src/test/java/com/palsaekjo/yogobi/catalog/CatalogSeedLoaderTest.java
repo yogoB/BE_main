@@ -93,7 +93,8 @@ class CatalogSeedLoaderTest {
                 .isEqualTo(seedRowCount("subscription_tier"));
         assertThat(jdbc.queryForObject("SELECT count(*) FROM bundle_product", Integer.class))
                 .isEqualTo(seedRowCount("bundle_product"));
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM bundle_item", Integer.class)).isEqualTo(15);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM bundle_item", Integer.class))
+                .isEqualTo(seedBundleItemCount());
         assertThat(jdbc.queryForObject("SELECT price FROM subscription_tier WHERE id = 2", Long.class)).isEqualTo(13500L);
         // 실제 요금제 CSV(D4)가 들어왔다. 건수를 박아두면 CSV 갱신마다 깨지므로 파일 행수와 맞춘다.
         assertThat(jdbc.queryForObject("SELECT count(*) FROM mobile_plan", Integer.class))
@@ -113,6 +114,20 @@ class CatalogSeedLoaderTest {
         var resource = CombinedCatalogCsv.bundled().get(dataset);
         try (var lines = resource.getContentAsString(StandardCharsets.UTF_8).lines()) {
             return (int) lines.filter(line -> !line.isBlank()).count() - 1;
+        }
+    }
+
+    /**
+     * 번들 구성품 수 = {@code bundle_product} 각 행의 {@code tier_ids} 개수 합.
+     * 15 로 박아 두었더니 Apple One 두 줄을 넣자마자 깨졌다(2026-09-20) — 같은 파일 위쪽 주석이
+     * "건수를 박아두면 시드가 늘 때마다 깨진다" 라고 이미 적고 있었는데 이 줄만 예외였다.
+     */
+    private static int seedBundleItemCount() throws IOException {
+        var resource = CombinedCatalogCsv.bundled().get("bundle_product");
+        try (var lines = resource.getContentAsString(StandardCharsets.UTF_8).lines()) {
+            return lines.skip(1).filter(line -> !line.isBlank())
+                    .mapToInt(line -> line.substring(line.indexOf('"') + 1, line.lastIndexOf('"')).split(",").length)
+                    .sum();
         }
     }
 

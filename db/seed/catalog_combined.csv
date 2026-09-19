@@ -1960,3 +1960,5 @@ id,name,price,provider,tier_ids
 5,티빙x웨이브 더블 프리미엄,19500,TVING,"9,13"
 6,티빙x디즈니+ 더블,18000,TVING,"8,4"
 7,티빙x디즈니+ 3 PACK,21500,TVING,"8,4,12"
+8,Apple One 개인,14900,APPLE,"59,20,84"
+9,Apple One 가족,20900,APPLE,"60,20,85"
