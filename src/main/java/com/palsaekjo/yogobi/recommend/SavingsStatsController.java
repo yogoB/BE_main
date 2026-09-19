@@ -40,8 +40,13 @@ public class SavingsStatsController {
         this.cache = Duration.ofSeconds(cacheSeconds);
     }
 
-    /** {@code basis} 는 이 금액이 무엇 대비인지다 — 화면 문구가 기준을 적을 수 있어야 한다(절대 원칙 4). */
-    public record Savings(List<Long> samples, int sampleCount, String basis, Instant updatedAt) { }
+    /**
+     * {@code basis} 는 이 금액이 무엇 대비인지다 — 화면 문구가 기준을 적을 수 있어야 한다(절대 원칙 4).
+     * {@code monthlyAverage}·{@code monthlyMedian} 은 랜딩의 "1인당 절감액"이다(D-57). 표본이 임계값
+     * 미만이면 {@code samples} 와 함께 <b>둘 다 null</b> — 한두 명의 금액을 평균이라는 이름으로 내보내지 않는다.
+     */
+    public record Savings(List<Long> samples, int sampleCount, Long monthlyAverage, Long monthlyMedian,
+                          String basis, Instant updatedAt) { }
 
     @GetMapping("/savings")
     public ApiResponse<Savings> savings() {
@@ -66,6 +71,13 @@ public class SavingsStatsController {
                 ORDER BY saved_at DESC LIMIT ?
                 """, Long.class, MAX_SAMPLES);
         int count = samples.size();
-        return new Savings(count < MIN_SAMPLES ? List.of() : samples, count, "CURRENT_PLAN", Instant.now());
+        if (count < MIN_SAMPLES) {
+            return new Savings(List.of(), count, null, null, "CURRENT_PLAN", Instant.now());
+        }
+        long average = Math.round(samples.stream().mapToLong(Long::longValue).average().orElse(0));
+        var sorted = samples.stream().sorted().toList();
+        long median = sorted.size() % 2 == 1 ? sorted.get(sorted.size() / 2)
+                : Math.round((sorted.get(sorted.size() / 2 - 1) + sorted.get(sorted.size() / 2)) / 2.0);
+        return new Savings(samples, count, average, median, "CURRENT_PLAN", Instant.now());
     }
 }

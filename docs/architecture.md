@@ -142,12 +142,13 @@ AI의 `/parse`·`/narrate`·`/ocr`는 토큰 누락·불일치 시 401, 서버 �
 | POST | `/api/v1/me/nickname` | 닉네임 변경 — `{nickname}` (D-22) |
 | GET | `/api/v1/me` | 인증된 현재 회원 조회 |
 | GET/DELETE | `/api/v1/me/sessions` `/{id}` | 로그인 세션 목록 · 개별 세션 폐기 |
+| GET/DELETE | `/api/v1/admin/members` `/{id}/sessions` | 회원 운영(D-57 ⑥). 이메일·닉네임 검색, 세션 수·저장 수·구독 수·현재 요금제. **회원 삭제 경로는 없다** — 탈퇴는 본인만. 세션 회수는 `admin_action` 에 남는다 |
 | POST | `/api/v1/catalog/gaps` | **공개**(인증·CSRF 없음). 화면에서 못 찾은 것을 결손으로 남긴다(D-56). `{kind, queryText}` → 언제나 `{recorded:true}` — 존재 여부를 알려주지 않는다. 발신지당 15분 60회(`yogobi.catalog.gap-limit`), 1~200자, 기존 10,000행 상한·fail-soft |
 | GET/PATCH | `/api/v1/admin/gaps` `/{id}` | 결손 처리 흐름(D-52 ④). 요청 많은 순, 기본은 할 일(REQUESTED·IN_PROGRESS). PATCH `{status, note?}` → `admin_action` 기록 |
 | PATCH | `/api/v1/admin/reports/{kind}/{id}` | 제보 상태 + **처리 메모** `{status, note?}`(D-52 ⑤). 목록에 `note`·`updatedAt`·`targetId` 추가 |
 | GET | `/api/v1/admin/audit` | 감사 통합 타임라인(D-52 ⑧): `catalog_audit` + `admin_action`(제보·결손 상태, 수동 작업, 파기) 최신순 |
 | GET | `/api/v1/admin/dashboard` | + `savings`(우리가 찾아 준 절감액 — 계정당 최신 1건, 중앙값·합계·연 환산·구간 분포·14일 추이, D-54) · `health`(설명 실패 종류별·내레이터 지연·마지막 성공·추천 횟수 vs 사람 수) · `quality`(통신사 표기 중복·등급 중복·더미·출처 없음·MNO 망 결손) · `stats`(7일 1순위 상위·GB 분포·저장 상위) · `funnel.unique`(사람 수, 5단계) + `contaminatedUntil` |
-| GET | `/api/v1/stats/savings` | **공개**(인증·CSRF 없음). 랜딩 표본(D-53): `{samples: long[], sampleCount, basis: "CURRENT_PLAN", updatedAt}`. 계정당 최신 1건 · 최대 30건 · `sampleCount < 5` 면 `samples: []` · 금액 외 식별 정보 없음 · 60초 캐시(`yogobi.stats.cache-seconds`) |
+| GET | `/api/v1/stats/savings` | **공개**(인증·CSRF 없음). 랜딩 표본(D-53): `{samples: long[], sampleCount, monthlyAverage, monthlyMedian, basis: "CURRENT_PLAN", updatedAt}` — 1인당 평균·중앙값은 D-57. 계정당 최신 1건 · 최대 30건 · `sampleCount < 5` 면 `samples: []` · 금액 외 식별 정보 없음 · 60초 캐시(`yogobi.stats.cache-seconds`) |
 | POST/GET/DELETE | `/api/v1/me/saved-results` `/{id}` | 결과 저장(D-51). 본문은 계산기 요청(`planId`·`tierIds`·`optional`) — **금액은 저장 시점에 BE 가 다시 계산해 스냅숏**으로 둔다. 응답 `{id, savedAt, cost}`, 목록 최신순, 회원당 50개(초과 409), 남의 것은 404, 탈퇴 시 CASCADE |
 | GET/POST/DELETE | `/api/v1/me/subscriptions` `/{id}` | 내 구독 (구현) |
 | POST | `/api/v1/me/current-plan` | 현재 요금제 설정 (구현) |

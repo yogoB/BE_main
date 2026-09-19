@@ -52,6 +52,7 @@ class BackofficeBoardApiTest {
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;
     @Autowired FunnelCounter funnel;
+    @Autowired com.palsaekjo.yogobi.user.AuthTokens tokens;
 
     @BeforeEach
     void clean() {
@@ -150,6 +151,31 @@ class BackofficeBoardApiTest {
                 .andExpect(jsonPath("$.data.savings.annualTotalEstimate").value(1116120))
                 .andExpect(jsonPath("$.data.savings.histogram.length()").value(3))
                 .andExpect(jsonPath("$.data.savings.daily.length()").value(14));
+    }
+
+    /** G-44 — 회원 운영(D-57 ⑥): 검색·세션 회수. 운영자는 회원을 지우지 않는다 — 탈퇴는 본인만 한다. */
+    @Test
+    void memberBoardSearchesAndRevokesSessions() throws Exception {
+        jdbc.update("DELETE FROM app_user WHERE email LIKE 'ops%@example.com'");
+        long id = com.palsaekjo.yogobi.user.TestMembers.create(jdbc, "ops1@example.com");
+        com.palsaekjo.yogobi.user.TestMembers.session(tokens, id);   // 살아 있는 세션 하나
+        Cookie[] admin = loginAsAdmin();
+
+        send(get("/api/v1/admin/members").param("q", "ops1"), admin).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].email").value("ops1@example.com"))
+                .andExpect(jsonPath("$.data[0].activeSessions").value(1))
+                .andExpect(jsonPath("$.data[0].savedResults").value(0));
+
+        send(post("/api/v1/admin/members/{id}/sessions", id).with(r -> { r.setMethod("DELETE"); return r; }), admin)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.revoked").value(true));
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM auth_session WHERE user_id = ?", Integer.class, id)).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM admin_action WHERE action = 'MEMBER_SESSIONS_REVOKED'",
+                Integer.class)).isEqualTo(1);
+        // 없는 회원은 404. 그리고 회원을 지우는 경로는 아예 없다.
+        send(post("/api/v1/admin/members/{id}/sessions", 999999).with(r -> { r.setMethod("DELETE"); return r; }), admin)
+                .andExpect(status().isNotFound());
     }
 
     private void saveFor(String email, Long amount, String savedAt) {

@@ -82,6 +82,21 @@ class SavingsStatsApiTest {
     }
 
     /** 표본에 쓰는 절감액은 저장 시점에 BE 가 계산해 둔 값이다 — 화면이 보낸 숫자가 아니다. */
+    /** G-43 — 임계값을 넘으면 1인당 평균·중앙값이 함께 나간다(D-57, 랜딩용). 미만이면 둘 다 null 이다. */
+    @Test
+    void perPersonAverageAppearsOnlyAboveTheThreshold() throws Exception {
+        save("sample1@example.com", 10000L);
+        mvc.perform(get("/api/v1/stats/savings")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.monthlyAverage").doesNotExist())
+                .andExpect(jsonPath("$.data.monthlyMedian").doesNotExist());
+
+        for (int i = 2; i <= 5; i++) save("sample" + i + "@example.com", 10000L * i);   // 10,20,30,40,50천
+        mvc.perform(get("/api/v1/stats/savings")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.sampleCount").value(5))
+                .andExpect(jsonPath("$.data.monthlyAverage").value(30000))   // (10+20+30+40+50)/5
+                .andExpect(jsonPath("$.data.monthlyMedian").value(30000));
+    }
+
     private void save(String email, Long savingsVsCurrent) {
         Long userId = jdbc.query("SELECT id FROM app_user WHERE email = ?", (rs, i) -> rs.getLong(1), email)
                 .stream().findFirst().orElse(null);

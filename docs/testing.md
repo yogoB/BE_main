@@ -882,3 +882,26 @@ dev 프로파일에서 합본 1,700건이 전부 물러났을 것이다.
 | e | 한 발신지가 상한 초과 | **429**. 공개 쓰기 경로라 상한이 있다(기본 15분 60회) |
 
 **c 가 핵심이다.** 공개 쓰기 경로에서 응답이 갈리면 그것만으로 카탈로그 전체를 훑을 수 있다.
+
+
+## G-43. 1인당 평균은 표본이 모인 뒤에만 (2026-09-19, D-57)
+
+**검증**: `SavingsStatsApiTest` (`perPersonAverageAppearsOnlyAboveTheThreshold`)
+
+| | 표본 | 정답 |
+|---|---|---|
+| a | 1건 | `monthlyAverage`·`monthlyMedian` **둘 다 null**. 한 명의 금액이 "1인당 평균"이라는 이름으로 랜딩에 뜨면 안 된다 |
+| b | 5건(1·2·3·4·5만) | 평균 **30,000** · 중앙값 **30,000**. `samples` 도 함께 나간다 |
+
+임계값은 `samples` 와 같다 — 숫자를 내보내는 기준이 둘로 갈리면 한쪽이 먼저 새어 나간다.
+
+## G-44. 운영자는 세션을 끊을 수 있고 회원을 지울 수는 없다 (2026-09-19, D-57 ⑥)
+
+**검증**: `BackofficeBoardApiTest` (`memberBoardSearchesAndRevokesSessions`)
+
+| | 동작 | 정답 |
+|---|---|---|
+| a | `GET /admin/members?q=ops1` | 1건, 이메일·활성 세션 1·저장 0 |
+| b | `DELETE /admin/members/{id}/sessions` | 200, `auth_session` 0건, `admin_action` 에 `MEMBER_SESSIONS_REVOKED` |
+| c | 없는 회원 | 404 |
+| d | 회원 삭제 | **경로가 없다.** 탈퇴는 본인만 한다(`DELETE /api/v1/me`, 처리방침) |
