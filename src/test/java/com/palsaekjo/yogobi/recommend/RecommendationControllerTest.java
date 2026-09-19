@@ -20,7 +20,10 @@ class RecommendationControllerTest {
     private final Narrator narrator = mock(Narrator.class);
     private final FunnelCounter funnel = mock(FunnelCounter.class);
     private final RecommendationStats stats = mock(RecommendationStats.class);
-    private final RecommendationController controller = new RecommendationController(service, narrator, funnel, stats);
+    private final MemberSavings memberSavings = mock(MemberSavings.class);
+    private final RecommendationController controller =
+            new RecommendationController(service, narrator, funnel, stats, memberSavings);
+    private final java.security.Principal member = () -> "7";
     private final org.springframework.mock.web.MockHttpServletRequest http = new org.springframework.mock.web.MockHttpServletRequest();
 
     private final CostResult best = new CostResult(42, "넷플플랜", "SKT", 55000, 68500, 13500, 162000,
@@ -46,6 +49,25 @@ class RecommendationControllerTest {
         assertThat(response.data().reasons()).isEmpty();
         assertThat(response.data().notices()).isEmpty();
         verifyNoInteractions(narrator);
+    }
+
+    /**
+     * D-59 — 절감액 표본은 <b>로그인한 채 결과를 본 회원</b>에게서 나온다. 저장 버튼과 무관하다.
+     * 비회원은 기록하지 않고, 지금 요금제를 모르면({@code current == null}) 회원이라도 기록하지 않는다 —
+     * 절감액을 만들 수 없는데 0 으로 적으면 "모른다"가 "절감 없음"으로 둔갑한다.
+     */
+    @Test
+    void recordsTheSavingsSampleOnlyForMembersWhoToldUsTheirCurrentPlan() {
+        when(service.recommend(any()))
+                .thenReturn(new RecommendationResponse(Accuracy.PARTIAL, missing, List.of(best), 127, current, null));
+        controller.recommend(request, member, http);
+        org.mockito.Mockito.verify(memberSavings).record(7L, 15390L);
+
+        controller.recommend(request, null, http);                     // 비회원
+        when(service.recommend(any()))
+                .thenReturn(new RecommendationResponse(Accuracy.PARTIAL, missing, List.of(best), 127, null, null));
+        controller.recommend(request, member, http);                   // 지금 요금제를 모르는 회원
+        org.mockito.Mockito.verifyNoMoreInteractions(memberSavings);
     }
 
     /** 같은 본문으로 /narrate 를 부르면 1순위 설명이 온다. current 도 그대로 내레이터에 넘어간다. */

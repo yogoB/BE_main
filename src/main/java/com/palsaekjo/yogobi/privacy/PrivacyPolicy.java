@@ -20,8 +20,9 @@ public final class PrivacyPolicy {
      * <b>조용히 갱신하지 않는다</b> — 사용자가 바뀐 내용을 본 시점이 기록으로 남아야 한다.
      *
      * <p>2026-09-17: D-34(Google 전용 로그인)로 회원에게서 비밀번호를 받지 않게 되어 "계정" 항목을 고쳤다.
+     * <p>2026-09-20: D-59 로 {@code member_savings}(결과 화면에서 확인한 월 절감액) 가 생겨 "이용 현황"에 더했다.
      */
-    public static final String VERSION = "2026-09-17";
+    public static final String VERSION = "2026-09-20";
     public static final String RETENTION_ZONE = "Asia/Seoul";
     public static final int PAYMENT_RETENTION_MONTHS = 12;
     public static final int DETECTION_RETENTION_MONTHS = 6;
@@ -39,8 +40,9 @@ public final class PrivacyPolicy {
                         "회원 인증·본인 확인", "계약 이행", "탈퇴 시 즉시 파기"),
                 new Item("이용 현황",
                         List.of("current_plan_id", "user_subscription", "payment_record(merchant_raw, amount, paid_at)",
-                                "saved_result(저장한 결과 — 계산 요청과 금액 스냅숏)"),
-                        // 저장한 결과의 절감액은 랜딩 통계(금액만, 계정당 1건, 5건 미만 비노출)에 쓰인다 — D-53.
+                                "saved_result(저장한 결과 — 계산 요청과 금액 스냅숏)",
+                                "member_savings(결과 화면에서 확인한 지금 요금제 대비 월 절감액 — 계정당 1건)"),
+                        // 절감액은 랜딩 통계(금액만, 계정당 1건, 5건 미만 비노출)에 쓰인다 — D-53·D-59.
                         "실질 지불 총액 계산·중복 결제 탐지", "정보주체 동의·계약 이행",
                         "결제내역 " + PAYMENT_RETENTION_MONTHS + "개월·탐지결과 " + DETECTION_RETENTION_MONTHS
                                 + "개월 후 파기, 탈퇴 시 즉시 파기. 법정 보존 의무가 확인된 증빙만 별도 보관"),

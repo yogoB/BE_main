@@ -12,8 +12,9 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * 랜딩의 "이용자들이 진단에서 확인한 절감액"(D-53). 공개 경로 — 인증도 CSRF 도 없다.
  *
- * <p><b>금액만 나간다.</b> 계정·요금제·시각은 싣지 않는다. 표본은 <b>계정당 최신 1건</b>이고
- * (한 사람이 여러 번 저장해도 한 번만 센다), 지금 쓰는 요금제 대비 절감액을 <b>실제로 계산해 둔 건</b>만 쓴다 —
+ * <p><b>금액만 나간다.</b> 계정·요금제·시각은 싣지 않는다. 표본은 <b>로그인한 채 결과 화면을 본 회원</b>이고
+ * (D-59), 계정당 최신 1건이다 — 여러 번 봐도 한 번만 센다. 저장 버튼을 누른 회원만 세던 때는(D-53)
+ * 표본이 거의 안 쌓여 랜딩이 늘 임계값 미달이었다. 기준은 그대로 <b>지금 쓰는 요금제 대비</b>다 —
  * 정가 대비 값은 알뜰폰에서 대부분 0 이라 화면에 0 만 늘어놓게 된다.
  *
  * <p>표본이 {@link #MIN_SAMPLES} 미만이면 <b>빈 배열</b>을 준다. 한두 건이면 특정 이용자의 금액이
@@ -60,15 +61,10 @@ public class SavingsStatsController {
     }
 
     private Savings collect() {
-        // 계정당 최신 1건. 0 이하(더 내는 조합)는 "절감액 표본"이 아니므로 뺀다.
+        // 계정당 한 행이다(테이블이 보장한다). 0 이하(더 내는 조합)는 "절감액 표본"이 아니므로 뺀다.
         List<Long> samples = jdbc.queryForList("""
-                SELECT monthly_savings_vs_current FROM (
-                    SELECT DISTINCT ON (user_id) user_id, saved_at, monthly_savings_vs_current
-                    FROM saved_result WHERE monthly_savings_vs_current IS NOT NULL
-                    ORDER BY user_id, saved_at DESC
-                ) latest
-                WHERE monthly_savings_vs_current > 0
-                ORDER BY saved_at DESC LIMIT ?
+                SELECT monthly_savings FROM member_savings
+                WHERE monthly_savings > 0 ORDER BY seen_at DESC LIMIT ?
                 """, Long.class, MAX_SAMPLES);
         int count = samples.size();
         if (count < MIN_SAMPLES) {

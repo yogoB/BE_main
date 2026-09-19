@@ -127,23 +127,24 @@ class BackofficeBoardApiTest {
     }
 
     /**
-     * G-40 — 절감액 트레킹(D-54). 계정당 최신 1건, 대표값은 중앙값, 음수·null 은 합계에서 빠진다.
-     * 표본: 12,000 / 30,000 / 51,010(같은 계정이 재저장) / -3,000 / null.
+     * G-40 — 절감액 트레킹(D-54·D-59). 표본은 로그인한 채 결과를 본 회원이고 계정당 1건,
+     * 대표값은 중앙값, 음수·null 은 합계에서 빠진다.
+     * 표본: 12,000 / 30,000 / 51,010(같은 계정이 다시 봄) / -3,000 / null.
      */
     @Test
     void savingsTracksOnePerAccountAndUsesMedian() throws Exception {
-        jdbc.update("DELETE FROM saved_result");
+        jdbc.update("DELETE FROM member_savings");
         jdbc.update("DELETE FROM app_user WHERE email LIKE 'saver%@example.com'");
         saveFor("saver1@example.com", 12000L, "2026-09-17 10:00+09");
         saveFor("saver2@example.com", 30000L, "2026-09-17 11:00+09");
-        saveFor("saver3@example.com", 9000L, "2026-09-17 12:00+09");    // 같은 계정의 옛 저장
+        saveFor("saver3@example.com", 9000L, "2026-09-17 12:00+09");    // 같은 계정이 먼저 본 결과
         saveFor("saver3@example.com", 51010L, "2026-09-18 09:00+09");   // 최신이 이긴다
         saveFor("saver4@example.com", -3000L, "2026-09-18 09:30+09");   // 지금이 더 싼 사람
-        saveFor("saver5@example.com", null, "2026-09-18 09:40+09");     // 현재 요금제를 모르는 저장
+        saveFor("saver5@example.com", null, "2026-09-18 09:40+09");     // 현재 요금제를 모르는 조회
 
         send(get("/api/v1/admin/dashboard"), loginAsAdmin()).andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.savings.basis").value("CURRENT_PLAN"))
-                .andExpect(jsonPath("$.data.savings.members").value(4))        // null 저장은 표본이 아니다
+                .andExpect(jsonPath("$.data.savings.members").value(4))        // 현재 요금제를 모르면 표본이 아니다
                 .andExpect(jsonPath("$.data.savings.improved").value(3))       // 음수 제외
                 .andExpect(jsonPath("$.data.savings.monthlyTotal").value(93010))       // 12,000+30,000+51,010
                 .andExpect(jsonPath("$.data.savings.monthlyMedian").value(30000))
@@ -182,9 +183,10 @@ class BackofficeBoardApiTest {
         Long userId = jdbc.query("SELECT id FROM app_user WHERE email = ?", (rs, i) -> rs.getLong(1), email)
                 .stream().findFirst().orElse(null);
         if (userId == null) userId = com.palsaekjo.yogobi.user.TestMembers.create(jdbc, email);
+        if (amount == null) return;   // 지금 요금제를 모르면 행 자체가 없다
         jdbc.update("""
-                INSERT INTO saved_result(user_id, request, cost, monthly_savings_vs_current, saved_at)
-                VALUES (?, '{}'::jsonb, '{"planId":1,"planName":"X","carrier":"SKT","monthlyTotal":1,"baseline":1}'::jsonb, ?, ?::timestamptz)
+                INSERT INTO member_savings(user_id, monthly_savings, seen_at) VALUES (?, ?, ?::timestamptz)
+                ON CONFLICT (user_id) DO UPDATE SET monthly_savings = EXCLUDED.monthly_savings, seen_at = EXCLUDED.seen_at
                 """, userId, amount, savedAt);
     }
 

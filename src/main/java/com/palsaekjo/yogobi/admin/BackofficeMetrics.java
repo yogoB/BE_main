@@ -91,9 +91,10 @@ public class BackofficeMetrics {
      * 우리 서비스가 찾아 준 절감액(D-54). <b>진단 기준이다</b> — 사용자가 실제로 요금제를 옮겼는지는 모른다.
      * 화면 문구도 "진단에서 확인한 절감액"으로 적는다(D-53 과 같은 선).
      *
-     * <p>표본은 <b>계정당 최신 저장 1건</b>이다. 한 사람이 여러 번 저장해도 한 번 센다 — 아니면
-     * 많이 눌러 본 사람이 합계를 끌어올린다. 기준은 "지금 쓰는 요금제 대비"이고
-     * ({@code monthly_savings_vs_current}), 그 값이 없는 저장 건은 <b>0 으로 세지 않고 뺀다</b>(모름 ≠ 0).
+     * <p>표본은 <b>로그인한 채 결과 화면을 본 회원</b>이고 계정당 한 행이다(D-59, {@code member_savings}).
+     * 한 사람이 여러 번 봐도 한 번 센다 — 아니면 많이 눌러 본 사람이 합계를 끌어올린다.
+     * 기준은 "지금 쓰는 요금제 대비"이고, 지금 요금제를 안 알려준 조회는 <b>애초에 행이 안 생긴다</b>(모름 ≠ 0).
+     * {@code savedCount} 는 그날 표본이 생기거나 갱신된 사람 수다 — 저장 버튼 수가 아니다.
      *
      * <p>대표값은 <b>중앙값</b>이다. 평균은 한 명의 큰 금액에 끌려가고, 이 표본은 아직 작다.
      * 연 환산은 월 × 12 이며 이름에 {@code Estimate} 를 남긴다 — 1년치 실측이 아니다.
@@ -104,9 +105,7 @@ public class BackofficeMetrics {
         try {
             Map<String, Object> core = jdbc.queryForMap("""
                     WITH latest AS (
-                        SELECT DISTINCT ON (user_id) user_id, saved_at, monthly_savings_vs_current AS amount
-                        FROM saved_result WHERE monthly_savings_vs_current IS NOT NULL
-                        ORDER BY user_id, saved_at DESC
+                        SELECT user_id, seen_at, monthly_savings AS amount FROM member_savings
                     )
                     SELECT count(*) AS "members",
                            count(*) FILTER (WHERE amount > 0) AS "improved",
@@ -122,9 +121,7 @@ public class BackofficeMetrics {
             out.put("annualTotalEstimate", monthlyTotal * 12);   // 월 × 12. 1년치 실측이 아니다
             out.put("histogram", rows("""
                     WITH latest AS (
-                        SELECT DISTINCT ON (user_id) user_id, saved_at, monthly_savings_vs_current AS amount
-                        FROM saved_result WHERE monthly_savings_vs_current IS NOT NULL
-                        ORDER BY user_id, saved_at DESC
+                        SELECT user_id, seen_at, monthly_savings AS amount FROM member_savings
                     ), bucketed AS (
                         SELECT CASE WHEN amount < 10000 THEN '1만 미만'
                                     WHEN amount < 30000 THEN '1~3만'
@@ -139,10 +136,10 @@ public class BackofficeMetrics {
                     """));
             out.put("daily", rows("""
                     SELECT to_char(d.day, 'YYYY-MM-DD') AS date,
-                           count(s.id) AS "savedCount",
-                           coalesce(sum(s.monthly_savings_vs_current) FILTER (WHERE s.monthly_savings_vs_current > 0), 0) AS "monthlySum"
+                           count(s.user_id) AS "savedCount",
+                           coalesce(sum(s.monthly_savings) FILTER (WHERE s.monthly_savings > 0), 0) AS "monthlySum"
                       FROM generate_series((CURRENT_DATE - 13)::timestamp, CURRENT_DATE::timestamp, interval '1 day') AS d(day)
-                      LEFT JOIN saved_result s ON s.saved_at >= d.day AND s.saved_at < d.day + interval '1 day'
+                      LEFT JOIN member_savings s ON s.seen_at >= d.day AND s.seen_at < d.day + interval '1 day'
                      GROUP BY d.day ORDER BY d.day
                     """));
         } catch (DataAccessException e) {
