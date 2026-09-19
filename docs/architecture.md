@@ -136,6 +136,7 @@ POST /api/v1/admin/catalog/{dataset}  (운영자 변경 제안, D-29·D-45)
 ### 구독 공식가 조회 (D-60, 2026-09-20)
 
 `POST /operations/subscriptions/check` — 내레이터. `AI-/docs/contract.md` §8 이 사본이다.
+**이 절이나 사본을 고쳤으면 `python3 scripts/contract_audit.py` 를 돌린다** — 둘이 소리 없이 갈라진 것을 잡는다.
 
 | | |
 |---|---|
