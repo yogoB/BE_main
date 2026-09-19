@@ -21,7 +21,8 @@ import org.springframework.stereotype.Service;
  * <p>두 소스에서 우리 값과 다른 것만 골라낸다.
  * <ul>
  *   <li><b>요금제</b> — 스마트초이스 스냅샷(`smartchoice_plan_snapshot`, 배치 수집분)과 기본료 비교.</li>
- *   <li><b>구독</b> — AI 서버 조회(`POST /catalog/candidates`)로 현재 가격 확인.</li>
+ *   <li><b>구독</b> — <b>지금은 비어 있다.</b> 대조 소스가 AI 모델뿐이어서 D-45 로 사라졌다.
+ *       이 클래스는 구독 쪽으로 아무 데도 호출하지 않는다(생성자 인자에 클라이언트가 없다).</li>
  * </ul>
  *
  * <p>사용자 요청 경로는 여전히 외부를 부르지 않는다(D-05·D-17). 외부 호출은 이 배치와 승인 절차에서만 일어난다.
