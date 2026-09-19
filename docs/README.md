@@ -59,4 +59,4 @@ python3 scripts/contract_audit.py          # 계약 원본과 내레이터 사�
 ```
 
 세 검사기의 공통점: **침묵을 잡는다.** 테스트는 틀린 값을, `golden_audit` 는 검증자 없는 골든 케이스를,
-`contract_audit` 는 두 레포 계약이 소리 없이 갈라진 것을 잡는다.
+`contract_audit` 는 두 레포 계약에서 **항목이 통째로 빠진 것**을 잡는다(값 대조는 사람이 한다).
