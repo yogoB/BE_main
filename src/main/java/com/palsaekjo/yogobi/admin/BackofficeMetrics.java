@@ -210,7 +210,8 @@ public class BackofficeMetrics {
                 SELECT c.name || ' · ' || n.network || ' 0건' FROM carrier c
                 CROSS JOIN (VALUES ('FIVE_G'), ('LTE')) AS n(network)
                 WHERE c.carrier_type = 'MNO' AND EXISTS (SELECT 1 FROM mobile_plan p WHERE p.carrier_id = c.id AND p.active)
-                  AND NOT EXISTS (SELECT 1 FROM mobile_plan p WHERE p.carrier_id = c.id AND p.active AND p.network_type = n.network)"""));
+                  AND NOT EXISTS (SELECT 1 FROM mobile_plan p WHERE p.carrier_id = c.id AND p.active
+                                    AND p.network_type IN (n.network, 'LTE_5G'))"""));   // 통합요금제는 양쪽을 덮는다(D-58)
         return out;
     }
 

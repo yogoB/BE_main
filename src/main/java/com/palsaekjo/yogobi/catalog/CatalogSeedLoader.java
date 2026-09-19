@@ -142,6 +142,8 @@ public class CatalogSeedLoader implements ApplicationRunner {
                         SELECT c.id, btrim(s.plan_name),
                             CASE btrim(s.network_type)
                                 WHEN '5G' THEN 'FIVE_G' WHEN '4G' THEN 'LTE' WHEN '3G' THEN 'THREE_G'
+                                -- 통합요금제(D-58): 한 요금제가 5G·LTE 양쪽에서 쓰인다. KT 현재 라인업이 그렇다.
+                                WHEN '5G/LTE' THEN 'LTE_5G' WHEN 'LTE/5G' THEN 'LTE_5G'
                                 ELSE btrim(s.network_type) END,
                             s.base_price::BIGINT, s.data_mb::BIGINT,
                             nullif(btrim(s.voice_min), '')::BIGINT, nullif(btrim(s.sms_cnt), '')::BIGINT,

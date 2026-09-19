@@ -86,85 +86,85 @@ SKT,다이렉트5G 27,5G,27000,6144,999999,,,,다이렉트,https://m.tworld.co.k
 SKT,ZEM플랜 베스트,5G,26000,3072,999999,,,,키즈 만 12세 이하,https://m.tworld.co.kr/product/renewal/mobileplan/list,2026-09-08
 SKT,다이렉트LTE 22,LTE,22000,1843,999999,,,,다이렉트,https://m.tworld.co.kr/product/renewal/mobileplan/list,2026-09-08
 SKT,ZEM플랜 스마트,5G,19800,1536,999999,,,,키즈 만 12세 이하,https://m.tworld.co.kr/product/renewal/mobileplan/list,2026-09-08
-KT,초이스 130 Google AI Plus,5G,130000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,초이스130,5G,130000,999999,300,,,,ALL,https://product.kt.com/wDic/productDetail.do,2026-09-11
-KT,초이스130 가전구독,5G,130000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,초이스130 넷플릭스,5G,130000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,초이스130 디바이스,5G,130000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,초이스130 디즈니플러스,5G,130000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,초이스130 삼성,5G,130000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,초이스130 위버스,5G,130000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,초이스130 유튜브 프리미엄,5G,130000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,초이스130 티빙/지니/밀리,5G,130000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,초이스130 폰케어,5G,130000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,초이스 더블,5G,120000,999999,300,,,,ALL,https://product.kt.com/wDic/productDetail.do,2026-09-11
-KT,초이스 더블 디바이스,5G,120000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,초이스 더블 디즈니플러스+폰케어,5G,120000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,초이스 더블 유튜브 프리미엄+Google AI Plus,5G,120000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,초이스 더블 유튜브 프리미엄+넷플릭스,5G,120000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,초이스 더블 유튜브 프리미엄+디바이스,5G,120000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,초이스 110 Google AI Plus,5G,110000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,초이스110,5G,110000,999999,300,,,,ALL,https://product.kt.com/wDic/productDetail.do,2026-09-11
-KT,초이스110 가전구독,5G,110000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,초이스110 넷플릭스,5G,110000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,초이스110 디바이스,5G,110000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,초이스110 디즈니플러스,5G,110000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,초이스110 삼성,5G,110000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,초이스110 위버스,5G,110000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,초이스110 유튜브 프리미엄,5G,110000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,초이스110 티빙/지니/밀리,5G,110000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,초이스110 폰케어,5G,110000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,초이스 130 Google AI Plus,5G/LTE,130000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,초이스130,5G/LTE,130000,999999,300,,,,ALL,https://product.kt.com/wDic/productDetail.do,2026-09-11
+KT,초이스130 가전구독,5G/LTE,130000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,초이스130 넷플릭스,5G/LTE,130000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,초이스130 디바이스,5G/LTE,130000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,초이스130 디즈니플러스,5G/LTE,130000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,초이스130 삼성,5G/LTE,130000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,초이스130 위버스,5G/LTE,130000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,초이스130 유튜브 프리미엄,5G/LTE,130000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,초이스130 티빙/지니/밀리,5G/LTE,130000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,초이스130 폰케어,5G/LTE,130000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,초이스 더블,5G/LTE,120000,999999,300,,,,ALL,https://product.kt.com/wDic/productDetail.do,2026-09-11
+KT,초이스 더블 디바이스,5G/LTE,120000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,초이스 더블 디즈니플러스+폰케어,5G/LTE,120000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,초이스 더블 유튜브 프리미엄+Google AI Plus,5G/LTE,120000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,초이스 더블 유튜브 프리미엄+넷플릭스,5G/LTE,120000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,초이스 더블 유튜브 프리미엄+디바이스,5G/LTE,120000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,초이스 110 Google AI Plus,5G/LTE,110000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,초이스110,5G/LTE,110000,999999,300,,,,ALL,https://product.kt.com/wDic/productDetail.do,2026-09-11
+KT,초이스110 가전구독,5G/LTE,110000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,초이스110 넷플릭스,5G/LTE,110000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,초이스110 디바이스,5G/LTE,110000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,초이스110 디즈니플러스,5G/LTE,110000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,초이스110 삼성,5G/LTE,110000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,초이스110 위버스,5G/LTE,110000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,초이스110 유튜브 프리미엄,5G/LTE,110000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,초이스110 티빙/지니/밀리,5G/LTE,110000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,초이스110 폰케어,5G/LTE,110000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
 KT,순 완전무한99(3G),3G,108900,25600,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,베이직100,5G,100000,999999,,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,초이스 90 Google AI Plus,5G,90000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,초이스90,5G,90000,999999,300,,,,ALL,https://product.kt.com/wDic/productDetail.do,2026-09-11
-KT,초이스90 가전구독,5G,90000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,초이스90 넷플릭스,5G,90000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,초이스90 디바이스,5G,90000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,초이스90 디즈니플러스,5G,90000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,초이스90 삼성,5G,90000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,초이스90 위버스,5G,90000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,초이스90 유튜브 프리미엄,5G,90000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,초이스90 티빙/지니/밀리,5G,90000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,초이스90 폰케어,5G,90000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,베이직100,5G/LTE,100000,999999,,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,초이스 90 Google AI Plus,5G/LTE,90000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,초이스90,5G/LTE,90000,999999,300,,,,ALL,https://product.kt.com/wDic/productDetail.do,2026-09-11
+KT,초이스90 가전구독,5G/LTE,90000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,초이스90 넷플릭스,5G/LTE,90000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,초이스90 디바이스,5G/LTE,90000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,초이스90 디즈니플러스,5G/LTE,90000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,초이스90 삼성,5G/LTE,90000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,초이스90 위버스,5G/LTE,90000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,초이스90 유튜브 프리미엄,5G/LTE,90000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,초이스90 티빙/지니/밀리,5G/LTE,90000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,초이스90 폰케어,5G/LTE,90000,999999,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
 KT,순 완전무한77(3G),3G,84700,17408,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,베이직80,5G,80000,999999,,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,베이직110GB,5G,69000,112640,,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,요고 69,5G,69000,999999,999999,999999,,,다이렉트,https://product.kt.com/wDic/index.do,2026-09-08
+KT,베이직80,5G/LTE,80000,999999,,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,베이직110GB,5G/LTE,69000,112640,,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,요고 69,5G/LTE,69000,999999,999999,999999,,,다이렉트,https://product.kt.com/wDic/index.do,2026-09-08
 KT,순 완전무한61(3G),3G,67100,10240,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,베이직90GB,5G,67000,92160,,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,베이직70GB,5G,65000,71680,,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,베이직50GB,5G,63000,51200,,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,베이직30GB,5G,61000,30720,,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,요고 61,5G,61000,999999,999999,999999,,,다이렉트,https://product.kt.com/wDic/index.do,2026-09-08
-KT,베이직21GB,5G,58000,21504,,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,베이직21GB(이월),5G,58000,21504,,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,베이직90GB,5G/LTE,67000,92160,,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,베이직70GB,5G/LTE,65000,71680,,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,베이직50GB,5G/LTE,63000,51200,,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,베이직30GB,5G/LTE,61000,30720,,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,요고 61,5G/LTE,61000,999999,999999,999999,,,다이렉트,https://product.kt.com/wDic/index.do,2026-09-08
+KT,베이직21GB,5G/LTE,58000,21504,,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,베이직21GB(이월),5G/LTE,58000,21504,,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
 KT,순 완전무한51(3G),3G,56100,5120,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,베이직14GB,5G,55000,14336,,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,베이직14GB(이월),5G,55000,14336,,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,요고 55,5G,55000,204800,999999,999999,,,다이렉트,https://product.kt.com/wDic/index.do,2026-09-08
-KT,베이직10GB,5G,50000,10240,,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,베이직10GB(이월),5G,50000,10240,,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,요고 49,5G,49000,122880,999999,999999,,,다이렉트,https://product.kt.com/wDic/index.do,2026-09-08
-KT,요고 46,5G,46000,81920,999999,999999,,,다이렉트,https://product.kt.com/wDic/index.do,2026-09-08
+KT,베이직14GB,5G/LTE,55000,14336,,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,베이직14GB(이월),5G/LTE,55000,14336,,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,요고 55,5G/LTE,55000,204800,999999,999999,,,다이렉트,https://product.kt.com/wDic/index.do,2026-09-08
+KT,베이직10GB,5G/LTE,50000,10240,,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,베이직10GB(이월),5G/LTE,50000,10240,,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,요고 49,5G/LTE,49000,122880,999999,999999,,,다이렉트,https://product.kt.com/wDic/index.do,2026-09-08
+KT,요고 46,5G/LTE,46000,81920,999999,999999,,,다이렉트,https://product.kt.com/wDic/index.do,2026-09-08
 KT,순 모두다올레41(3G),3G,45100,2560,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,베이직7GB,5G,45000,7168,,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,베이직7GB(이월),5G,45000,7168,,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,요고 44,5G,44000,40960,999999,999999,,,다이렉트,https://product.kt.com/wDic/index.do,2026-09-08
-KT,요고 42,5G,42000,35840,999999,999999,,,다이렉트,https://product.kt.com/wDic/index.do,2026-09-08
-KT,요고 40,5G,40000,30720,999999,999999,,,다이렉트,https://product.kt.com/wDic/index.do,2026-09-08
+KT,베이직7GB,5G/LTE,45000,7168,,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,베이직7GB(이월),5G/LTE,45000,7168,,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,요고 44,5G/LTE,44000,40960,999999,999999,,,다이렉트,https://product.kt.com/wDic/index.do,2026-09-08
+KT,요고 42,5G/LTE,42000,35840,999999,999999,,,다이렉트,https://product.kt.com/wDic/index.do,2026-09-08
+KT,요고 40,5G/LTE,40000,30720,999999,999999,,,다이렉트,https://product.kt.com/wDic/index.do,2026-09-08
 KT,순 i-밸류(3G),3G,39600,75,300,300,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,요고 38,5G,38000,25600,999999,999999,,,다이렉트,https://product.kt.com/wDic/index.do,2026-09-08
+KT,요고 38,5G/LTE,38000,25600,999999,999999,,,다이렉트,https://product.kt.com/wDic/index.do,2026-09-08
 KT,순 모두다올레34(3G),3G,37400,1536,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,베이직4GB,5G,37000,4096,,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,베이직4GB(이월),5G,37000,4096,,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,요고 36,5G,36000,20480,999999,999999,,,다이렉트,https://product.kt.com/wDic/index.do,2026-09-08
-KT,요고 34,5G,34000,15360,999999,999999,,,다이렉트,https://product.kt.com/wDic/index.do,2026-09-08
-KT,베이직1.4GB,5G,33000,1434,,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,요고 32,5G,32000,10240,999999,999999,,,다이렉트,https://product.kt.com/wDic/index.do,2026-09-08
+KT,베이직4GB,5G/LTE,37000,4096,,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,베이직4GB(이월),5G/LTE,37000,4096,,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,요고 36,5G/LTE,36000,20480,999999,999999,,,다이렉트,https://product.kt.com/wDic/index.do,2026-09-08
+KT,요고 34,5G/LTE,34000,15360,999999,999999,,,다이렉트,https://product.kt.com/wDic/index.do,2026-09-08
+KT,베이직1.4GB,5G/LTE,33000,1434,,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,요고 32,5G/LTE,32000,10240,999999,999999,,,다이렉트,https://product.kt.com/wDic/index.do,2026-09-08
 KT,순 모두다올레28(3G),3G,30800,750,999999,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
-KT,요고 30,5G,30000,8192,999999,999999,,,다이렉트,https://product.kt.com/wDic/index.do,2026-09-08
-KT,베이직600MB,5G,28900,600,180,180,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
+KT,요고 30,5G/LTE,30000,8192,999999,999999,,,다이렉트,https://product.kt.com/wDic/index.do,2026-09-08
+KT,베이직600MB,5G/LTE,28900,600,180,180,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
 KT,순 데이터 4GB (3G),3G,26950,4096,,,,,ALL,https://product.kt.com/wDic/index.do,2026-09-08
 KT,순 소리나눔23(3G),3G,25300,300,250,100,,,시각 장애인,https://product.kt.com/wDic/index.do,2026-09-08
 KT,순 손말나눔23(3G),3G,25300,300,120,1000,,,복지 청각·언어 장애인,https://product.kt.com/wDic/index.do,2026-09-08

@@ -458,6 +458,32 @@ class RecommendationApiTest {
                 .andExpect(jsonPath("$.data.minimalChange").doesNotExist());
     }
 
+    /**
+     * G-45 — 통합요금제(D-58)는 5G·LTE 어느 쪽을 골라도 후보다. KT 현재 라인업이 "5G/LTE 구분없이" 라
+     * 5G 로만 적어 두던 동안 <b>LTE 를 고른 사용자에게 KT 후보가 0건</b>이었다.
+     */
+    @Test
+    void g45_unifiedPlansAnswerBothNetworks() throws Exception {
+        jdbc.execute("""
+                INSERT INTO mobile_plan(id,carrier_id,name,network_type,base_price,data_mb,voice_min,sms_cnt,source_url,collected_at)
+                VALUES (4,2,'통합베이직','LTE_5G',33000,100000,999999,9999,'http://seed','2026-09-20')""");
+        for (String network : new String[] {"5G", "LTE"}) {
+            mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
+                    {"required":{"monthlyDataGb":20,"wantedServiceIds":[1]},
+                     "optional":{"contractType":"NONE","networkType":"%s"}}""".formatted(network)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.results[*].planName")
+                            .value(org.hamcrest.Matchers.hasItem("통합베이직")));
+        }
+        // 3G 를 고른 사람에게는 넣지 않는다 — 그 요금제는 3G 단말에서 쓰는 것이 아니다.
+        mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
+                {"required":{"monthlyDataGb":20,"wantedServiceIds":[1]},
+                 "optional":{"contractType":"NONE","networkType":"3G"}}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.results").isEmpty());
+        jdbc.execute("DELETE FROM mobile_plan WHERE id = 4");
+    }
+
     private void assertGap(String kind, String queryText, int expectedCount) {
         assertThat(jdbc.queryForObject(
                 "SELECT requested_cnt FROM catalog_candidate WHERE kind=? AND query_text=?",

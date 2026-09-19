@@ -125,6 +125,16 @@ public class CatalogReader {
      */
     private static final String OPEN_TO_ALL = "p.age_limit IS NULL OR p.age_limit IN ('ALL', '다이렉트')";
 
+    /**
+     * 망 필터(D-58). 통합요금제({@code LTE_5G})는 5G·LTE 어느 쪽을 골라도 후보다 — 한 요금제가 양쪽에서
+     * 쓰이기 때문이다. KT 현재 라인업(초이스·베이직·요고)이 그렇고, 이걸 5G 로만 적어 두던 동안
+     * <b>LTE 를 고른 사용자에게 KT 후보가 0건</b>이었다. 쓸 수 있는 선택지를 우리가 숨기고 있었다.
+     * 3G 를 고른 사람에게는 통합을 넣지 않는다 — 그 요금제는 3G 단말에서 쓰는 것이 아니다.
+     */
+    private static final String NETWORK_MATCHES = """
+            :networkType::text IS NULL OR p.network_type = :networkType
+                OR (p.network_type = 'LTE_5G' AND :networkType::text IN ('FIVE_G', 'LTE'))""";
+
     /** 데이터 요구량을 만족하는 후보 요금제. networkType 은 있으면 필터, 없으면 전체. */
     public List<CandidatePlan> findCandidatePlans(long dataMb, String networkType) {
         var params = new MapSqlParameterSource()
@@ -134,9 +144,9 @@ public class CatalogReader {
                 SELECT p.id, p.name, p.base_price, p.contract_discount_12m, p.contract_discount_24m, c.name AS carrier
                 FROM mobile_plan p JOIN carrier c ON c.id = p.carrier_id
                 WHERE p.active AND p.data_mb >= :dataMb
-                  AND (:networkType::text IS NULL OR p.network_type = :networkType)
                   AND (%s)
-                """.formatted(OPEN_TO_ALL), params, (rs, i) -> new Object[]{
+                  AND (%s)
+                """.formatted(NETWORK_MATCHES, OPEN_TO_ALL), params, (rs, i) -> new Object[]{
                     rs.getLong("id"), rs.getString("name"), rs.getLong("base_price"),
                     contractDiscount(rs.getObject("contract_discount_24m", Long.class),
                             rs.getObject("contract_discount_12m", Long.class)),
@@ -164,9 +174,9 @@ public class CatalogReader {
         Integer found = jdbc.queryForObject("""
                 SELECT count(*) FROM mobile_plan p
                 WHERE p.active AND p.data_mb >= :dataMb
-                  AND (:networkType::text IS NULL OR p.network_type = :networkType)
+                  AND (%s)
                   AND NOT (%s)
-                """.formatted(OPEN_TO_ALL), new MapSqlParameterSource()
+                """.formatted(NETWORK_MATCHES, OPEN_TO_ALL), new MapSqlParameterSource()
                 .addValue("dataMb", dataMb).addValue("networkType", networkType), Integer.class);
         return found == null ? 0 : found;
     }

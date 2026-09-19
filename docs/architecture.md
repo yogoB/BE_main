@@ -402,6 +402,7 @@ V4에서 `email_verified`(자체 가입은 검증 토큰 소비 시 TRUE), `cred
 `auth_email_token`(token_hash PK, purpose SIGNUP|RESET, email, user_id, credential_version, expires_at): 10분·단일 사용 본인 확인 토큰.
 이메일별 트랜잭션 잠금 후 소비해 동시 링크 정리의 교착을 방지한다.
 자격 증명 변경과 세션 발급은 회원 행/버전을 검사하며 재설정 전 로그인 결과의 뒤늦은 발급을 차단한다.
+`mobile_plan.network_type` 는 `FIVE_G`·`LTE`·`THREE_G`·**`LTE_5G`**(통합요금제, D-58)다. 통합은 5G·LTE 어느 쪽을 골라도 후보이고 3G 에는 걸리지 않는다. CSV 표기는 `5G/LTE`.
 `auth_rate_limit`(bucket PK, expires_at, attempts): IP **2,000**(`yogobi.auth.ip-limit`)·이메일 로그인 10·재인증 10·메일 3, 15분 창. 만료 행은 요청 시 정리.
 IP 버킷 키는 프론트 nginx 가 넘기는 `X-Client-IP`(Fly 엣지가 준 진짜 발신지)이고, 없으면 TCP peer 다(H-1, 2026-09-18). peer 는 프록시 뒤라 **전 사용자가 한 값**이라 40 이던 때는 정상 사용자 41명이면 전원 429 였다. `X-Forwarded-For` 는 안 본다(누적 헤더라 첫 값을 사용자가 정한다). 직접 호출자가 `X-Client-IP` 를 지어내면 자기 버킷만 쪼개질 뿐 남을 막지 못한다.
 
