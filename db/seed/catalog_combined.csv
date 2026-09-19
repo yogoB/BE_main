@@ -1783,7 +1783,7 @@ id,service_id,name,price,concurrent_streams,quality,note,currency,tax_included
 29,9,300회 듣기,5280,,,기간 내 300회 재생,KRW,true
 30,9,익스트리밍 플러스,10700,,,PC·모바일 스트리밍; 데이터 제휴,KRW,true
 31,9,익스트리밍,8300,,,모바일 스트리밍; 데이터 제휴,KRW,true
-32,10,스마트 음악감상,8140,,,모바일 스트리밍,KRW,true
+32,10,스마트 음악감상,8140,,,모바일 스트리밍; 4개월·12개월 선불권은 같은 월 단가의 총액이라 싣지 않는다,KRW,true
 33,10,음악감상,9240,,,모든 기기 스트리밍,KRW,true
 34,10,청소년 스마트 음악감상,3960,,,모바일 스트리밍,KRW,true
 35,10,알뜰 음악감상,110,,,기본료 + 재생 건수 과금,KRW,true
@@ -1792,8 +1792,6 @@ id,service_id,name,price,concurrent_streams,quality,note,currency,tax_included
 38,10,초고음질 모바일 음악감상,15400,,,모바일 고해상도 음원 감상,KRW,true
 39,10,MP3 30곡,16500,,,매월 MP3 30곡,KRW,true
 40,10,MP3 50곡,26400,,,매월 MP3 50곡,KRW,true
-41,10,스마트 음악감상 12개월,97680,,,모바일 음악감상,KRW,true
-42,10,스마트 음악감상 4개월,32560,,,모바일 음악감상,KRW,true
 43,10,U+ 모바일 음악감상,7900,,,모바일 음악감상,KRW,true
 44,10,U+ 음악감상,9600,,,모든 기기 음악감상,KRW,true
 45,10,U+ 뮤직벨링,8800,,,음악감상 + 벨링,KRW,true
@@ -1832,8 +1830,6 @@ id,service_id,name,price,concurrent_streams,quality,note,currency,tax_included
 79,20,세계문학,6900,,,세계문학 대상 콘텐츠,KRW,true
 80,20,sam2 첫 이용,7000,,,매월 2권,KRW,true
 81,20,sam무제한 첫 이용,9900,,,무제한 대상 도서,KRW,true
-82,20,북모닝 CEO,282000,,,월별 종이책 및 디지털 독서 콘텐츠,KRW,true
-83,20,북모닝 CEO 플래티넘,336000,,,월별 종이책 및 디지털 독서 콘텐츠,KRW,true
 84,21,50GB,1100,,,50GB; HomeKit 카메라 1대,KRW,true
 85,21,200GB,4400,,,200GB; HomeKit 카메라 5대,KRW,true
 86,21,2TB,14000,,,2TB; HomeKit 카메라 수 무제한,KRW,true

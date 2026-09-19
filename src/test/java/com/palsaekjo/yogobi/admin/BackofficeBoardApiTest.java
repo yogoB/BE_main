@@ -154,6 +154,30 @@ class BackofficeBoardApiTest {
                 .andExpect(jsonPath("$.data.savings.daily.length()").value(14));
     }
 
+    /**
+     * G-54 — <b>월 단가가 아닌 금액이 섞이면 백오피스가 말한다.</b> 이 표는 전부 월 단가라는 약속 위에
+     * 서 있고 계산기는 고른 등급의 price 를 그대로 월 총액에 더한다. 연간 총액이 한 줄 들어오면
+     * 그 사용자의 "실제 내시는 금액" 이 12배가 되는데 <b>화면에는 검증할 방법이 없다.</b>
+     * 2026-09-20 에 네 건이 그랬다(구글 연간 · 지니뮤직 선불권 둘 · 교보 북모닝 연간구독 둘).
+     */
+    @Test
+    void qualityFlagsTiersThatAreNotMonthlyPrices() throws Exception {
+        Long serviceId = jdbc.queryForObject(
+                "SELECT id FROM subscription_service WHERE active ORDER BY id LIMIT 1", Long.class);
+        jdbc.update("""
+                INSERT INTO subscription_tier(id, service_id, name, price, currency, tax_included)
+                VALUES (900001, ?, '테스트 월권', 10000, 'KRW', TRUE),
+                       (900002, ?, '테스트 12개월', 120000, 'KRW', TRUE)""", serviceId, serviceId);
+        try {
+            send(get("/api/v1/admin/dashboard"), loginAsAdmin()).andExpect(status().isOk())
+                    // 이름의 기간 표기와 "다른 등급의 12배" 둘 다로 걸린다.
+                    .andExpect(jsonPath("$.data.quality.nonMonthlyTiers.sample[*]").value(
+                            org.hamcrest.Matchers.hasItem(org.hamcrest.Matchers.containsString("테스트 12개월"))));
+        } finally {
+            jdbc.update("DELETE FROM subscription_tier WHERE id IN (900001, 900002)");
+        }
+    }
+
     /** G-44 — 회원 운영(D-57 ⑥): 검색·세션 회수. 운영자는 회원을 지우지 않는다 — 탈퇴는 본인만 한다. */
     @Test
     void memberBoardSearchesAndRevokesSessions() throws Exception {

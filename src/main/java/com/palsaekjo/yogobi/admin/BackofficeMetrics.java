@@ -196,6 +196,32 @@ public class BackofficeMetrics {
                 SELECT s.name || ' · ' || t.price || '원 ×' || count(*) || ' (' || string_agg(t.name, ', ') || ')'
                 FROM subscription_tier t JOIN subscription_service s ON s.id = t.service_id
                 WHERE t.active AND s.active AND t.currency = 'KRW' GROUP BY s.name, t.price HAVING count(*) > 1"""));
+        /*
+         * 월 단가가 아닌 금액이 섞였는지 본다. 이 표는 **전부 월 단가**라는 약속 위에 서 있고,
+         * 계산기는 고른 등급의 price 를 그대로 월 총액에 더한다. 연간 총액이 한 줄 들어오면
+         * 그 등급을 고른 사용자의 "실제 내시는 금액" 이 12배가 되는데 **화면에는 검증할 방법이 없다.**
+         * 2026-09-20 에 네 건이 그랬다 — 구글 연간 174,000 · 지니뮤직 4개월/12개월 선불권 ·
+         * 교보 북모닝 연간구독 둘. 앞의 하나는 우연히 봤고 나머지는 프론트가 물어봐서 찾았다.
+         *
+         * 두 신호를 쓴다. ① 이름·메모의 기간 표기(`개월`·`연간`·`N년`). ② 같은 서비스 중앙값의 10배 초과.
+         * **정수배는 신호가 아니다** — 스토리지 등급이 서로 정수배인 경우가 흔해서(iCloud+ 88,000 =
+         * 44,000 × 2) 처음 규칙은 9건을 뱉었다. 검수함이 울부짖으면 아무도 안 본다.
+         */
+        out.put("nonMonthlyTiers", sample("""
+                WITH scale AS (
+                    SELECT service_id, percentile_cont(0.5) WITHIN GROUP (ORDER BY price) AS mid
+                    FROM subscription_tier WHERE active AND currency = 'KRW' AND price > 0 GROUP BY service_id
+                )
+                SELECT s.name || ' · ' || t.name || ' ' || t.price || '원 (' ||
+                       CASE WHEN t.name ~ '(개월|연간|[0-9]년)' OR coalesce(t.note, '') ~ '(개월|연간|[0-9]년)'
+                            THEN '기간 표기' ELSE '같은 서비스 중앙값의 ' || round(t.price / scale.mid) || '배' END || ')'
+                FROM subscription_tier t
+                JOIN subscription_service s ON s.id = t.service_id
+                JOIN scale ON scale.service_id = t.service_id
+                WHERE t.active AND s.active AND t.currency = 'KRW'
+                  AND (t.name ~ '(개월|연간|[0-9]년)' OR coalesce(t.note, '') ~ '(개월|연간|[0-9]년)'
+                       OR t.price > scale.mid * 10)
+                ORDER BY t.price DESC"""));
         // 999999MB 는 카탈로그의 "무제한" 표기라 더미의 증거가 아니다(126건이 진짜다). 더미는 출처가 진짜 URL 이 아니거나 가격이 0 인 행이다.
         out.put("placeholderPlans", sample("""
                 SELECT c.name || ' ' || p.name FROM mobile_plan p JOIN carrier c ON c.id = p.carrier_id
