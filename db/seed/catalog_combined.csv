@@ -1742,6 +1742,11 @@ id,name,category,official_url
 29,Cursor,AI,https://cursor.com/pricing
 30,Dropbox,CLOUD,https://www.dropbox.com/en_GB/buy
 31,카카오 이모티콘 플러스,EMOTICON,https://cs.kakao.com/helps_html/1073203543
+32,아마존 프라임 비디오,OTT,https://www.primevideo.com/
+33,라프텔,OTT,https://laftel.net/membership/landing
+34,Notion,PRODUCTIVITY,https://www.notion.com/ko/pricing
+35,PlayStation Plus,GAME,https://www.playstation.com/ko-kr/ps-plus/
+36,Xbox Game Pass,GAME,https://www.xbox.com/ko-KR/xbox-game-pass
 #@ subscription_tier
 id,service_id,name,price,concurrent_streams,quality,note,currency,tax_included
 1,1,광고형 스탠다드,7000,2,FHD,광고 포함,KRW,true
@@ -1858,6 +1863,16 @@ id,service_id,name,price,concurrent_streams,quality,note,currency,tax_included
 112,30,Plus 월간,11,,,2TB,USD,false
 113,30,Plus,9,,,2TB,USD,false
 114,31,이모티콘 플러스,3900,,,이모티콘 무제한 사용,KRW,true
+115,32,프라임 비디오,6,3,,공식 표기는 월 USD 5.99 — 정수 저장이라 6으로 적었다,USD,false
+116,33,베이직,9900,1,,프로필 1인,KRW,true
+117,33,프리미엄,14900,4,,프로필 4인,KRW,true
+118,34,플러스,14000,,,멤버 1인당 1개월,KRW,true
+119,34,비즈니스,30000,,,멤버 1인당 1개월,KRW,true
+120,35,스페셜,18000,,,1개월 정기 구독. 에센셜·디럭스는 공식 표기 미확인,KRW,true
+121,36,Essential,10800,,,게임 50종 이상 · 클라우드 월 5시간,KRW,true
+122,36,Premium,14900,,,게임 200종 이상 · 클라우드 월 10시간,KRW,true
+123,36,Ultimate,19000,,,게임 400종 이상 · 클라우드 월 15시간,KRW,true
+124,36,PC 전용,15500,,,PC 게임 300종 이상,KRW,true
 #@ plan_benefit
 carrier,plan_name,service_id,tier_id,benefit_type,discount_value,is_exclusive,exclusive_group,valid_from,valid_to,source_url,collected_at
 SKT,베스트 Max(넷플릭스),1,,BUNDLE_INCLUDED,,false,,,,https://m.tworld.co.kr/product/renewal/mobileplan/list,2026-09-08
