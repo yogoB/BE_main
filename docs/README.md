@@ -29,7 +29,7 @@ Java 21 · Spring Boot · PostgreSQL. 프론트(`yogob`)와 내레이터(`yogob-
 | 백오피스 | [`backoffice.md`](backoffice.md) |
 | 배포 | [`deploy.md`](deploy.md) |
 | 결정 이력 (D-01 ~ D-61) | [`project.md`](project.md) |
-| 작업 기록 | [`worklog.md`](worklog.md) · [`state.md`](state.md) |
+| 작업 기록 | [`worklog.md`](worklog.md) · [`state.md`](state.md) — **append-only 로그다.** 날짜별로 그때의 사실을 적은 것이라 **옛 줄은 현재 상태가 아니다**. 지금 모양은 위의 여섯 문서가 옳다 |
 
 ## 이 서비스가 지키는 다섯 가지
 
