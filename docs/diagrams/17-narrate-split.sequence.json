@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "요고비 · 결과와 설명 분리 · 후보 제외 사유",
+    "quality_profile": "showcase",
+    "column_fit": "spread",
+    "viewBox": [
+      1080,
+      560
+    ]
+  },
+  "participants": [
+    {
+      "id": "screen",
+      "type": "frontend",
+      "label": "결과 화면",
+      "sublabel": "비회원도 이용"
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "RecommendationController",
+      "sublabel": "추천·설명 두 경로"
+    },
+    {
+      "id": "service",
+      "type": "backend",
+      "label": "RecommendationService",
+      "sublabel": "조합 탐색·정렬"
+    },
+    {
+      "id": "catalog",
+      "type": "database",
+      "label": "CatalogReader",
+      "sublabel": "후보 질의 · 제외 사유"
+    },
+    {
+      "id": "narrator",
+      "type": "backend",
+      "label": "내레이터",
+      "sublabel": "yogob-narrator · 모델 안 씀"
+    }
+  ],
+  "messages": [
+    {
+      "id": "ask",
+      "from": "screen",
+      "to": "api",
+      "y": 170,
+      "label": "추천 요청",
+      "note": "POST /api/v1/recommendations. 인증 없음. 비회원은 게이트, 회원은 리포트로 센다(D-36)",
+      "variant": "emphasis"
+    },
+    {
+      "id": "cand",
+      "from": "service",
+      "to": "catalog",
+      "y": 210,
+      "label": "후보 질의",
+      "note": "Controller 경유. active · data_mb >= 요구량 · 망(통합요금제는 5G·LTE 양쪽, D-58) · 가입 자격. 현재 요금제를 따로 빼지 않는다"
+    },
+    {
+      "id": "why",
+      "from": "service",
+      "to": "catalog",
+      "y": 250,
+      "label": "지금 요금제가 왜 빠졌나",
+      "note": "같은 WHERE 절을 한 행에 그대로 적용한다(D-61). 자바로 옮겨 적지 않는다 — 사본을 만들면 필터를 고칠 때 조용히 어긋난다",
+      "variant": "emphasis"
+    },
+    {
+      "id": "fit",
+      "from": "catalog",
+      "to": "service",
+      "y": 290,
+      "label": "후보 + 제외 사유",
+      "note": "reason 은 INACTIVE · DATA · NETWORK · ELIGIBILITY 넷. 후보였으면 null",
+      "variant": "return"
+    },
+    {
+      "id": "result",
+      "from": "api",
+      "to": "screen",
+      "y": 330,
+      "label": "표를 먼저 그린다",
+      "note": "상위 5개 · current · minimalChange. message·reasons·notices 는 비어 있다(D-50) — 내레이터를 부르지 않으므로 그쪽 지연·장애가 결과를 막지 않는다",
+      "variant": "return"
+    },
+    {
+      "id": "expand",
+      "from": "screen",
+      "to": "api",
+      "y": 390,
+      "label": "사용자가 설명을 펼친다",
+      "note": "POST /api/v1/recommendations/narrate. 같은 본문으로 다시 계산한다 — 무상태 경로라 그게 가장 단순하고 계산은 싸다",
+      "variant": "emphasis"
+    },
+    {
+      "id": "narrate",
+      "from": "api",
+      "to": "narrator",
+      "y": 430,
+      "label": "1순위 설명 요청",
+      "note": "계약 필드 10개만 보낸다. 계약 밖 필드가 하나만 섞여도 422 이고 설명이 통째로 사라진다(G-49)"
+    },
+    {
+      "id": "text",
+      "from": "narrator",
+      "to": "screen",
+      "y": 470,
+      "label": "message · reasons · notices",
+      "note": "Controller 경유. 결정론적 템플릿이라 모델 키가 없어도 나온다. 닿지 못하면 WARN 을 남기고 빈 설명으로 흡수한다",
+      "variant": "return"
+    }
+  ]
+}

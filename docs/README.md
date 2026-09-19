@@ -15,7 +15,7 @@ Java 21 · Spring Boot · PostgreSQL. 프론트(`yogob`)와 내레이터(`yogob-
 | 2 | [`domain.md`](domain.md) | 계산 규칙과 **용어 표**(이름은 여기서 찾는다) |
 | 3 | [`erd.md`](erd.md) | **DB ERD** — 테이블 29개, 영역별 다이어그램 |
 | 4 | [`BE_API.md`](BE_API.md) | **API 명세서** — 프론트 연동용 정리본 |
-| 5 | [`diagrams/index.html`](diagrams/index.html) | **시퀀스 다이어그램 16개**(현행 12 · 폐기 4) |
+| 5 | [`diagrams/index.html`](diagrams/index.html) | **시퀀스 다이어그램 17개**(현행 13 · 폐기 4) |
 | 6 | [`testing.md`](testing.md) | **골든 케이스 G-01~G-54** — 이 서비스의 정답지 |
 
 ## 주제별

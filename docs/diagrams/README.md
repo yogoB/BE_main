@@ -4,10 +4,12 @@
 
 2026-09-15에 실제 Controller → Service → DB/외부 호출을 확인해 16개 흐름으로 정리했다.
 **2026-09-20 검토: 16개 중 12개가 현행이고 4개(02·03·05·13)는 지금 코드에 없는 흐름이다.**
+**같은 날 17번을 새로 그려 17개가 됐다** — 지금의 추천 경로(결과·설명 분리, 후보 제외 사유)다.
 표에 `폐기` 로 표시했다. 그림 자체는 지우지 않았다 — 당시 검증 기록이 붙어 있는 산출물이다.
-현재 작업 트리의 D-18 CSV 운영·정보 제보·API 제거와 병행 V8 결제 중복 방지·V10 결손 기록을 포함한다.
+그릴 당시 범위는 마이그레이션 **V10** 까지였다. 지금은 **V29** 이고, 그 사이에 생긴 흐름은 그림이 없다 —
+무엇이 빠졌는지는 아래 [그림이 없는 흐름](#그림이-없는-흐름-2026-09-20-기준) 에 적었다.
 각 그림의 근거 파일과 확인 시점의 SHA-256은 [코드 근거](sources.json)에 기록한다.
-시퀀스 검증은 그림의 검증이며, 실제 Google·SMTP·운영 환경 성공을 뜻하지 않는다.
+시퀀스 검증은 **그림의 검증**이며, 실제 Google·운영 환경 성공을 뜻하지 않는다.
 
 ## 기능별 보기
 
@@ -29,6 +31,7 @@
 | [14 결제 업로드](14-payment-import.html) | 회원 Mock JSON 검증·가맹점 정규화·외부 결제 분석본 저장 | `subscription/MePaymentController.java`, `PaymentImportService.java`, `port/MockMydataProvider.java`, `MerchantNormalizer.java` |
 | [15 검수 CSV 발행과 DB 반영](15-catalog-refresh.html) | 운영자 검수·승인 파일 발행, 60초마다 전체 트랜잭션 반영 | `scripts/catalog_csv.py`(레포 루트), `catalog/CatalogCsvSync.java`, `CatalogSeedLoader.java`, V9 |
 | [16 비회원 정보 오류 제보](16-catalog-report.html) | CSRF·입력·빈도·대상 검증 후 PENDING 접수 | `catalog/CatalogReportController.java`, `user/AuthRateLimit.java`, `SecurityConfig.java` |
+| **[17 결과·설명 분리 · 후보 제외 사유](17-narrate-split.html)** `신규 2026-09-20` | 표를 먼저 그리고 설명은 펼칠 때 받는다(D-50). 지금 요금제가 후보에서 빠진 이유를 서버가 말한다(D-61) | `recommend/RecommendationController.java`, `RecommendationService.java`, `catalog/CatalogReader.java`, `recommend/NarratorClient.java` |
 
 ## 읽는 방법과 현재 제한
 
@@ -49,14 +52,17 @@
 - 변경 시점은 현재·대상에 같은 활성 티어를 적용하되 **카탈로그 가격**을 사용한다.
   저장된 `monthly_price`를 실제 청구액 기준으로 합산하는 경로가 아니며 약정/가족결합은 null이다.
   현재 응답의 항목별 출처 미포함 등은 후속 백엔드 검토 대상으로 남긴다.
-- Google 로그인·SMTP는 설정된 경우의 코드 흐름이다. 실제 계정 승인·메일 도달·운영 HTTPS 확인은 별도다.
+- Google 로그인은 설정된 경우의 코드 흐름이다. 실제 계정 승인·운영 HTTPS 확인은 별도다.
   설정 순서는 [OAuth 가이드](../google-oauth-guide.md)를 따른다.
+  **메일(SMTP) 경로는 코드에 없다** — D-34 로 로그인이 Google 하나가 되면서 사라졌다.
 - 외부 구독 `payment_record`는 탈퇴 CASCADE와 분석본 12개월 정책을 유지한다.
   법정 대상은 `PaymentRetentionService.preserve`를 원본 삭제 전에 명시 호출한 사본만 별도 보관한다.
   자동 5년 보존이나 익명화 보장을 뜻하지 않는다. 사본은 한국시간 확정 기한에 파기한다.
 - 결제 업로드는 KRW 정수·승인 내역·실제 일시를 검증한 뒤 전부 저장한다. 미인식 가맹점은 null로 남긴다.
   V8 자연키로 재업로드 중복을 제외하고 새 행만 집계한다. 자동 구독 생성은 하지 않으며 실제 금융기관 API 연동이 아니다.
-- CSV 발행은 형식·승인 해시 검증이며 출처 내용·사용 권한은 운영자가 확인한다. AI 자동 수집기는 미연결이다.
+- CSV 발행은 형식·승인 해시 검증이며 출처 내용·사용 권한은 운영자가 확인한다.
+  **2026-09-20(D-60)부터 일일 수집이 내레이터의 구독 공식가 조회를 부른다** — 저쪽은 공식 페이지를 읽어
+  원문을 인용할 뿐이고 대조·제안·승인은 그대로 BE 와 사람의 몫이다. 15 그림은 이 연결 이전 모습이다.
   발행과 DB 갱신은 별도 단계이며 DB 실패 시 이전 조회 자료를 유지한다. [운영 가이드](../catalog-data.md)를 따른다.
 - 제보는 가격을 직접 바꾸지 않으며 원문 IP·회원 ID·이메일을 저장하지 않는다. 90일 경과 후 별도 정기 파기한다.
 - 백엔드 `test bootJar` 전체 153개 실패·오류·스킵 0. 변경 시점 음수 입력·회수 개월 범위 초과는 400이며,
@@ -79,3 +85,24 @@ node ~/.codex/skills/archify/bin/archify.mjs visual-check docs/diagrams/01-recom
 JSON 변경 후 다시 validate → deliver → visual-check를 실행하고 실제 화면을 확인한다.
 코드가 바뀌면 이 문서의 구현 상태와 코드 근거도 갱신한다. Graphify는 이 Markdown의 의미를 추적하고,
 생성 HTML·이미지·검증 JSON의 재분석은 `.graphifyignore`로 제외해 Viewer 코드를 서비스 코드와 혼동하지 않도록 한다.
+
+## 그림이 없는 흐름 (2026-09-20 기준)
+
+이 16개는 **2026-09-15 의 구현**을 그린 것이다. 그 뒤에 생긴 흐름은 그림이 없다.
+제출본에서 "이건 왜 그림이 없나" 를 묻지 않아도 되도록 여기에 적는다 — 근거는 코드와 골든 케이스다.
+
+| 흐름 | 결정 | 어디를 보면 되나 |
+|---|---|---|
+| 결과 저장 (마이페이지) | D-51 | `recommend/SavedResultController.java` |
+| 백오피스 대시보드·검수 보드·감사 | D-52 | `admin/**` · G-38 · G-44 |
+| 랜딩 절감액 표본 · 1인당 평균 | D-53 · D-57 | `recommend/SavingsStatsController.java` · G-39 · G-43 |
+| 절감액 표본 기준 = 로그인하고 결과를 본 회원 | D-59 | `recommend/MemberSavings.java` · G-46 · G-47 |
+| 화면에서 못 찾은 것을 결손으로 (`/catalog/gaps`) | D-56 | `catalog/CatalogGapController.java` |
+| 구독 공식가 대조 (내레이터 조회 → 변경 제안) | D-60 | `catalog/SubscriptionPriceOracle.java` · G-48 |
+| 통합요금제(5G/LTE) 후보 판정 | D-58 | `catalog/CatalogReader.NETWORK_MATCHES` · G-45 |
+
+**그리지 않은 이유**: 그림은 생성물이라 손으로 고칠 수 없고 `*.sequence.json` 을 고쳐 다시 뽑아야 한다
+(절차는 위 [검증과 재생성](#검증과-재생성)). 도구는 살아 있어서 **가장 중요한 하나(17번)는 실제로 그렸고**,
+나머지는 마감까지 전부 다시 뽑기보다 **무엇이 빠졌는지 정확히 적는 쪽**을 골랐다.
+현재 구현의 정답지는 [`../testing.md`](../testing.md) 의 골든 케이스 G-01~G-54 이고,
+API 는 [`../BE_API.md`](../BE_API.md) 다.
