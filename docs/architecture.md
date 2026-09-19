@@ -141,7 +141,7 @@ POST /api/v1/admin/catalog/{dataset}  (운영자 변경 제안, D-29·D-45)
 |---|---|
 | 요청 | `{ "serviceName": "Spotify" \| "Apple Music" \| "iCloud+" }` |
 | 200 | `{ serviceName, sourceUrl, checkedAt, sourceHash, offers[{ tierName, price, currency, billingPeriod, evidence }] }` |
-| 502 | `offers` 없이 코드 둘 — `CATALOG-SOURCE-UNAVAILABLE`(못 읽음) · `CATALOG-SOURCE-CHANGED`(읽었는데 한 상품의 월 정가가 유일하지 않음) |
+| 502 | `offers` 없이 코드 둘 — `CATALOG-SOURCE-UNAVAILABLE`(못 읽음) · `CATALOG-SOURCE-CHANGED`(읽었는데 한 상품의 월 정가가 유일하지 않음). **코드는 `detail.code` 에 있다** — 최상위 `code` 도 `error.code` 도 아니다(FastAPI 가 감싼다). 2026-09-20 에 BE 가 최상위를 보다 모든 실패를 한 코드로 뭉갰다 |
 
 - **URL 을 요청으로 받지 않는다**(SSRF). 주소는 내레이터가 들고 있고, BE 는 응답의 `sourceUrl` 을
   우리 `subscription_service.official_url` 과 **대조해 다르면 그 서비스를 통째로 건너뛴다**(G-48 c).
