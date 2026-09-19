@@ -91,8 +91,10 @@ public final class CostCalculator {
             if (bundle.price() >= individualSum) {
                 continue;
             }
+            // 묶음은 등급 여러 줄을 한 줄로 바꿔 넣는다 — 음수 줄이 생기지 않는다. 표시만 보던 화면이
+            // "적용된 할인 없음" 이라고 적고 있었다(2026-09-20). 제휴 혜택과 같은 자리에 꼬리표를 단다.
             lines.add(new CostLine(bundle.name(),
-                    new ValuedAmount(Money.of(bundle.price()), Provenance.OFFICIAL)));
+                    new ValuedAmount(Money.of(bundle.price()), Provenance.OFFICIAL), "번들 적용"));
             total += bundle.price();
             bundle.tierIds().forEach(remaining::remove);
         }

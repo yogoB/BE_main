@@ -46,10 +46,11 @@ class CatalogSeedLoaderTest {
                 .containsExactly(8L, 12L);
         assertThat(jdbc.queryForObject("SELECT concurrent_streams FROM subscription_tier WHERE id = 16", Integer.class))
                 .isNull();
-        // 시퀀스는 최대 id 다음 값이다. 건수를 박지 않고 시드 행수에서 유도한다(id 는 1..N 연속).
-        long tierCount = seedRowCount("subscription_tier");
+        // 시퀀스는 **최대 id** 다음 값이다. 시드 행수로 유도하면 id 가 1..N 연속일 때만 맞는데,
+        // 중간 id 를 하나라도 지우면 그 가정이 깨진다(2026-09-20, 등급 66 삭제).
+        long maxTier = jdbc.queryForObject("SELECT max(id) FROM subscription_tier", Long.class);
         assertThat(jdbc.queryForObject("SELECT nextval('subscription_tier_id_seq')", Long.class))
-                .isEqualTo(tierCount + 1);
+                .isEqualTo(maxTier + 1);
 
         var parts = CombinedCatalogCsv.bundled();
         var services = parts.get("subscription_service");
@@ -81,8 +82,11 @@ class CatalogSeedLoaderTest {
                 .containsExactly(4L, 8L);
         loader.run(null);
         assertSnapshot();
+        // 시퀀스는 행수가 아니라 **최대 id** 를 따라간다. 행수로 보면 중간 id 를 하나라도 지우는 순간 깨진다
+        // (2026-09-20 에 실제로 그랬다 — 연간 총액이 섞여 있던 등급 66 을 지우자 행수 134·최대 id 135 가 됐다).
+        Long maxTierId = jdbc.queryForObject("SELECT max(id) FROM subscription_tier", Long.class);
         assertThat(jdbc.queryForObject("SELECT nextval('subscription_tier_id_seq')", Long.class))
-                .isEqualTo(tierCount + 2);   // 위에서 한 번 당겼으므로 그다음 값
+                .isEqualTo(maxTierId + 2);   // 위에서 한 번 당겼으므로 그다음 값
     }
 
     private void assertSnapshot() throws IOException {

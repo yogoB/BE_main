@@ -1813,11 +1813,10 @@ id,service_id,name,price,concurrent_streams,quality,note,currency,tax_included
 59,14,개인,8900,,,음악 스트리밍·다운로드,KRW,true
 60,14,가족,13500,,,가족 계정 음악 이용,KRW,true
 61,15,Music Premium 개인,11990,,,음악 광고 제거·백그라운드·오프라인,KRW,true
-62,16,Google AI Plus,7500,,,400GB; Gemini 비구독 대비 2배 한도; Flow 월 200크레딧,KRW,true
-63,16,Google AI Pro,29000,,,"5TB; Gemini 비구독 대비 4배 한도; Flow 월 1,000크레딧",KRW,true
-64,16,Google AI Ultra 5배,119000,,,"20TB; Pro 대비 5배; Flow 월 10,000크레딧",KRW,true
-65,16,Google AI Ultra 20배,300000,,,"30TB; Pro 대비 20배; Flow 월 25,000크레딧",KRW,true
-66,16,Google AI Pro 연간,174000,,,연간 요금제 존재 확인,KRW,true
+62,16,Google AI Plus,7500,,,400GB; Gemini 비구독 대비 2배 한도; Flow 월 200크레딧; google-ai-plans 표기(Google One 의 2TB 11900 은 별개 상품),KRW,true
+63,16,Google AI Pro,29000,,,"5TB; Gemini 비구독 대비 4배 한도; Flow 월 1,000크레딧; 연간 요금제 별도 존재(할인 중이라 금액은 싣지 않는다)",KRW,true
+64,16,Google AI Ultra 20TB,119000,,,"20TB(Ultra 최저가); Gemini 비구독 대비 20배·Pro 대비 5배; Flow 월 10,000크레딧",KRW,true
+65,16,Google AI Ultra 30TB,300000,,,"30TB; Pro 대비 20배; Flow 월 25,000크레딧",KRW,true
 67,17,리디셀렉트,4900,,,셀렉트 대상 도서 무제한,KRW,true
 68,18,베이직,12500,,,전자책·오디오북·웹소설·클래스,KRW,true
 69,18,패밀리,16900,,,베이직 콘텐츠와 가족 공유,KRW,true
@@ -1886,6 +1885,7 @@ id,service_id,name,price,concurrent_streams,quality,note,currency,tax_included
 132,35,에센셜,12000,,,1개월 정기 구독 · 운영자 제공,KRW,true
 133,35,디럭스,21000,,,1개월 정기 구독 · 운영자 제공,KRW,true
 134,39,월 구독,11900,,,전자책·오디오북 무제한 · 운영자 제공,KRW,true
+135,37,Google AI Plus 2TB,11900,,,2TB; about/plans 표기 — 같은 이름의 400GB(7500)와 다른 상품,KRW,true
 #@ plan_benefit
 carrier,plan_name,service_id,tier_id,benefit_type,discount_value,is_exclusive,exclusive_group,valid_from,valid_to,source_url,collected_at
 SKT,베스트 Max(넷플릭스),1,,BUNDLE_INCLUDED,,false,,,,https://m.tworld.co.kr/product/renewal/mobileplan/list,2026-09-08
