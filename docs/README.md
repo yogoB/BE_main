@@ -53,6 +53,10 @@ Java 21 · Spring Boot · PostgreSQL. 프론트(`yogob`)와 내레이터(`yogob-
 
 ```bash
 docker compose up -d
-./gradlew check                       # 테스트 + 커버리지 강제
-python3 scripts/golden_audit.py --check   # 골든 케이스마다 검증자가 있는지
+./gradlew check                        # 테스트 + 커버리지 강제
+python3 scripts/golden_audit.py --check    # 골든 케이스마다 검증자가 있는지
+python3 scripts/contract_audit.py          # 계약 원본과 내레이터 사본이 어긋났는지
 ```
+
+세 검사기의 공통점: **침묵을 잡는다.** 테스트는 틀린 값을, `golden_audit` 는 검증자 없는 골든 케이스를,
+`contract_audit` 는 두 레포 계약이 소리 없이 갈라진 것을 잡는다.
