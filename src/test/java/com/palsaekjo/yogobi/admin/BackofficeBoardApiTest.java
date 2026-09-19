@@ -165,16 +165,22 @@ class BackofficeBoardApiTest {
         Long serviceId = jdbc.queryForObject(
                 "SELECT id FROM subscription_service WHERE active ORDER BY id LIMIT 1", Long.class);
         jdbc.update("""
-                INSERT INTO subscription_tier(id, service_id, name, price, currency, tax_included)
-                VALUES (900001, ?, '테스트 월권', 10000, 'KRW', TRUE),
-                       (900002, ?, '테스트 12개월', 120000, 'KRW', TRUE)""", serviceId, serviceId);
+                INSERT INTO subscription_tier(id, service_id, name, price, currency, tax_included, note)
+                VALUES (900001, ?, '테스트 월권', 10000, 'KRW', TRUE, NULL),
+                       (900002, ?, '테스트 12개월', 120000, 'KRW', TRUE, NULL),
+                       -- 이름엔 기간 표기가 없고 **메모에만** 있다. 메모는 우리가 쓰는 설명문이라
+                       -- 기간 낱말이 늘 섞인다 — 걸리면 안 된다(2026-09-20 에 7건이 그랬다).
+                       (900003, ?, '테스트 설명있는월권', 11000, 'KRW', TRUE, '1개월 정기 구독; 연간 요금제 별도 존재')""",
+                serviceId, serviceId, serviceId);
         try {
             send(get("/api/v1/admin/dashboard"), loginAsAdmin()).andExpect(status().isOk())
-                    // 이름의 기간 표기와 "다른 등급의 12배" 둘 다로 걸린다.
                     .andExpect(jsonPath("$.data.quality.nonMonthlyTiers.sample[*]").value(
-                            org.hamcrest.Matchers.hasItem(org.hamcrest.Matchers.containsString("테스트 12개월"))));
+                            org.hamcrest.Matchers.hasItem(org.hamcrest.Matchers.containsString("테스트 12개월"))))
+                    .andExpect(jsonPath("$.data.quality.nonMonthlyTiers.sample[*]").value(
+                            org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem(
+                                    org.hamcrest.Matchers.containsString("테스트 설명있는월권")))));
         } finally {
-            jdbc.update("DELETE FROM subscription_tier WHERE id IN (900001, 900002)");
+            jdbc.update("DELETE FROM subscription_tier WHERE id IN (900001, 900002, 900003)");
         }
     }
 

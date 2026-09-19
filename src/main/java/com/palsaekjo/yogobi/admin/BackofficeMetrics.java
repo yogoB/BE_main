@@ -201,11 +201,19 @@ public class BackofficeMetrics {
          * 계산기는 고른 등급의 price 를 그대로 월 총액에 더한다. 연간 총액이 한 줄 들어오면
          * 그 등급을 고른 사용자의 "실제 내시는 금액" 이 12배가 되는데 **화면에는 검증할 방법이 없다.**
          * 2026-09-20 에 네 건이 그랬다 — 구글 연간 174,000 · 지니뮤직 4개월/12개월 선불권 ·
-         * 교보 북모닝 연간구독 둘. 앞의 하나는 우연히 봤고 나머지는 프론트가 물어봐서 찾았다.
+         * 교보 북모닝 연간구독 둘.
          *
-         * 두 신호를 쓴다. ① 이름·메모의 기간 표기(`개월`·`연간`·`N년`). ② 같은 서비스 중앙값의 10배 초과.
-         * **정수배는 신호가 아니다** — 스토리지 등급이 서로 정수배인 경우가 흔해서(iCloud+ 88,000 =
-         * 44,000 × 2) 처음 규칙은 9건을 뱉었다. 검수함이 울부짖으면 아무도 안 본다.
+         * 신호는 둘뿐이다. ① <b>등급 이름</b>의 기간 표기 ② 같은 서비스 중앙값의 10배 초과.
+         * 넷을 전부 잡으면서 운영 카탈로그(130건)에 오탐이 <b>0</b> 이다(2026-09-20 실측).
+         *
+         * <p><b>빼기로 한 신호 둘을 남겨 둔다 — 같은 실수를 반복하지 않도록.</b>
+         * <ul>
+         *   <li><b>정수배</b>: 스토리지 등급이 서로 정수배인 게 흔하다(iCloud+ 88,000 = 44,000 × 2). 9건.</li>
+         *   <li><b>메모의 기간 표기</b>: 메모는 우리가 쓰는 설명문이라 기간 낱말이 늘 섞인다 —
+         *       "1개월 정기 구독"(PS Plus 셋) · "멤버 1인당 1개월"(Notion 둘) · "연간 요금제 별도 존재"(Gemini) ·
+         *       그리고 <b>선불권을 왜 안 실었는지 적어 둔 문장</b>(지니뮤직)까지 걸렸다. 7건 전부 오탐이다.</li>
+         * </ul>
+         * 둘 다 "상시 주황" 을 만든다. 카드가 늘 켜져 있으면 진짜 한 건이 섞여도 안 보인다.
          */
         out.put("nonMonthlyTiers", sample("""
                 WITH scale AS (
@@ -213,14 +221,13 @@ public class BackofficeMetrics {
                     FROM subscription_tier WHERE active AND currency = 'KRW' AND price > 0 GROUP BY service_id
                 )
                 SELECT s.name || ' · ' || t.name || ' ' || t.price || '원 (' ||
-                       CASE WHEN t.name ~ '(개월|연간|[0-9]년)' OR coalesce(t.note, '') ~ '(개월|연간|[0-9]년)'
-                            THEN '기간 표기' ELSE '같은 서비스 중앙값의 ' || round(t.price / scale.mid) || '배' END || ')'
+                       CASE WHEN t.name ~ '(개월|연간|[0-9]년)' THEN '이름의 기간 표기'
+                            ELSE '같은 서비스 중앙값의 ' || round(t.price / scale.mid) || '배' END || ')'
                 FROM subscription_tier t
                 JOIN subscription_service s ON s.id = t.service_id
                 JOIN scale ON scale.service_id = t.service_id
                 WHERE t.active AND s.active AND t.currency = 'KRW'
-                  AND (t.name ~ '(개월|연간|[0-9]년)' OR coalesce(t.note, '') ~ '(개월|연간|[0-9]년)'
-                       OR t.price > scale.mid * 10)
+                  AND (t.name ~ '(개월|연간|[0-9]년)' OR t.price > scale.mid * 10)
                 ORDER BY t.price DESC"""));
         // 999999MB 는 카탈로그의 "무제한" 표기라 더미의 증거가 아니다(126건이 진짜다). 더미는 출처가 진짜 URL 이 아니거나 가격이 0 인 행이다.
         out.put("placeholderPlans", sample("""
