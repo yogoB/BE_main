@@ -84,10 +84,9 @@
 | 카탈로그 결손 | `catalog_candidate` / `CatalogCandidateRecorder` | **"아예 없다"** 를 센다(제보는 "있는데 틀렸다"). `REQUESTED` 기록·`requested_cnt`=수집 우선순위, **계산 미사용**(D-17). fail-soft·행 상한 10,000 |
 | 결손 수집 후보 검증 | `CandidateVerifier` | P2. 출처·형식/범위·2소스 일치 3단계. 결정적 규칙이며 AI는 판정하지 않는다 |
 | 카탈로그 시드 로더 | `CatalogSeedLoader` | `catalog` 내부, CSV 스냅샷 적재 |
-| AI 서버 게이트웨이 | `AiGateway` | `/parse`·`/narrate` HTTP 호출과 응답 검증 |
-| 서버 간 내부 토큰 | `AI_INTERNAL_TOKEN` | BE와 AI만 공유. 사용자 인증 토큰과 별도이며 프론트에 노출하지 않음 |
-| 챗봇 요청 진입점 | `ChatController` | 기존 추천 서비스 재사용, 추가 입력·필터 폴백 안내 |
-| 챗봇 응답 | `ChatResponse` | `status`, `message`, `recommendation` |
+| 내레이터 클라이언트 | `NarratorClient` | `/narrate` HTTP 호출과 **응답 허용목록 검증**(G-31). 나가는 필드는 `NARRATE_FIELDS` 로 고정(G-49) |
+| 구독 공식가 조회 | `SubscriptionPriceOracle` | 내레이터 `/operations/subscriptions/check` 호출(D-60). 쿨다운·URL 드리프트 가드는 이쪽 몫 |
+| 서버 간 내부 토큰 | `NARRATOR_INTERNAL_TOKEN` | BE와 AI만 공유. 사용자 인증 토큰과 별도이며 프론트에 노출하지 않음 |
 | 통신 요금제 로더 | `loadMobilePlans` | 통신사 이름 파생·망 매핑·(carrier_id,name) 업서트, 파일 있을 때만 |
 | 제휴 혜택 로더 | `loadPlanBenefits` | 요금제 자연키(carrier,plan_name) 해석, 요금제별 혜택 교체(멱등), 미매칭 시 전체 실패 |
 | 통신사 종류 파생 | `carrier_type` | SKT/KT/LGU+ → `MNO`, 그 외 → `MVNO` (템플릿에 없어 이름으로 파생) |
@@ -106,7 +105,7 @@
 | 결제내역 업로드 | `PaymentImportService` / `MePaymentController` | 업로드분 → `payment_record` 적재+가맹점 정규화. 미매칭은 null·묻는 목록(G-10). 자동 구독 생성 안 함. `POST /me/payments/import` |
 | 결제내역 프로바이더 | `PaymentHistoryProvider` / `MockMydataProvider` | 소스별 파서(port). Mock 마이데이터: 승인(01)만·취소 제외·KRW·yyyyMMddHHmmss |
 | 회원 인증 | `AuthService` / `AuthController` | 자체 가입·로그인, 회원 정보와 명시적 계정 연결 |
-| 이메일 본인 확인 | `AuthEmail` / `Proof` / `auth_email_token` | SIGNUP·RESET 목적, 10분·단일 사용, DB는 SHA-256만 저장 |
+| ~~이메일 본인 확인~~ | ~~`AuthEmail` / `auth_email_token`~~ | **없다.** D-34 로 로그인이 Google 하나가 되면서 클래스도 표(V21 에서 DROP)도 사라졌다 |
 | 이메일 확인 여부 | `email_verified` | 검증 완료만 자체 로그인. 기존 미검증 회원은 메일 재설정으로 복구 |
 | 자격 증명 버전 | `credential_version` | 비밀번호·계정 연결 변경 시 증가. 이전 확인 결과로 세션 발급 금지 |
 | 로그인 목록 항목 | `AuthTokens.Session` | UUID id·생성/사용/만료 시각·userAgent·current. 지문은 응답하지 않음 |

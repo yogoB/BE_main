@@ -99,7 +99,8 @@ D-18 변경: 우체국 연동을 제거했다. 스마트초이스와 `CostResult
 | 콘텐츠 타입 | `application/json` (UTF-8) |
 | CORS | 정확한 프론트 오리진만 허용(`YOGOBI_CORS_ALLOWED_ORIGINS`). 회원 요청은 `credentials: include`; wildcard 금지 |
 
-**프론트는 이 문서의 BE API만 호출한다.** AI의 `/parse`·`/narrate`·`/ocr`를 직접 호출하지 않는다.
+**프론트는 이 문서의 BE API만 호출한다.** 내레이터(`/narrate`·`/operations/**`)를 직접 호출하지 않는다.
+(`/parse`·`/ocr` 는 D-44·D-45 로 사라진 옛 표기다.)
 AI 연결과 내부 인증은 BE가 담당하며 프론트에는 AI 주소·내부 토큰·모델 API 키가 필요 없다.
 사용자 인증·대화 이력 저장도 BE 책임이다. 자체·Google 회원 인증은 구현됐고 대화 이력 저장은 후속 작업이다.
 

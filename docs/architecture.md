@@ -153,8 +153,9 @@ POST /api/v1/admin/catalog/{dataset}  (운영자 변경 제안, D-29·D-45)
 - 대상 서비스는 `yogobi.harvest.subscription-services`(기본 `Spotify,Apple Music,iCloud+`).
   **카탈로그 36개 중 3개만 점검된다** — 서비스마다 페이지 문구에 맞춘 추출이 따로 필요해 개수만큼 유지비가 는다.
 
-**BE_main이 AI-를 호출한다. 반대 방향은 없다.** `confidence < 0.7`이면 되묻는다.
-내레이터가 죽어도 필터 경로는 정상 동작해야 한다.
+**BE_main이 AI-를 호출한다. 반대 방향은 없다.** 내레이터가 죽어도 결과·계산은 그대로 나간다 —
+설명은 결과와 따로 오고(D-50) 실패는 빈 설명으로 흡수하되 **WARN 으로 이유를 남긴다**.
+`confidence` 로 되묻던 경로는 `/parse` 기능이라 D-44·D-45 로 함께 사라졌다(코드에 `confidence` 는 없다).
 
 프론트는 BE_main API만 호출하며 내레이터와 직접 통신하지 않는다.
 프론트 연동 명세는 `docs/BE_API.md`, 내레이터 간 계약은 `AI-/docs/contract.md` 사본과 AI README에서 확인한다.
@@ -174,11 +175,12 @@ BE가 `Authorization: Bearer <NARRATOR_INTERNAL_TOKEN>`으로 호출한다. 사�
 **숫자를 만드는 주체(BE `pricing`)와 말을 만드는 주체(AI)를 물리적으로 분리**한다.
 
 - 금액·조합은 `pricing`(순수 Java, 골든케이스·분기 100%)이 독점한다. **AI는 숫자를 만들지 않는다**
-  (절대 원칙 2, D-03). AI가 하는 건 둘뿐: `/parse`(자연어→파라미터), `/narrate`(BE가 계산한 숫자를 문장으로 포장).
-- 경계는 코드로 강제된다: `/narrate`의 **금액 문장(`message`)은 LLM을 쓰지 않는 결정론적 템플릿**이고,
-  **추천 사유(`reasons`)만 LLM이 만들되 BE가 보낸 금액 외의 금액이 섞이면 그 줄을 버린다**(D-26).
-  BE `NarratorClient`가 AI 응답(confidence·정수 GB·서비스 ID·enum)을 **전부 재검증**해 어긋나면 폐기,
-  추천 경로가 **하나의 recommend 엔진**을 탄다(원칙 3).
+  (절대 원칙 2, D-03). 내레이터가 하는 건 둘뿐: `/narrate`(BE가 계산한 숫자를 문장으로 포장)와
+  `/operations/subscriptions/check`(공식 페이지를 읽어 **원문을 인용**, D-60). 자연어 파싱(`/parse`)은 D-44·D-45 로 없다.
+- 경계는 코드로 강제된다: `/narrate` 는 **모델을 쓰지 않는다**(D-45) — `message` 도 `reasons` 도
+  결정론적 규칙이 만들고, BE 가 보낸 금액 외의 금액이 섞이면 그 줄을 버린다(D-26).
+  `NarratorClient` 가 응답을 **허용 목록으로 재검증**해 계약 밖 필드가 하나라도 있으면 폐기하고(G-31),
+  나가는 필드 집합도 `NARRATE_FIELDS` 로 고정한다(G-49). 추천 경로는 **하나의 recommend 엔진**을 탄다(원칙 3).
 
 **부수 근거(핵심은 아니지만 정당화):**
 - **기술 적합성** — 결정론적 계산은 Java(BigDecimal·타입), 자연어 파싱/생성은 Python/LLM 생태계.
@@ -367,8 +369,10 @@ D-18에서 우체국·스마트초이스 연동과 `priceCrossCheck` 응답 필�
 D-26에서 AI `/narrate` **응답**에 `reasons`를 더했다. 요청 필드는 그대로다.
 D-26 후속(2026-09-16): BE가 `/narrate`를 호출해 `reasons`를 `/recommendations` 응답 최상위에 싣는다.
 1순위 결과(`results[0]`)에 대한 사유를 담으며, AI 장애 시에도 `results`는 정상이다.
-narrate 오케스트레이션은 컨트롤러가 한다(`RecommendationController`·`ChatController`) — `RecommendationService`는 AI를 모른다.
-`recommend`가 `chat`의 `NarratorClient`에 직접 의존하면 순환이 되므로 포트 `recommend.Narrator`(구현: `NarratorClient`)로 역전한다.
+narrate 오케스트레이션은 컨트롤러가 한다(`RecommendationController`) — `RecommendationService`는 내레이터를 모른다.
+포트 `recommend.Narrator`(구현: `NarratorClient`)로 역전해 둔 구조는 그대로다.
+**D-50(2026-09-18)로 추천 응답에서는 `reasons`가 비어 나가고** 사용자가 펼칠 때 `/recommendations/narrate`가 채운다 —
+위 문단은 그 분리 이전의 서술이다.
 
 **`/narrate` 요청에 싣는 필드는 아래 10개뿐이다**(`NarratorClient.NARRATE_FIELDS`):
 `planId`·`planName`·`carrier`·`monthlyTotal`·`baseline`·`monthlySavings`·`annualSavings`·`breakdown`·`missingInputs`·`candidateCount`·`currentMonthlyTotal`·`currentMonthlySavings`(뒤 둘은 선택, 같이 온다).
