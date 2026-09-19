@@ -700,7 +700,7 @@ JWT 절대 수명 24시간·유휴 제한 2시간(refresh 없음, D-48). 상태�
             "narrationCalls": 12, "narrationAvgMs": 380, "narrationMaxMs": 3800, "narratorLastOkAt": "…",
             "recommendationsToday": 41, "reportShownToday": 41, "reportViewersToday": 9 },   // 횟수 ≫ 사람이면 반복 호출 의심
 "quality": { "carrierNameVariants": {"count":0,"sample":[]}, "duplicateTierNames": {…}, "samePriceTiers": {…},
-             "placeholderPlans": {…}, "plansWithoutSource": {…}, "mnoNetworkGaps": {"count":1,"sample":["KT · LTE 0건"]} },
+             "placeholderPlans": {…}, "plansWithoutSource": {…}, "mnoNetworkGaps": {"count":1,"sample":["SKT · LTE 1건"]} },   // 3건 미만이면 얇다고 센다 — 0 과 1 은 사용자에게 같다
 "savings": { "basis": "CURRENT_PLAN", "members": 12, "improved": 10,     // D-54. 진단 기준이다 — 실제 이전 여부는 모른다
              "monthlyTotal": 256080, "monthlyMedian": 17100, "monthlyAverage": 21340, "monthlyMax": 51010,
              "annualTotalEstimate": 3072960,                            // 월 × 12. 1년치 실측이 아니다

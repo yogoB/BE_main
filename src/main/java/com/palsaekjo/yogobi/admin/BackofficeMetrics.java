@@ -206,12 +206,16 @@ public class BackofficeMetrics {
         out.put("plansWithoutSource", sample("""
                 SELECT c.name || ' ' || p.name FROM mobile_plan p JOIN carrier c ON c.id = p.carrier_id
                 WHERE p.active AND (p.source_url IS NULL OR btrim(p.source_url) = '') ORDER BY p.id"""));
+        // 0 건만 보면 "1건뿐" 이 안 보인다 — 사용자에게는 둘이 거의 같다(고를 게 없다). 3건 미만을 얇다고 센다.
+        // 통합요금제는 양쪽을 덮는다(D-58).
         out.put("mnoNetworkGaps", sample("""
-                SELECT c.name || ' · ' || n.network || ' 0건' FROM carrier c
+                SELECT c.name || ' · ' || n.network || ' ' || count(p.id) || '건' FROM carrier c
                 CROSS JOIN (VALUES ('FIVE_G'), ('LTE')) AS n(network)
-                WHERE c.carrier_type = 'MNO' AND EXISTS (SELECT 1 FROM mobile_plan p WHERE p.carrier_id = c.id AND p.active)
-                  AND NOT EXISTS (SELECT 1 FROM mobile_plan p WHERE p.carrier_id = c.id AND p.active
-                                    AND p.network_type IN (n.network, 'LTE_5G'))"""));   // 통합요금제는 양쪽을 덮는다(D-58)
+                LEFT JOIN mobile_plan p ON p.carrier_id = c.id AND p.active
+                     AND p.network_type IN (n.network, 'LTE_5G')
+                WHERE c.carrier_type = 'MNO'
+                  AND EXISTS (SELECT 1 FROM mobile_plan x WHERE x.carrier_id = c.id AND x.active)
+                GROUP BY c.name, n.network HAVING count(p.id) < 3 ORDER BY count(p.id), c.name"""));
         return out;
     }
 
