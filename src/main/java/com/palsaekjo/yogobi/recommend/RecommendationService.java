@@ -199,6 +199,30 @@ public class RecommendationService {
                 && a.replace(" ", "").equalsIgnoreCase(b.replace(" ", ""));
     }
 
+    /**
+     * 지금 쓰는 요금제 대비 절감액(D-53). {@code optional.currentPlanId} 가 있고 대상과 다를 때만 —
+     * 같은 계산기로 그 요금제도 계산해 차액을 낸다. 없으면 <b>null</b> 이고 <b>0 으로 적지 않는다</b>:
+     * "절감이 없다" 와 "모른다" 는 다르고, 절감액 표본은 후자를 빼야 한다.
+     *
+     * <p>정가 대비({@code cost.monthlySavings})를 쓰지 않는 이유: 알뜰폰은 정가 할인이 없어 대부분 0 이라
+     * 사용자가 화면에서 본 숫자("지금보다 매달 N원")와 다르다.
+     *
+     * <p>지금 요금제가 카탈로그에서 내려갔으면 null 이다 — 부르는 쪽을 막지 않는다.
+     */
+    public Long savingsVsCurrent(CalculatorRequest request, CostResult cost) {
+        Long currentPlanId = request.optional() == null ? null : request.optional().currentPlanId();
+        if (currentPlanId == null || currentPlanId.equals(request.planId())) {
+            return null;
+        }
+        try {
+            CostResult current = calculate(
+                    new CalculatorRequest(currentPlanId, request.tierIds(), request.optional())).result();
+            return current.monthlyTotal() - cost.monthlyTotal();
+        } catch (ApiException e) {
+            return null;
+        }
+    }
+
     /** 특정 조합(요금제 + 티어들)의 총비용. 후보 탐색·정렬 없이 1회 계산한다. */
     public CalculatorResponse calculate(CalculatorRequest request) {
         if (request.planId() == null) {

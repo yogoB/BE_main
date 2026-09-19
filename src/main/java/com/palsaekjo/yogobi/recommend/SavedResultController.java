@@ -51,7 +51,7 @@ public class SavedResultController {
     public ApiResponse<Saved> save(@RequestBody CalculatorRequest request, Principal principal) throws Exception {
         long userId = Long.parseLong(principal.getName());
         CostResult cost = service.calculate(request).result();
-        Long vsCurrent = savingsVsCurrent(request, cost);
+        Long vsCurrent = service.savingsVsCurrent(request, cost);
         Integer count = jdbc.queryForObject("SELECT count(*) FROM saved_result WHERE user_id = ?", Integer.class, userId);
         if (count != null && count >= MAX_PER_MEMBER)
             throw ApiException.conflict("저장한 결과는 " + MAX_PER_MEMBER + "개까지예요. 오래된 것을 지운 뒤 저장해 주세요.");
@@ -64,28 +64,6 @@ public class SavedResultController {
                 """, (rs, i) -> new Saved(rs.getObject("id", UUID.class), rs.getTimestamp("saved_at").toInstant(),
                         cost, vsCurrent),
                 userId, json.writeValueAsString(request), json.writeValueAsString(cost), vsCurrent));
-    }
-
-    /**
-     * 지금 쓰는 요금제 대비 절감액(D-53). 저장 요청에 {@code currentPlanId} 가 있을 때만 — 같은 계산기로
-     * 그 요금제도 계산해 차액을 낸다. 없으면 null 이다. <b>0 으로 적지 않는다</b>: "절감이 없다"와
-     * "모른다"는 다르고, 랜딩 표본은 후자를 빼야 한다.
-     *
-     * <p>정가 대비({@code cost.monthlySavings})를 쓰지 않는 이유: 알뜰폰은 정가 할인이 없어 대부분 0 이라
-     * 사용자가 화면에서 본 숫자("지금보다 매달 N원")와 다르다.
-     */
-    private Long savingsVsCurrent(CalculatorRequest request, CostResult cost) {
-        Long currentPlanId = request.optional() == null ? null : request.optional().currentPlanId();
-        if (currentPlanId == null || currentPlanId.equals(request.planId())) {
-            return null;
-        }
-        try {
-            CostResult current = service.calculate(
-                    new CalculatorRequest(currentPlanId, request.tierIds(), request.optional())).result();
-            return current.monthlyTotal() - cost.monthlyTotal();
-        } catch (ApiException e) {
-            return null;   // 지금 요금제가 카탈로그에서 내려갔을 수 있다 — 저장 자체를 막지 않는다.
-        }
     }
 
     /** 최신순. 스냅숏 그대로 — 다시 계산하지 않는다. */

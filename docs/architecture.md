@@ -65,7 +65,31 @@ POST /api/v1/admin/catalog/{dataset}  (운영자 변경 제안, D-29·D-45)
   → 스마트초이스 Open API   → 조건별 추천에서 (통신사, 요금제명) 대조
   → 통신사 공식 목록        → 사업자 전체 목록에서 대조 (D-35, 모델 안 씀)
   → 판정은 BE 가 한다: VERIFIED / MISMATCH(승인 차단) / UNVERIFIED(통과 후 사용자 제보로 보완)
+
+일일 카탈로그 수집 (CatalogDailyHarvest, 매일 09:00 KST)
+  → 내레이터: POST /operations/subscriptions/check  → 구독 공식 표기가 (D-60, 모델 안 씀)
+  → 대조·제안은 BE 가 한다. 저쪽은 공식 페이지를 읽어 원문을 인용할 뿐 계산도 저장도 하지 않는다
 ```
+
+### 구독 공식가 조회 (D-60, 2026-09-20)
+
+`POST /operations/subscriptions/check` — 내레이터. `AI-/docs/contract.md` §8 이 사본이다.
+
+| | |
+|---|---|
+| 요청 | `{ "serviceName": "Spotify" \| "Apple Music" \| "iCloud+" }` |
+| 200 | `{ serviceName, sourceUrl, checkedAt, sourceHash, offers[{ tierName, price, currency, billingPeriod, evidence }] }` |
+| 502 | `offers` 없이 코드 둘 — `CATALOG-SOURCE-UNAVAILABLE`(못 읽음) · `CATALOG-SOURCE-CHANGED`(읽었는데 한 상품의 월 정가가 유일하지 않음) |
+
+- **URL 을 요청으로 받지 않는다**(SSRF). 주소는 내레이터가 들고 있고, BE 는 응답의 `sourceUrl` 을
+  우리 `subscription_service.official_url` 과 **대조해 다르면 그 서비스를 통째로 건너뛴다**(G-48 c).
+- `tierName` 은 `subscription_tier.name` 과 글자까지 같아야 붙는다. 안 붙으면 **짝을 지어내지 않는다.**
+- **허용 오차 0.** 그 행의 `official_url` 이 가리키는 페이지에서 찍힌 정수를 그대로 읽으므로 반올림이 없다.
+- **쿨다운은 BE 가 지킨다.** 내레이터는 부를 때마다 원본 페이지를 읽고 캐시·쿨다운이 없다(무상태 규칙).
+  `yogobi.harvest.subscription-cooldown-minutes`(기본 360). 배치는 하루 한 번이지만 운영자가 손으로
+  수집을 연타할 수 있고, 그 경로가 곧 원본 페이지 연타다.
+- 대상 서비스는 `yogobi.harvest.subscription-services`(기본 `Spotify,Apple Music,iCloud+`).
+  **카탈로그 36개 중 3개만 점검된다** — 서비스마다 페이지 문구에 맞춘 추출이 따로 필요해 개수만큼 유지비가 는다.
 
 **BE_main이 AI-를 호출한다. 반대 방향은 없다.** `confidence < 0.7`이면 되묻는다.
 내레이터가 죽어도 필터 경로는 정상 동작해야 한다.
