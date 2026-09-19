@@ -149,8 +149,10 @@ public class RecommendationService {
                 .orElse(null);
 
         // 현재 요금제는 지금 통신사의 요금제다 — 결합 할인이 붙어 있는 쪽이라 ctx 를 그대로 쓴다(G-30 f).
+        // 후보에서 빠졌다면 그 이유도 같이 싣는다(D-61) — '변경 최소'가 지금보다 비싸거나 null 인 이유다(G-51).
         var current = currentPlan
-                .map(p -> currentCost(toResult(p, calculator.calculate(p.plan(), wanted, ctx)), results))
+                .map(p -> currentCost(toResult(p, calculator.calculate(p.plan(), wanted, ctx)), results,
+                        catalog.currentPlanExclusion(p.plan().id(), dataMb, networkType).orElse(null)))
                 .orElse(null);
 
         List<MissingInput> missing = missingInputs(optional, currentCarrier, familyDiscount,
@@ -163,9 +165,10 @@ public class RecommendationService {
     }
 
     /** 현재 요금제를 1순위와 나란히 놓는다. 절감액은 여기서 만든다 — 화면이 두 금액을 빼지 않도록(원칙 2). */
-    private static RecommendationResponse.CurrentCost currentCost(CostResult cost, List<CostResult> results) {
+    private static RecommendationResponse.CurrentCost currentCost(CostResult cost, List<CostResult> results,
+            com.palsaekjo.yogobi.catalog.CatalogReader.CurrentPlanExclusion excluded) {
         long monthly = cost.monthlyTotal() - results.get(0).monthlyTotal();
-        return new RecommendationResponse.CurrentCost(cost, monthly, monthly * 12);
+        return new RecommendationResponse.CurrentCost(cost, monthly, monthly * 12, excluded);
     }
 
     /** {@code currentPlanId} 가 있으면 카탈로그에서 찾는다. 없는 id 는 막지 않고 빈 값으로 둔다(G-30 d). */

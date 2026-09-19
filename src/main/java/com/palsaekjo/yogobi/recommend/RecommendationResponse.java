@@ -32,7 +32,16 @@ public record RecommendationResponse(
      * <p>절감액을 화면이 빼지 않고 여기서 주는 이유는 절대 원칙 2 다 — 금액은 BE 만 만든다.
      * 현재 요금제가 더 싸면 <b>음수 그대로</b> 나간다.
      */
-    public record CurrentCost(CostResult cost, long monthlySavings, long annualSavings) {
+    public record CurrentCost(CostResult cost, long monthlySavings, long annualSavings,
+                             com.palsaekjo.yogobi.catalog.CatalogReader.CurrentPlanExclusion excluded) {
+        /**
+         * {@code excluded} 는 지금 요금제가 <b>후보에서 빠진 이유</b>다(D-61). 후보였으면 null 이고
+         * 화면은 그때 이유를 말하지 않는다. '변경 최소'가 지금보다 비싸거나 null 인 이유가 여기 있다(G-51).
+         */
+        public CurrentCost(CostResult cost, long monthlySavings, long annualSavings) {
+            this(cost, monthlySavings, annualSavings, null);
+        }
+
         /** 6개월 절감(D-51). 음수면 음수 그대로. */
         @com.fasterxml.jackson.annotation.JsonProperty("semiannualSavings")
         public long semiannualSavings() {

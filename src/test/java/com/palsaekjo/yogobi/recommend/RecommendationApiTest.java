@@ -71,6 +71,43 @@ class RecommendationApiTest {
     }
 
     /**
+     * G-52 — <b>후보에서 빠진 이유를 서버가 말한다</b>(D-61). 화면이 필터 규칙을 거울처럼 들고 있다가
+     * 실제로 틀렸다: 데이터가 요구보다 <b>많은데</b> "데이터가 모자라다"고 적혔다(운영, 2026-09-20).
+     * 어느 조건에서 걸렸는지는 후보를 거른 쪽만 확실히 안다.
+     *
+     * <p>판정은 후보 질의의 WHERE 절을 <b>그대로 한 행에 적용해</b> 만든다 — 자바로 옮겨 적으면
+     * 거울이 하나 더 생길 뿐이다({@code CatalogReader.currentPlanExclusion}).
+     */
+    @Test
+    void tellsWhyTheCurrentPlanIsNotACandidate() throws Exception {
+        // 작은플랜 1GB · LTE. 5GB 를 요구하면 데이터에서 먼저 걸린다.
+        var data = recommendWithCurrentPlan(3).path("current").path("excluded");
+        assertThat(data.path("reason").asText()).isEqualTo("DATA");
+        assertThat(data.path("planDataMb").asLong()).isEqualTo(1000);
+        assertThat(data.path("requiredDataMb").asLong()).isEqualTo(5120);
+
+        // 데이터는 넉넉한데 망이 어긋나는 경우 — 여기서 화면 판정이 틀렸었다.
+        // 이 테스트 안에서만 LTE 후보를 하나 넣는다(@BeforeEach 가 매번 지운다). 후보가 0건이면
+        // 서비스가 "조건을 만족하는 요금제가 없어요" 로 먼저 끝나 current 자체가 안 실린다.
+        jdbc.execute("""
+                INSERT INTO mobile_plan(id,carrier_id,name,network_type,base_price,data_mb,voice_min,sms_cnt,source_url,collected_at)
+                VALUES (4,2,'LTE넉넉','LTE',30000,20000,300,300,'http://seed','2026-09-08')""");
+        String body = mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
+                {"required":{"monthlyDataGb":5,"wantedServiceIds":[1]},
+                 "optional":{"currentPlanId":1,"networkType":"LTE","contractType":"NONE"}}"""))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        var network = new com.fasterxml.jackson.databind.ObjectMapper().readTree(body)
+                .path("data").path("current").path("excluded");
+        assertThat(network.path("reason").asText()).isEqualTo("NETWORK");
+        assertThat(network.path("planNetwork").asText()).isEqualTo("FIVE_G");
+        assertThat(network.path("requiredNetwork").asText()).isEqualTo("LTE");
+        assertThat(network.path("planDataMb").asLong()).isEqualTo(100000);   // 데이터는 남는다
+
+        // 후보인 요금제에는 이유가 없다 — 할 말이 없을 때는 아무 말도 하지 않는다.
+        assertThat(recommendWithCurrentPlan(1).path("current").path("excluded").isNull()).isTrue();
+    }
+
+    /**
      * G-51 — <b>'변경 최소'가 '지금'보다 비싸면, 지금 요금제가 요구 조건을 통과하지 못한 것이다.</b>
      *
      * <p>후보 질의의 조건은 {@code active · data_mb >= 요구량 · 망 · 가입자격} 넷뿐이고 현재 요금제를

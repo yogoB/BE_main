@@ -71,6 +71,30 @@ POST /api/v1/admin/catalog/{dataset}  (운영자 변경 제안, D-29·D-45)
   → 대조·제안은 BE 가 한다. 저쪽은 공식 페이지를 읽어 원문을 인용할 뿐 계산도 저장도 하지 않는다
 ```
 
+### 추천 응답 · 현재 요금제 제외 사유 (D-61, 2026-09-20)
+
+`POST /api/v1/recommendations` 의 `data.current` 에 `excluded` 가 붙는다. **지금 쓰는 요금제가 후보에서
+빠졌을 때만** 실리고, 후보였으면 `null` 이다.
+
+```json
+"current": { "cost": {...}, "monthlySavings": -14010, "annualSavings": -168120, "semiannualSavings": -84060,
+             "excluded": { "reason": "NETWORK", "planDataMb": 6144, "requiredDataMb": 5120,
+                           "planNetwork": "FIVE_G", "requiredNetwork": "LTE", "ageLimit": null } }
+```
+
+| 필드 | 뜻 |
+|---|---|
+| `reason` | `INACTIVE` · `DATA` · `NETWORK` · `ELIGIBILITY` 중 하나. 판정 순서는 후보 질의의 WHERE 절과 같다 |
+| `planDataMb` · `requiredDataMb` | 비교한 두 값. `DATA` 가 아니어도 사실로서 실린다 |
+| `planNetwork` · `requiredNetwork` | 같은 뜻. 사용자가 망을 안 골랐으면 `requiredNetwork` 는 null |
+| `ageLimit` | 가입 자격 표기 원문. 없으면 null. 화면은 이 값을 다른 데서 얻을 수 없다 |
+
+- **이 값이 `minimalChange` 가 지금보다 비싸거나 null 인 이유다**(G-51). 화면은 그 표 바로 위에 적는다 —
+  `/narrate` 가 아니라 **추천 응답**에 실리는 이유가 그것이다(D-50 이후 설명은 사용자가 펼쳐야 온다).
+- **문장은 싣지 않는다.** 사실만 준다 — 문구는 화면·내레이터의 몫이다(D-46·D-47).
+- 판정은 후보 질의의 조건을 **한 행에 그대로 적용해** 만든다(`CatalogReader.currentPlanExclusion`).
+  자바로 옮겨 적지 않는다 — 사본을 만들면 필터를 고칠 때 조용히 어긋난다. 실제로 프론트에서 그 일이 났다.
+
 ### 구독 공식가 조회 (D-60, 2026-09-20)
 
 `POST /operations/subscriptions/check` — 내레이터. `AI-/docs/contract.md` §8 이 사본이다.

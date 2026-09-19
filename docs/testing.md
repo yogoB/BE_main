@@ -1034,3 +1034,21 @@ V27 부터 채워져 그 전 건은 비어 있고, 그 뒤 건도 그때의 카�
 이 성질이 참이어야 화면이 "지금 요금제로는 원하시는 조건을 못 맞춰요"라고 적을 수 있다.
 후보 질의나 선택 규칙을 건드리는 리팩터링은 여기서 먼저 걸린다.
 
+
+## G-52. 후보에서 빠진 이유는 서버가 말한다 (2026-09-20, D-61)
+
+**검증**: `RecommendationApiTest` (`tellsWhyTheCurrentPlanIsNotACandidate`)
+
+화면이 필터 규칙을 거울처럼 들고 있다가 **실제로 틀렸다**: 데이터가 요구보다 **많은데**
+"데이터가 모자라다"고 적혔다(운영 재현, LG헬로모바일 `5G 유심 6GB` + 망 LTE 요구).
+어느 조건에서 걸렸는지는 **후보를 거른 쪽만** 확실히 안다.
+
+| | 지금 요금제 · 요구 | `current.excluded` |
+|---|---|---|
+| a | `작은플랜` 1GB · 5GB 요구 | `reason: DATA` · `planDataMb 1000` · `requiredDataMb 5120` |
+| b | `넷플플랜` 100GB · **5G 전용** · 망 LTE 요구 | `reason: NETWORK` · `planNetwork FIVE_G` · `requiredNetwork LTE` · **데이터는 남는다** |
+| c | 후보인 요금제 | **null.** 할 말이 없을 때는 아무 말도 하지 않는다 |
+
+**판정을 자바로 옮겨 적지 않는다.** 후보 질의의 `NETWORK_MATCHES`·`OPEN_TO_ALL` 를 그대로 끼워 넣어
+한 행에 적용한다(`CatalogReader.currentPlanExclusion`). 사본을 만들면 거울이 하나 더 생길 뿐이다.
+

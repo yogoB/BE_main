@@ -187,6 +187,46 @@ public class CatalogReader {
     }
 
     /** 계산기용 단건 조회. 없으면 빈 Optional (호출부가 404 로 변환). */
+    /**
+     * 지금 쓰는 요금제가 <b>후보에서 빠진 이유</b>(D-61). 후보였으면 이 값 자체가 없다.
+     *
+     * <p>{@code reason} 은 {@code INACTIVE · DATA · NETWORK · ELIGIBILITY} 넷 중 하나이고 판정 순서는
+     * {@link #findCandidatePlans} 의 WHERE 절과 같다. 나머지는 화면이 문장을 만들 수 있도록
+     * <b>비교한 두 값</b>을 그대로 준다 — "지금 1.8GB, 원하시는 건 5GB" 처럼.
+     *
+     * <p><b>문장은 여기서 만들지 않는다.</b> 사실만 싣고 문구는 화면·내레이터의 몫이다(D-46·D-47).
+     * {@code requiredNetwork} 는 사용자가 망을 안 고르면 null 인데, 그때는 망으로 걸릴 일도 없다.
+     */
+    public record CurrentPlanExclusion(String reason, long planDataMb, long requiredDataMb,
+                                       String planNetwork, String requiredNetwork, String ageLimit) {
+    }
+
+    /**
+     * 후보 조건을 <b>한 요금제에만</b> 그대로 적용해 어느 절에서 걸렸는지 돌려준다.
+     * 통과했거나 요금제가 없으면 empty — 화면이 할 말이 없는 경우다.
+     *
+     * <p><b>규칙을 자바로 옮겨 적지 않는다.</b> {@code NETWORK_MATCHES}·{@code OPEN_TO_ALL} 를 그대로
+     * 끼워 넣어 DB 가 판정한다 — 사본을 만들면 후보 질의를 고칠 때 이쪽이 조용히 어긋나고,
+     * 그게 프론트에서 실제로 일어난 일이다(2026-09-20: 데이터가 남는데 "데이터가 모자라다"고 적혔다).
+     * 원본이 하나여야 거울이 안 생긴다.
+     */
+    public java.util.Optional<CurrentPlanExclusion> currentPlanExclusion(long planId, long dataMb, String networkType) {
+        var params = new MapSqlParameterSource()
+                .addValue("id", planId).addValue("dataMb", dataMb).addValue("networkType", networkType);
+        return jdbc.query("""
+                SELECT CASE WHEN NOT p.active THEN 'INACTIVE'
+                            WHEN p.data_mb < :dataMb THEN 'DATA'
+                            WHEN NOT (%s) THEN 'NETWORK'
+                            WHEN NOT (%s) THEN 'ELIGIBILITY'
+                       END AS reason,
+                       p.data_mb, p.network_type, p.age_limit
+                FROM mobile_plan p WHERE p.id = :id
+                """.formatted(NETWORK_MATCHES, OPEN_TO_ALL), params,
+                (rs, i) -> new CurrentPlanExclusion(rs.getString("reason"), rs.getLong("data_mb"), dataMb,
+                        rs.getString("network_type"), networkType, rs.getString("age_limit")))
+                .stream().filter(fit -> fit.reason() != null).findFirst();
+    }
+
     public java.util.Optional<CandidatePlan> findPlanById(long planId) {
         var plans = jdbc.query("""
                 SELECT p.id, p.name, p.base_price, p.contract_discount_12m, p.contract_discount_24m, c.name AS carrier
