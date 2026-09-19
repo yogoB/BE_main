@@ -71,6 +71,46 @@ class RecommendationApiTest {
     }
 
     /**
+     * G-51 — <b>'변경 최소'가 '지금'보다 비싸면, 지금 요금제가 요구 조건을 통과하지 못한 것이다.</b>
+     *
+     * <p>후보 질의의 조건은 {@code active · data_mb >= 요구량 · 망 · 가입자격} 넷뿐이고 현재 요금제를
+     * 따로 빼지 않는다. 그러니 지금 요금제가 조건을 통과하면 그것도 후보이고, 같은 통신사에서 가장 싼 것을
+     * 고르는 {@code minimalChange} 는 <b>지금보다 비쌀 수 없다.</b> 비싸게 나왔다면 통과하지 못한 것이다.
+     *
+     * <p>운영에서 실제로 본 모양이다(2026-09-20 페르소나 B): LG U+ `LTE 표준`(데이터 0MB) 사용자가
+     * 5GB 를 원하면 '지금'보다 '변경 최소'가 비싸게 나온다. 화면이 그 이유를 적으려면 이 성질이 참이어야
+     * 하므로 여기서 고정한다 — 리팩터링이 후보 질의나 선택 규칙을 건드리면 여기서 먼저 걸린다.
+     *
+     * <p>고정 픽스처로만 본다: SKT `작은플랜`(1GB) · SKT `넷플플랜`(100GB, 넷플릭스 무료).
+     * 넷플릭스를 원하면서 5GB 를 요구하면 `작은플랜` 은 후보에서 빠진다.
+     */
+    @Test
+    void minimalChangeCostsMoreOnlyWhenTheCurrentPlanFailsTheRequirement() throws Exception {
+        // 지금 = 작은플랜(1GB). 5GB 요구를 통과하지 못한다 → 지금(20,000+13,500)보다 비싼 넷플플랜(55,000)이 나온다.
+        var failing = recommendWithCurrentPlan(3);
+        long now = failing.path("current").path("cost").path("monthlyTotal").asLong();
+        long minimal = failing.path("minimalChange").path("monthlyTotal").asLong();
+        assertThat(now).isEqualTo(33500);
+        assertThat(minimal).isEqualTo(55000).isGreaterThan(now);
+        assertThat(failing.path("minimalChange").path("planId").asLong()).isNotEqualTo(3);
+
+        // 뒤집으면: 조건을 통과하는 요금제를 쓰고 있으면 '변경 최소'는 지금보다 비쌀 수 없다.
+        var passing = recommendWithCurrentPlan(1);
+        assertThat(passing.path("minimalChange").path("monthlyTotal").asLong())
+                .isLessThanOrEqualTo(passing.path("current").path("cost").path("monthlyTotal").asLong());
+    }
+
+    private com.fasterxml.jackson.databind.JsonNode recommendWithCurrentPlan(long planId) throws Exception {
+        String body = mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
+                {"required":{"monthlyDataGb":5,"wantedServiceIds":[1]},
+                 "optional":{"currentPlanId":%d,"contractType":"NONE"}}""".formatted(planId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.minimalChange").exists())
+                .andReturn().getResponse().getContentAsString();
+        return new com.fasterxml.jackson.databind.ObjectMapper().readTree(body).path("data");
+    }
+
+    /**
      * G-50 — 공개 경로의 목록 길이 상한. 인증도 CSRF 도 없는 자리라, 길이를 안 보면 id 를 만 개 실은
      * 한 요청이 그대로 {@code IN (...)} 파라미터 만 개가 된다. 카탈로그 전체가 서비스 36개라
      * 이 상한(200)은 정상 사용자에게 닿지 않는다.
