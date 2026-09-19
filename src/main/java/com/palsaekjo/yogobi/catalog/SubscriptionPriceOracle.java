@@ -121,11 +121,21 @@ public class SubscriptionPriceOracle {
                 body.path("checkedAt").asText(null), body.path("sourceHash").asText(null), List.copyOf(offers));
     }
 
-    /** 실패 본문의 코드. 계약은 최상위 {@code code} 이고, 공통 오류 포맷({@code error.code})도 같이 본다. */
+    /**
+     * 실패 본문의 코드. 계약은 {@code {"detail": {"code": ..., "message": ...}}} 다 —
+     * FastAPI 가 {@code HTTPException} 을 {@code detail} 로 감싸기 때문이고, 내레이터의 401
+     * ({@code NARRATOR-AUTH-001})도 같은 모양이다(AI-/docs/contract.md §7·§8).
+     *
+     * <p>못 찾으면 {@code CATALOG-SOURCE-UNAVAILABLE} 로 떨어뜨리되 <b>WARN 을 남긴다.</b>
+     * 처음엔 최상위 {@code code} 를 봤는데 그 자리가 아니어서 <b>모든 실패가 UNAVAILABLE 한 코드로
+     * 뭉개졌다</b> — "그냥 재시도"와 "사람이 페이지를 봐야 함"을 가르는 신호가 통째로 사라졌고,
+     * 기록은 멀쩡히 남아서 아무도 몰랐을 일이다. 지어내지 않으려던 폴백이 침묵이 되면 안 된다.
+     */
     private static String code(JsonNode body) {
         if (body == null) return "CATALOG-SOURCE-UNAVAILABLE";
-        for (JsonNode at : List.of(body.path("code"), body.path("error").path("code")))
-            if (at.isTextual() && !at.asText().isBlank()) return at.asText();
+        JsonNode code = body.path("detail").path("code");
+        if (code.isTextual() && !code.asText().isBlank()) return code.asText();
+        log.warn("구독 조회 실패 본문에서 코드를 못 찾았다 — 계약이 바뀌었는지 확인하라: {}", body);
         return "CATALOG-SOURCE-UNAVAILABLE";
     }
 

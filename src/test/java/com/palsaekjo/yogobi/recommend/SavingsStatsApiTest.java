@@ -50,7 +50,7 @@ class SavingsStatsApiTest {
         jdbc.update("DELETE FROM app_user WHERE email LIKE 'sample%@example.com'");
     }
 
-    /** 표본 1건은 표본이 아니다 — 임계값(5) 미만이면 금액을 내보내지 않는다. */
+    /** 표본 1건은 표본이 아니다 — 임계값(2) 미만이면 금액을 내보내지 않는다. */
     @Test
     void belowThresholdExposesNothing() throws Exception {
         save("sample1@example.com", 12000L);

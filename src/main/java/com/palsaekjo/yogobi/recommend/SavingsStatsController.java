@@ -17,16 +17,18 @@ import org.springframework.web.bind.annotation.RestController;
  * 표본이 거의 안 쌓여 랜딩이 늘 임계값 미달이었다. 기준은 그대로 <b>지금 쓰는 요금제 대비</b>다 —
  * 정가 대비 값은 알뜰폰에서 대부분 0 이라 화면에 0 만 늘어놓게 된다.
  *
- * <p>표본이 {@link #MIN_SAMPLES} 미만이면 <b>빈 배열</b>을 준다. 한두 건이면 특정 이용자의 금액이
- * 랜딩에 그대로 뜨는 셈이다. 화면은 이때 숫자 블록을 숨긴다(가짜 숫자를 넣지 않는다).
+ * <p>표본이 {@link #MIN_SAMPLES} 미만이면 <b>빈 배열</b>을 준다. 화면은 이때 숫자 블록을 숨긴다
+ * (가짜 숫자를 넣지 않는다). 임계값은 5 였다가 <b>2 로 내렸다</b>(2026-09-20, 사용자 결정) —
+ * 5 로는 서비스 초기에 랜딩이 계속 비어 있었다. 대신 <b>표본 수는 화면에 적지 않는다</b>:
+ * "이용자 2명 기준"은 평균이라는 이름으로 두 사람의 금액을 거의 그대로 알려 주는 셈이다.
  *
  * <p>우리가 아는 것은 "진단에서 확인한 절감액"이지 실제로 옮겼는지가 아니다. 화면 문구도 그렇게 적는다.
  */
 @RestController
 @RequestMapping("/api/v1/stats")
 public class SavingsStatsController {
-    /** 이보다 적으면 노출하지 않는다. */
-    static final int MIN_SAMPLES = 5;
+    /** 이보다 적으면 노출하지 않는다. 2026-09-20 에 5 → 2(사용자 결정) — 화면은 표본 수를 적지 않는다. */
+    static final int MIN_SAMPLES = 2;
     /** 랜딩이 순환 표시하는 개수. 더 줘도 화면이 쓰지 않는다. */
     private static final int MAX_SAMPLES = 30;
     private final JdbcTemplate jdbc;

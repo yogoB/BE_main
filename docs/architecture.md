@@ -98,7 +98,9 @@ POST /api/v1/admin/catalog/{dataset}  (운영자 변경 제안, D-29·D-45)
 프론트 연동 명세는 `docs/BE_API.md`, 내레이터 간 계약은 `AI-/docs/contract.md` 사본과 AI README에서 확인한다.
 BE와 AI에 같은 비밀 환경 변수 `NARRATOR_INTERNAL_TOKEN`을 설정하고,
 BE가 `Authorization: Bearer <NARRATOR_INTERNAL_TOKEN>`으로 호출한다. 사용자 인증 헤더는 AI에 전달하지 않는다.
-AI의 `/parse`·`/narrate`·`/ocr`는 토큰 누락·불일치 시 401, 서버 토큰 미설정 시 503 (`AI-AUTH-001`)로 차단한다.
+내레이터의 `/narrate`·`/operations/**`는 토큰 누락·불일치 시 401, 서버 토큰 미설정 시 503으로 차단한다.
+오류 코드는 `NARRATOR-AUTH-001`이고 본문은 `{"detail": {"code", "message"}}` 다 — FastAPI 가 감싸는 모양이며
+구독 공식가 조회의 502도 같다(2026-09-20 운영 확인). `/parse`·`/ocr`와 `AI-AUTH-001`은 D-45 로 사라진 옛 표기다.
 헬스체크는 토큰 없이 사용한다. 배포 시 AI 접근은 사설망 또는 BE만 허용한 네트워크로 제한한다.
 이는 사용자 JWT 인증과 별도이며 내레이터에 사용자 DB·세션을 추가하지 않는다.
 
