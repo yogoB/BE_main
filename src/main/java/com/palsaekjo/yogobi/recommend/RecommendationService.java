@@ -306,7 +306,7 @@ public class RecommendationService {
         return new CostResult(plan.id(), plan.name(), candidate.carrier(),
                 breakdown.effectiveMonthlyCost(), breakdown.baseline(),
                 breakdown.monthlySavings(), breakdown.annualSavings(), lines)
-                .withPromotion(plan.promoMonths(), plan.regularPrice());
+                .withPromotion(plan.promoMonths(), plan.regularPrice(), plan.basePrice());
     }
 
     private static BreakdownLine toLine(CostLine line) {
@@ -369,10 +369,12 @@ public class RecommendationService {
         CostResult top = results.get(0);
         int months = top.promoMonths();
         if (top.regularPrice() != null) {
+            // 특가가 끝나면 **싸지는** 경우도 있다(장기할인 7743: "12개월 이후 4,800원/월").
+            // 그래서 "특가가 끝나요"가 아니라 "금액이 바뀌어요"라고 적는다 — 내려가는데 겁을 주면 안 된다.
+            String after = String.format("%,d", top.regularPrice());
             missing.add(new MissingInput("promotionPeriod",
-                    "1순위 요금제는 " + months + "개월 특가예요 — 이후에는 월 "
-                            + String.format("%,d", top.regularPrice()) + "원이라 그만큼 반영해 계산했어요",
-                    "특가가 끝나는 시점을 달력에 적어 두세요"));
+                    months + "개월 뒤에는 요금제 금액이 월 " + after + "원으로 바뀌어요 — 기간 절감액에 그만큼 반영했어요",
+                    "1·6·12개월 탭의 금액은 이 변동을 넣고 계산한 값이에요"));
             return;
         }
         missing.add(new MissingInput("promotionPeriod",

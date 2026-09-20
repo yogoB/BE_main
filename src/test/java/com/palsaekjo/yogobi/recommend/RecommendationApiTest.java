@@ -679,10 +679,19 @@ class RecommendationApiTest {
                     {"required":{"monthlyDataGb":20,"wantedServiceIds":[1]},"optional":{"contractType":"NONE"}}"""))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.data.results[0].planName").value("7개월 특가(이후 3만원)"))
-                    .andExpect(jsonPath("$.data.results[0].annualSavings").isNumber())
+                    // 기본료 1,000 → 종료 후 30,000. 7개월은 지금 금액, 남은 5개월은 29,000원 비싸다.
+                    // 월 절감액이 m 이면 연 절감액은 7m + 5(m - 29,000) = 12m - 145,000 이다.
                     .andExpect(jsonPath("$.data.results[0].regularPrice").value(30000))
                     .andExpect(jsonPath("$.data.missingInputs[?(@.field=='promotionPeriod')].impact")
-                            .value(org.hamcrest.Matchers.hasItem(org.hamcrest.Matchers.containsString("월 30,000원"))));
+                            .value(org.hamcrest.Matchers.hasItem(org.hamcrest.Matchers.containsString("월 30,000원으로 바뀌어요"))));
+            String body = mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
+                    {"required":{"monthlyDataGb":20,"wantedServiceIds":[1]},"optional":{"contractType":"NONE"}}"""))
+                    .andReturn().getResponse().getContentAsString();
+            var top = new com.fasterxml.jackson.databind.ObjectMapper().readTree(body).path("data").path("results").get(0);
+            long monthly = top.path("monthlySavings").asLong();
+            assertThat(top.path("annualSavings").asLong()).isEqualTo(12 * monthly - 5 * 29_000);
+            // 6개월은 특가 안이라 그대로 ×6 이다 — 기간마다 따로 판정한다.
+            assertThat(top.path("semiannualSavings").asLong()).isEqualTo(6 * monthly);
         } finally {
             jdbc.execute("DELETE FROM mobile_plan WHERE id = 8");
         }
