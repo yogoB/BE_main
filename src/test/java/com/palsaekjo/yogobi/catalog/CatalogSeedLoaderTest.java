@@ -44,7 +44,9 @@ class CatalogSeedLoaderTest {
         assertSnapshot();
         assertThat(jdbc.queryForList("SELECT tier_id FROM bundle_item WHERE bundle_id = 4 ORDER BY tier_id", Long.class))
                 .containsExactly(8L, 12L);
-        assertThat(jdbc.queryForObject("SELECT concurrent_streams FROM subscription_tier WHERE id = 16", Integer.class))
+        // 비어 있는 선택 칼럼이 0 이 아니라 null 로 들어가는지 본다. 표본은 id 17(유튜브 프리미엄) —
+        // 전에 쓰던 16 은 중복 등급이라 2026-09-21 에 합본에서 내렸다(G-63).
+        assertThat(jdbc.queryForObject("SELECT concurrent_streams FROM subscription_tier WHERE id = 17", Integer.class))
                 .isNull();
         // 시퀀스는 **최대 id** 다음 값이다. 시드 행수로 유도하면 id 가 1..N 연속일 때만 맞는데,
         // 중간 id 를 하나라도 지우면 그 가정이 깨진다(2026-09-20, 등급 66 삭제).

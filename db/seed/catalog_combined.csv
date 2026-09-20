@@ -1767,8 +1767,7 @@ id,service_id,name,price,concurrent_streams,quality,note,currency,tax_included
 13,4,프리미엄,13900,4,최고화질,,KRW,true
 14,5,베이직,7900,1,FHD,,KRW,true
 15,5,프리미엄,12900,4,4K,,KRW,true
-16,6,유튜브 프리미엄 라이트,8500,,,YouTube Music 앱 포함,KRW,true
-17,6,유튜브 프리미엄,14900,,,YouTube Music 앱 제외,KRW,true
+17,6,유튜브 프리미엄,14900,,,YouTube Music 포함,KRW,true
 18,7,와우 멤버십,7890,,,쿠팡 와우 혜택과 쿠팡플레이 이용,KRW,true
 19,6,Premium Lite,8500,,,대부분의 비음악 영상 광고 없이; 대상 영상 백그라운드·오프라인 재생,KRW,true
 20,8,Apple TV,6500,,,Apple 오리지널 콘텐츠,KRW,true
@@ -1962,3 +1961,4 @@ id,name,price,provider,tier_ids
 7,티빙x디즈니+ 3 PACK,21500,TVING,"8,4,12"
 8,Apple One 개인,14900,APPLE,"59,20,84"
 9,Apple One 가족,20900,APPLE,"60,20,85"
+10,유튜브 프리미엄(Music 포함),14900,YouTube,"17,61"

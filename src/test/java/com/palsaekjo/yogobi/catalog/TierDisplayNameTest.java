@@ -57,12 +57,17 @@ class TierDisplayNameTest {
                 .extracting(SubscriptionTier::name).isEqualTo("넷플릭스 스탠다드");
     }
 
-    /** b — 이미 서비스명을 품은 등급명에는 또 붙이지 않는다. "유튜브 프리미엄 유튜브 프리미엄 라이트" 는 안 된다. */
+    /**
+     * b — 이미 서비스명을 품은 등급명에는 또 붙이지 않는다. "크레마클럽 크레마클럽 X FLO 99" 는 안 된다.
+     *
+     * <p>표본이 <b>원화 등급</b>이어야 한다 — {@code findTiersByIds} 는 해외 결제 등급을 거른다(G-17).
+     * "리디셀렉트 해외카드" 로 짚었다가 빈 목록을 받았다.
+     */
     @Test void g61b_tierNamesThatAlreadySayTheServiceAreLeftAlone() {
-        List<SubscriptionTier> tiers = reader.findTiersByIds(List.of(tierId("유튜브 프리미엄", "유튜브 프리미엄 라이트")));
+        List<SubscriptionTier> tiers = reader.findTiersByIds(List.of(tierId("크레마클럽", "크레마클럽 X FLO 99")));
 
         assertThat(tiers).singleElement()
-                .extracting(SubscriptionTier::name).isEqualTo("유튜브 프리미엄 라이트");
+                .extracting(SubscriptionTier::name).isEqualTo("크레마클럽 X FLO 99");
     }
 
     /**
