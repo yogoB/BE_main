@@ -303,6 +303,15 @@ erDiagram
 
 **사람 수와 횟수를 나눠 센다**(D-52) — 무한 호출 사고가 나도 사람 수는 안 부푼다. 운영자가 한 일은 `admin_action` 에 남는다.
 
+`kind` 는 `funnel_daily` 에 CHECK 로 고정돼 있다 — 오타가 새 단계처럼 보이면 안 되기 때문이다.
+현재 허용값 7종(V31, 2026-09-21): `GATE_SHOWN` · `REPORT_SHOWN` · `MEMBER_LOGIN` ·
+`CALENDAR_SHOWN` · `RESULT_SAVED` · `INPUT_STARTED` · `INPUT_COMPLETED`.
+**단계를 늘릴 때 이 CHECK 를 같이 넓혀야 한다.** 안 넓히면 기록이 조용히 버려진다 —
+집계 실패는 삼켜지도록 되어 있어(기능이 지표 때문에 멈추면 안 된다) 화면에서 "아무도 안 했다"와
+구분되지 않는다. 실제로 그렇게 사흘을 잃었다(G-57 f 가 이제 그걸 막는다).
+
+`day` 는 **한국시간 기준**이다(D-63). 2026-09-21 이전 행은 UTC 기준이라 그 지점에 이음매가 있다.
+
 ```mermaid
 erDiagram
     funnel_daily {
