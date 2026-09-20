@@ -580,6 +580,114 @@ class RecommendationApiTest {
         jdbc.execute("DELETE FROM mobile_plan WHERE id = 4");
     }
 
+    /**
+     * G-64. 망을 좁혀서 <b>더 싼 요금제를 놓쳤으면 그 사실을 말한다.</b>
+     *
+     * <p>실제 사용자 사례에서 나왔다(2026-09-21). 디테일 모드는 "<b>사용 중인</b> 통신망"을 묻고
+     * 그 답을 후보 필터로 쓴다. 무제한을 원한 사용자가 5G라고 사실대로 답했더니 알뜰폰 LTE
+     * 무제한이 통째로 빠져 <b>"지금이 더 싸요"</b>가 나왔다 — 망을 안 좁히면 절감이 나오는
+     * 경우였다. <b>"지금 5G를 쓴다"와 "5G만 원한다"는 다른 말인데</b> 화면 어디에도 그 사실이 없었다.
+     *
+     * <p>필터는 그대로 둔다(사용자가 고른 조건이다). 대신 그 선택이 무엇을 지웠는지 숫자로 말한다.
+     * <b>총액은 약속하지 않는다</b> — 비교는 기본료끼리이고 제휴 혜택은 후보마다 달라 뒤집힐 수 있다.
+     */
+    @Test
+    void g64_narrowingTheNetworkSaysWhatItCost() throws Exception {
+        // LTE 전용 알뜰폰이 5G 후보보다 싸다 — 실제 카탈로그의 모양(무제한 LTE 46,200 vs 5G 55,000)과 같다.
+        // 금액을 시드 전체보다 확실히 낮게 잡는다: 정확한 차액은 카탈로그가 자라면 바뀌므로 못박지 않는다.
+        jdbc.execute("""
+                INSERT INTO mobile_plan(id,carrier_id,name,network_type,base_price,data_mb,voice_min,sms_cnt,source_url,collected_at)
+                VALUES (5,2,'싼LTE무제한','LTE',1000,999999,999999,9999,'http://seed','2026-09-21')""");
+        try {
+            // a — 5G 로 좁히면 LTE 를 뺐다는 것과 그 차액을 말한다. 내부 enum(FIVE_G)이 아니라 "5G" 로 적는다.
+            mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
+                    {"required":{"monthlyDataGb":20,"wantedServiceIds":[1]},
+                     "optional":{"contractType":"NONE","networkType":"5G"}}"""))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.missingInputs[?(@.field=='networkType')].impact")
+                            .value(org.hamcrest.Matchers.hasItem(org.hamcrest.Matchers.allOf(
+                                    org.hamcrest.Matchers.containsString("5G 로 좁혀서"),
+                                    // 내부 enum 이 사용자 문구로 새어 나가면 안 된다 — 처음에 "FIVE_G 로 좁혀서" 가 나갔다.
+                                    org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("FIVE_G")),
+                                    // 남은 최저 45,000(웨이브플랜) - 뺀 최저 1,000 = 44,000
+                                    org.hamcrest.Matchers.containsString("44,000원 더 싼 것도 있어요")))));
+
+            // b — 안 좁혔으면 놓친 것도 없다. 없는 손해를 안내하면 소음이다.
+            //     (망을 안 고르면 "지정하면 더 정확해져요" 안내는 원래 나간다 — 그건 다른 말이다.)
+            mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
+                    {"required":{"monthlyDataGb":20,"wantedServiceIds":[1]},
+                     "optional":{"contractType":"NONE"}}"""))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.missingInputs[?(@.field=='networkType')].impact")
+                            .value(org.hamcrest.Matchers.everyItem(
+                                    org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("뺐어요")))));
+
+            // c — 좁혔는데 뺀 쪽이 더 비싸면 말하지 않는다. 손해가 아니기 때문이다.
+            mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
+                    {"required":{"monthlyDataGb":20,"wantedServiceIds":[1]},
+                     "optional":{"contractType":"NONE","networkType":"LTE"}}"""))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.missingInputs[?(@.field=='networkType')].impact")
+                            .value(org.hamcrest.Matchers.everyItem(
+                                    org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("뺐어요")))));
+        } finally {
+            jdbc.execute("DELETE FROM mobile_plan WHERE id = 5");
+        }
+    }
+
+    /**
+     * G-65. 요금제 이름에 <b>기간 표기</b>가 있으면 그대로 옮겨 적는다(2026-09-21, 사용자 제보).
+     *
+     * <p>알뜰폰은 3·6·7개월 특가가 흔한데 <b>카탈로그에 그 기간을 담을 칸이 없다.</b> 그래서 같은 표에
+     * 두 가지가 섞여 있다 — 프로모션가를 {@code base_price} 에 넣은 것(이지모바일 "7개월 특가" 46,200원)과,
+     * 정상가를 넣고 프로모션은 이름에만 남긴 것(큰사람커넥트 "12개월간 10원" 27,500원).
+     * <b>연 절감액은 월 × 12 라 이 요금제들에서 틀린다.</b>
+     *
+     * <p>고치려면 기간·정상가 칸이 필요하고 CSV·계산기·화면을 같이 건드려야 한다(발표 후 과제).
+     * 그때까지는 <b>이름이 말하는 것만</b> 옮긴다 — "특가가 N개월이다" 라고 주장하지 않고
+     * "이름에 그렇게 적혀 있다" 라고만 말한다.
+     */
+    @Test
+    void g65_aPlanNameThatMentionsMonthsIsFlagged() throws Exception {
+        jdbc.execute("""
+                INSERT INTO mobile_plan(id,carrier_id,name,network_type,base_price,data_mb,voice_min,sms_cnt,source_url,collected_at)
+                VALUES (7,2,'[무제한]7개월 특가 이지하게','LTE',1000,999999,999999,9999,'http://seed','2026-09-21')""");
+        try {
+            // a — 1순위 이름에 기간이 있으면 알린다.
+            mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
+                    {"required":{"monthlyDataGb":20,"wantedServiceIds":[1]},"optional":{"contractType":"NONE"}}"""))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.results[0].planName").value("[무제한]7개월 특가 이지하게"))
+                    .andExpect(jsonPath("$.data.missingInputs[?(@.field=='promotionPeriod')].impact")
+                            .value(org.hamcrest.Matchers.hasItem(org.hamcrest.Matchers.containsString("'7개월' 이라는 기간 표기"))));
+        } finally {
+            jdbc.execute("DELETE FROM mobile_plan WHERE id = 7");
+        }
+
+        // b — 기간 표기가 없으면 말하지 않는다. 없는 걱정을 만들지 않는다.
+        mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
+                {"required":{"monthlyDataGb":20,"wantedServiceIds":[1]},"optional":{"contractType":"NONE"}}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.results[0].planName").value("넷플플랜"))
+                .andExpect(jsonPath("$.data.missingInputs[?(@.field=='promotionPeriod')]")
+                        .value(org.hamcrest.Matchers.empty()));
+
+        // c — 24개월은 약정이지 특가가 아니다. 잡지 않는다.
+        jdbc.execute("""
+                INSERT INTO mobile_plan(id,carrier_id,name,network_type,base_price,data_mb,voice_min,sms_cnt,source_url,collected_at)
+                VALUES (8,2,'24개월 약정 요금제','LTE',1000,999999,999999,9999,'http://seed','2026-09-21')""");
+        try {
+            mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
+                    {"required":{"monthlyDataGb":20,"wantedServiceIds":[1]},"optional":{"contractType":"NONE"}}"""))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.results[0].planName").value("24개월 약정 요금제"))
+                    .andExpect(jsonPath("$.data.missingInputs[?(@.field=='promotionPeriod')]")
+                            .value(org.hamcrest.Matchers.empty()));
+        } finally {
+            jdbc.execute("DELETE FROM mobile_plan WHERE id = 8");
+        }
+    }
+
     private void assertGap(String kind, String queryText, int expectedCount) {
         assertThat(jdbc.queryForObject(
                 "SELECT requested_cnt FROM catalog_candidate WHERE kind=? AND query_text=?",

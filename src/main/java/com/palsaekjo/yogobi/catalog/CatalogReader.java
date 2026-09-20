@@ -11,6 +11,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -227,6 +228,50 @@ public class CatalogReader {
                 .addValue("dataMb", dataMb).addValue("networkType", networkType), Integer.class);
         return found == null ? 0 : found;
     }
+
+    /**
+     * 망을 좁히는 바람에 놓친 <b>더 싼</b> 요금제(2026-09-21). 없으면 빈 Optional 이다.
+     *
+     * <p>디테일 모드는 "<b>사용 중인</b> 통신망"을 묻고 그 답을 후보 필터로 쓴다. 그런데
+     * <b>"지금 5G를 쓴다"와 "5G만 원한다"는 다른 말이다.</b> 무제한을 원한 실제 사용자가 5G라고
+     * 답했다가 알뜰폰 LTE 무제한이 통째로 빠져 "지금이 더 싸요"를 받았다 — 망을 안 좁히면
+     * 월 2,800원 절감이 나오는 경우였다. 화면 어디에도 그 사실이 없었다.
+     *
+     * <p>필터를 없애지는 않는다. 사용자가 고른 조건이다. 대신 <b>그 선택이 무엇을 지웠는지</b>를
+     * 숫자로 돌려준다 — 가진 것만 말하고 판단은 사용자에게 맡기는 것이 원칙 5-④다.
+     *
+     * <p>비교는 <b>기본료끼리</b> 한다. 구독 금액은 후보마다 같고 제휴 혜택만 다른데, 혜택까지
+     * 계산하려면 후보 탐색을 두 번 돌려야 한다. 그래서 문구도 "기본료가 더 싸다"까지만 말하고
+     * 총액을 약속하지 않는다. {@code null} 을 주는 경우가 곧 "넓혀도 더 싼 건 없다"이다.
+     */
+    public Optional<CheaperOnOtherNetwork> cheaperIfNetworkWidened(long dataMb, String networkType) {
+        if (networkType == null) {
+            return Optional.empty();   // 안 좁혔으면 놓친 것도 없다
+        }
+        var params = new MapSqlParameterSource().addValue("dataMb", dataMb).addValue("networkType", networkType);
+        Long chosen = jdbc.queryForObject("""
+                SELECT min(p.base_price) FROM mobile_plan p
+                WHERE p.active AND p.data_mb >= :dataMb AND (%s) AND (%s)
+                """.formatted(NETWORK_MATCHES, OPEN_TO_ALL), params, Long.class);
+        if (chosen == null) {
+            return Optional.empty();
+        }
+        var excluded = jdbc.queryForList("""
+                SELECT count(*) AS n, min(p.base_price) AS cheapest FROM mobile_plan p
+                WHERE p.active AND p.data_mb >= :dataMb AND (%s) AND NOT (%s)
+                """.formatted(OPEN_TO_ALL, NETWORK_MATCHES), params);
+        if (excluded.isEmpty() || excluded.get(0).get("cheapest") == null) {
+            return Optional.empty();
+        }
+        long count = ((Number) excluded.get(0).get("n")).longValue();
+        long cheapest = ((Number) excluded.get(0).get("cheapest")).longValue();
+        return cheapest < chosen
+                ? Optional.of(new CheaperOnOtherNetwork(count, cheapest, chosen))
+                : Optional.empty();
+    }
+
+    /** 망 필터가 지운 요금제 수와 그중 최저 기본료, 그리고 남은 후보의 최저 기본료. */
+    public record CheaperOnOtherNetwork(long excludedCount, long cheapestExcluded, long cheapestKept) { }
 
     /** 계산기용 단건 조회. 없으면 빈 Optional (호출부가 404 로 변환). */
     /**

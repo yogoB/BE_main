@@ -159,6 +159,8 @@ public class RecommendationService {
         List<MissingInput> missing = missingInputs(optional, currentCarrier, familyDiscount,
                 unknownServiceIds, foreignPriced);
         addAgeRestrictionNotice(missing, dataMb, networkType);
+        addNetworkNarrowingNotice(missing, dataMb, networkType);
+        addPromotionPeriodNotice(missing, results);
         addFamilyBundleCarrierNotice(missing, familyDiscount, currentCarrier, results);
         addUnknownCurrentPlanNotice(missing, optional, currentPlan);
         Accuracy accuracy = missing.isEmpty() ? Accuracy.FULL : Accuracy.PARTIAL;
@@ -307,6 +309,74 @@ public class RecommendationService {
         missing.add(new MissingInput("ageLimit",
                 "청년·키즈·시니어처럼 가입 자격이 필요한 요금제 " + restricted + "건은 뺐어요",
                 "해당 자격이 있다면 통신사에서 더 싼 요금제를 찾을 수 있어요"));
+    }
+
+    /**
+     * 망을 좁혀서 <b>더 싼 요금제를 놓쳤을 때</b>만 안내한다(2026-09-21). 아니면 넣지 않는다 —
+     * 없는 손해를 안내하면 소음이다(G-18-h 와 같은 선).
+     *
+     * <p>디테일 모드는 "<b>사용 중인</b> 통신망"을 묻고 그 답이 후보 필터가 된다. 그런데
+     * <b>"지금 5G를 쓴다"와 "5G만 원한다"는 다른 말이다.</b> 무제한을 원한 실제 사용자가
+     * 5G라고 답했다가 알뜰폰 LTE 무제한이 통째로 빠져 "지금이 더 싸요"를 받았다.
+     * 망을 안 좁히면 절감이 나오는 경우였고, <b>화면 어디에도 그 사실이 없었다.</b>
+     *
+     * <p>필터를 없애지 않는다 — 사용자가 고른 조건이다. 대신 그 선택이 무엇을 지웠는지 숫자로
+     * 말한다. <b>총액을 약속하지 않는다</b>: 비교는 기본료끼리이고, 제휴 혜택은 후보마다 달라
+     * 뒤집힐 수 있다. 말할 수 있는 만큼만 말한다.
+     */
+    private void addNetworkNarrowingNotice(List<MissingInput> missing, long dataMb, String networkType) {
+        catalog.cheaperIfNetworkWidened(dataMb, networkType).ifPresent(missed -> missing.add(new MissingInput(
+                "networkType",
+                "통신망을 " + displayNetwork(networkType) + " 로 좁혀서 요금제 " + missed.excludedCount()
+                        + "건을 뺐어요 — 그중엔 기본료가 월 "
+                        + String.format("%,d", missed.cheapestKept() - missed.cheapestExcluded())
+                        + "원 더 싼 것도 있어요",
+                "지금 쓰는 망과 옮길 수 있는 망은 다를 수 있어요. 통신 규격을 '상관없어요'로 두면 같이 봐요")));
+    }
+
+    /** 요금제 이름에 박힌 <b>프로모션 기간</b>. 약정 24개월은 프로모션이 아니라 잡지 않는다. */
+    private static final java.util.regex.Pattern PROMO_MONTHS =
+            java.util.regex.Pattern.compile("(\\d{1,2})\\s*개월");
+
+    /**
+     * 1순위 요금제 이름에 <b>기간 표기</b>가 있으면 그대로 옮겨 적는다(2026-09-21, 사용자 제보).
+     *
+     * <p>알뜰폰은 3·6·7개월 단위 특가가 흔한데 <b>카탈로그에 그 기간을 담을 칸이 없다</b> —
+     * {@code mobile_plan} 에는 {@code base_price} 와 약정할인 12/24개월뿐이다. 그래서 같은 표에
+     * 두 가지가 섞여 있다: 프로모션가를 {@code base_price} 에 넣은 것(이지모바일 7개월 특가 46,200원)과,
+     * 정상가를 넣고 프로모션은 이름에만 남긴 것(큰사람커넥트 "12개월간 10원" 27,500원).
+     *
+     * <p><b>연 절감액은 월 × 12 다.</b> 프로모션 종료를 모르므로 이 요금제들에서는 그 값이 틀린다.
+     * 화면의 6·12개월 토글도 같은 값을 쓴다. 고치려면 기간과 정상가를 담는 칸이 필요하고,
+     * 그건 CSV·계산기·화면을 같이 건드리는 일이다(발표 후 과제).
+     *
+     * <p>그때까지는 <b>이름이 말하는 것만</b> 옮긴다. "특가가 N개월이다" 라고 우리가 주장하지 않고
+     * "이름에 N개월이라고 적혀 있다" 라고만 말한다 — 우리가 모르는 것을 아는 척하지 않는 유일한 방법이다.
+     */
+    private static void addPromotionPeriodNotice(List<MissingInput> missing, List<CostResult> results) {
+        if (results.isEmpty()) {
+            return;
+        }
+        String name = results.get(0).planName();
+        var found = PROMO_MONTHS.matcher(name);
+        if (!found.find() || Integer.parseInt(found.group(1)) >= 24) {
+            return;   // 24개월 이상은 약정이지 특가가 아니다
+        }
+        missing.add(new MissingInput("promotionPeriod",
+                "1순위 요금제 이름에 '" + found.group() + "' 이라는 기간 표기가 있어요 — 특가 기간이 끝난 뒤 금액은 저희가 모릅니다",
+                "통신사에서 기간 종료 후 월 요금을 확인해 주세요. 연 절감액은 지금 금액이 12개월 이어진다고 보고 계산해요"));
+    }
+
+    /**
+     * 내부 enum 을 사용자가 읽는 말로 돌린다. {@code FIVE_G} 가 안내 문구에 그대로 새어 나가고 있었다
+     * (2026-09-21, 이 안내를 처음 붙일 때 발견). 사용자는 그 낱말을 모른다.
+     */
+    private static String displayNetwork(String networkType) {
+        return switch (mapNetwork(networkType)) {
+            case "FIVE_G" -> "5G";
+            case "THREE_G" -> "3G";
+            default -> "LTE";
+        };
     }
 
     /**
