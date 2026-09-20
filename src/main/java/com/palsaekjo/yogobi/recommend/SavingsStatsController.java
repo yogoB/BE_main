@@ -47,8 +47,18 @@ public class SavingsStatsController {
      * {@code basis} 는 이 금액이 무엇 대비인지다 — 화면 문구가 기준을 적을 수 있어야 한다(절대 원칙 4).
      * {@code monthlyAverage}·{@code monthlyMedian} 은 랜딩의 "1인당 절감액"이다(D-57). 표본이 임계값
      * 미만이면 {@code samples} 와 함께 <b>둘 다 null</b> — 한두 명의 금액을 평균이라는 이름으로 내보내지 않는다.
+     *
+     * <p><b>표본 수는 아예 싣지 않는다</b>(2026-09-21). 화면에 안 적는 것만으로는 부족했다 — 공개 경로라
+     * 인증 없이 받아 보면 "지금 몇 명이고 각각 얼마"가 그대로 나왔다. 방어는 화면이 아니라 여기 있어야 한다.
+     * 화면이 숫자 블록을 숨길 판단은 {@code samples} 가 비었는지로 충분하다.
+     *
+     * <p><b>다만 이것으로 D-59 가 막으려던 것이 막히지는 않는다.</b> {@code samples} 자체가 개인별
+     * 절감액 배열이고 길이를 세면 표본 수가 그대로 나온다. 줄어든 것은 노출 표면이지 노출 자체가 아니다.
+     * 랜딩이 그 금액들을 돌려 보여 주는 게 기능이라 지금 구조에서는 여기까지다. 더 줄이려면 금액을
+     * 구간으로 뭉개거나 요청마다 하나씩만 주는 설계가 필요하고, 그건 화면 기획과 같이 정해야 한다
+     * (발표 뒤 과제, 프론트 세션과 합의 2026-09-21).
      */
-    public record Savings(List<Long> samples, int sampleCount, Long monthlyAverage, Long monthlyMedian,
+    public record Savings(List<Long> samples, Long monthlyAverage, Long monthlyMedian,
                           String basis, Instant updatedAt) { }
 
     @GetMapping("/savings")
@@ -70,12 +80,12 @@ public class SavingsStatsController {
                 """, Long.class, MAX_SAMPLES);
         int count = samples.size();
         if (count < MIN_SAMPLES) {
-            return new Savings(List.of(), count, null, null, "CURRENT_PLAN", Instant.now());
+            return new Savings(List.of(), null, null, "CURRENT_PLAN", Instant.now());
         }
         long average = Math.round(samples.stream().mapToLong(Long::longValue).average().orElse(0));
         var sorted = samples.stream().sorted().toList();
         long median = sorted.size() % 2 == 1 ? sorted.get(sorted.size() / 2)
                 : Math.round((sorted.get(sorted.size() / 2 - 1) + sorted.get(sorted.size() / 2)) / 2.0);
-        return new Savings(samples, count, average, median, "CURRENT_PLAN", Instant.now());
+        return new Savings(samples, average, median, "CURRENT_PLAN", Instant.now());
     }
 }

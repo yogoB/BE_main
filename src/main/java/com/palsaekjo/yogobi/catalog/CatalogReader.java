@@ -139,6 +139,24 @@ public class CatalogReader {
             :networkType::text IS NULL OR p.network_type = :networkType
                 OR (p.network_type = 'LTE_5G' AND :networkType::text IN ('FIVE_G', 'LTE'))""";
 
+    /**
+     * 계산 내역에 찍히는 <b>등급 표시명</b>. `subscription_tier.name` 은 "스탠다드"·"프리미엄" 처럼
+     * 서비스 없이는 읽히지 않는 이름이 대부분이다(130개 중 123개) — 넷플릭스·디즈니+·티빙·왓챠가
+     * 전부 "스탠다드"를 갖고 있어, 둘을 고르면 <b>같은 라벨 두 줄이 금액만 다르게</b> 뜬다.
+     * 실제로 운영 응답이 그랬다(2026-09-21, 페르소나 통합 점검에서 발견).
+     *
+     * <p>등급명이 이미 서비스명을 품고 있으면 그대로 둔다("유튜브 프리미엄 라이트"에 서비스명을
+     * 또 붙이면 "유튜브 프리미엄 유튜브 프리미엄 라이트" 가 된다). 나머지는 앞에 붙인다.
+     * 이 규약은 {@link #findForeignPricedTiers} 가 이미 쓰던 것이고, 계산 경로도 같은 이름을 쓰게 맞춘다.
+     * {@code docs/BE_API.md} 의 응답 예시("넷플릭스 스탠다드")와 골든 테스트가 가정하던 이름도 이것이다.
+     *
+     * <p><b>공개 선택 화면(`/catalog/services`)은 이 이름을 쓰지 않는다</b> — 거기는 서비스 아래에
+     * 등급이 묶여 있어 짧은 이름이 맞다. 여기는 한 줄로 떨어지므로 서비스가 같이 있어야 읽힌다.
+     */
+    private static final String TIER_DISPLAY_NAME = """
+            CASE WHEN position(s.name in t.name) > 0 THEN t.name
+                 ELSE s.name || ' ' || t.name END""";
+
     /** 데이터 요구량을 만족하는 후보 요금제. networkType 은 있으면 필터, 없으면 전체. */
     public List<CandidatePlan> findCandidatePlans(long dataMb, String networkType) {
         var params = new MapSqlParameterSource()
@@ -274,9 +292,10 @@ public class CatalogReader {
             return List.of();
         }
         return jdbc.query("""
-                SELECT id, service_id, name, price FROM subscription_tier
-                WHERE id IN (:ids) AND currency = 'KRW'
-                """, new MapSqlParameterSource("ids", tierIds),
+                SELECT t.id, t.service_id, %s AS name, t.price
+                  FROM subscription_tier t JOIN subscription_service s ON s.id = t.service_id
+                 WHERE t.id IN (:ids) AND t.currency = 'KRW'
+                """.formatted(TIER_DISPLAY_NAME), new MapSqlParameterSource("ids", tierIds),
                 (rs, i) -> new SubscriptionTier(rs.getLong("id"), rs.getLong("service_id"),
                         rs.getString("name"), rs.getLong("price")));
     }
@@ -343,10 +362,11 @@ public class CatalogReader {
      */
     public List<SubscriptionTier> findRepresentativeTiers(List<Long> serviceIds) {
         var tiers = jdbc.query("""
-                SELECT id, service_id, name, price FROM subscription_tier
-                WHERE active AND currency = 'KRW' AND service_id IN (:serviceIds)
-                  AND service_id IN (SELECT id FROM subscription_service WHERE active)
-                """, new MapSqlParameterSource("serviceIds", serviceIds),
+                SELECT t.id, t.service_id, %s AS name, t.price
+                  FROM subscription_tier t JOIN subscription_service s ON s.id = t.service_id
+                 WHERE t.active AND t.currency = 'KRW' AND t.service_id IN (:serviceIds)
+                   AND s.active
+                """.formatted(TIER_DISPLAY_NAME), new MapSqlParameterSource("serviceIds", serviceIds),
                 (rs, i) -> new SubscriptionTier(rs.getLong("id"), rs.getLong("service_id"),
                         rs.getString("name"), rs.getLong("price")));
 

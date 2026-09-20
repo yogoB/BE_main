@@ -56,7 +56,7 @@ class SavingsStatsApiTest {
         save("sample1@example.com", 12000L);
         mvc.perform(get("/api/v1/stats/savings")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.samples").isEmpty())
-                .andExpect(jsonPath("$.data.sampleCount").value(1))
+                .andExpect(jsonPath("$.data.sampleCount").doesNotExist())   // 표본 수도 내보내지 않는다
                 .andExpect(jsonPath("$.data.basis").value("CURRENT_PLAN"));
     }
 
@@ -72,8 +72,7 @@ class SavingsStatsApiTest {
         save("sample7@example.com", -3000L);                    // 더 내는 조합
 
         String body = mvc.perform(get("/api/v1/stats/savings")).andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.sampleCount").value(5))          // 계정 5개 (null·음수 제외)
-                .andExpect(jsonPath("$.data.samples.length()").value(5))
+                .andExpect(jsonPath("$.data.samples.length()").value(5))     // 계정 5개 (null·음수 제외)
                 // 같은 계정은 최신 값 하나로 대표된다.
                 .andExpect(jsonPath("$.data.samples").value(org.hamcrest.Matchers.hasItem(99000)))
                 .andExpect(jsonPath("$.data.samples").value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem(10000))))
@@ -82,7 +81,10 @@ class SavingsStatsApiTest {
         // (계정 id 같은 짧은 정수는 금액 문자열에 우연히 들어 있으므로 필드 이름으로 본다.)
         org.assertj.core.api.Assertions.assertThat(body)
                 .doesNotContain("userId").doesNotContain("user_id").doesNotContain("@example.com")
-                .doesNotContain("planName").doesNotContain("carrier").doesNotContain("seenAt");
+                .doesNotContain("planName").doesNotContain("carrier").doesNotContain("seenAt")
+                // 표본 수도 안 나간다(2026-09-21). 화면에만 안 적는 것으로는 부족했다 — 공개 경로라
+                // 인증 없이 받으면 "몇 명이고 각각 얼마"가 그대로 읽혔다. 이 단언이 그 회귀를 막는다.
+                .doesNotContain("sampleCount");
     }
 
     /** G-43 — 임계값을 넘으면 1인당 평균·중앙값이 함께 나간다(D-57, 랜딩용). 미만이면 둘 다 null 이다. */
@@ -95,7 +97,6 @@ class SavingsStatsApiTest {
 
         for (int i = 2; i <= 5; i++) save("sample" + i + "@example.com", 10000L * i);   // 10,20,30,40,50천
         mvc.perform(get("/api/v1/stats/savings")).andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.sampleCount").value(5))
                 .andExpect(jsonPath("$.data.monthlyAverage").value(30000))   // (10+20+30+40+50)/5
                 .andExpect(jsonPath("$.data.monthlyMedian").value(30000));
     }
