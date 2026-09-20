@@ -749,6 +749,7 @@ JWT 절대 수명 24시간·유휴 제한 2시간(refresh 없음, D-48). 상태�
                             "gateToLogin": null},   // 백분율. 못 내는 단계는 **키를 지우지 않고 null** — 0 은 "다 이탈"이라는 거짓말이 된다
              "uniqueDaily": [{date, …}],
              "inputStarted": 12,   // 결과 도달률의 분모(입력을 시작한 사람 수)
+             "dateBasis": "Asia/Seoul",   // 날짜를 어느 시간대로 잘랐는지. 화면이 기준 문구를 여기서 읽는다(G-60)
              "lastSeen": {"GATE_SHOWN":"2026-09-21", "RESULT_SAVED":null, …},   // 단계별 마지막으로 쌓인 날. **null 은 한 번도 안 쌓였다는 뜻**이고 키는 사라지지 않는다
              "contaminatedUntil": "2026-09-18" }   // 횟수 열은 그날까지 무한 호출로 부풀어 있음
 "activity": [{date, signups, reports, proposals, applied}],   // 14일. 퍼널과 시간축이 같다

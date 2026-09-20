@@ -364,4 +364,31 @@ class FunnelCounterTest {
         assertThat(kpi.get("resultReachOf")).isEqualTo(0L);
         assertThat((String) kpi.get("resultReachRateNote")).contains("입력 시작");
     }
+
+    /**
+     * G-60 — <b>날짜를 자르는 기준은 한국시간이다.</b> 서버는 UTC 로 돌고, 그대로 두면 KST
+     * 00:00~09:00 의 활동이 전날로 찍힌다 — 국내 서비스의 "오늘 몇 명"이 9시간 어긋난다.
+     *
+     * <p>세션 시간대 한 줄로 {@code CURRENT_DATE}·{@code now()}·timestamp→timestamptz 캐스트가
+     * 한꺼번에 맞는다. 쿼리마다 {@code AT TIME ZONE} 을 흩뿌리면 새로 쓰는 쿼리가 빠뜨리므로,
+     * <b>설정이 유일한 지점인지</b>를 여기서 고정한다. 아래 두 단언 중 날짜 쪽은 UTC 로 돌아가도
+     * 하루의 3분의 2 는 우연히 통과하므로, 설정 자체를 같이 본다.
+     */
+    @Test void g60_dayBoundariesFollowKoreanTime() {
+        assertThat(jdbc.queryForObject("SELECT current_setting('TimeZone')", String.class))
+                .isEqualTo("Asia/Seoul");
+        assertThat(jdbc.queryForObject("SELECT CURRENT_DATE", java.time.LocalDate.class))
+                .isEqualTo(java.time.LocalDate.now(java.time.ZoneId.of("Asia/Seoul")));
+
+        // 화면이 "무슨 기준인지"를 응답에서 읽는다. 박아 넣으면 설정이 바뀌는 순간 거짓이 된다.
+        @SuppressWarnings("unchecked")
+        var funnel = (java.util.Map<String, Object>) metrics.dashboard().get("funnel");
+        assertThat(funnel.get("dateBasis")).isEqualTo("Asia/Seoul");
+
+        // 쓰기 경로도 같은 기준을 쓴다 — 집계만 고치고 기록이 UTC 면 둘이 어긋난다.
+        counter.record(FunnelCounter.GATE_SHOWN, "ip:203.0.113.9");
+        assertThat(jdbc.queryForObject(
+                "SELECT day FROM funnel_daily WHERE kind = ?", java.time.LocalDate.class, FunnelCounter.GATE_SHOWN))
+                .isEqualTo(java.time.LocalDate.now(java.time.ZoneId.of("Asia/Seoul")));
+    }
 }

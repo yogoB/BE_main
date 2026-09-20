@@ -385,6 +385,9 @@ public class BackofficeMetrics {
             conversion.put("gateToLogin", null);
             var out = new LinkedHashMap<String, Object>();
             out.put("windowDays", 14);
+            // 날짜를 어느 시간대로 잘랐는지. **박아 넣지 않고 세션에서 읽는다** — 설정이 바뀌면
+            // 이 값도 따라 바뀌어야지, 화면이 "한국시간 기준"을 적어 둔 채 거짓이 되면 안 된다(G-60).
+            out.put("dateBasis", jdbc.queryForObject("SELECT current_setting('TimeZone')", String.class));
             out.put("gateShown", gate);          // 비회원이 결과를 받아 게이트를 만난 횟수 (실측)
             out.put("reportShown", report);      // 회원이 리포트를 본 횟수 (실측)
             out.put("memberLogin", login);       // Google 로그인 성공 (실측)
