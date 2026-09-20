@@ -29,7 +29,7 @@ class NarratorClientTest {
     private NarratorClient client;
 
     private static final CostResult COST = new CostResult(1, "5G 슬림+", "SKT", 55000, 68500,
-            13500, 162000, List.of());
+            13500, 162_000L, List.of());
 
     @BeforeEach
     void startStub() throws IOException {
@@ -76,7 +76,7 @@ class NarratorClientTest {
         body = """
                 {"message":"월 55,000원이에요.","reasons":[]}""";
         var current = new RecommendationResponse.CurrentCost(
-                new CostResult(2, "지금 요금제", "KT", 70390, 70390, 0, 0, List.of()), 17100, 205200);
+                new CostResult(2, "지금 요금제", "KT", 70390, 70390, 0, 0L, List.of()), 17100, 205_200L, 102_600L);
 
         client.narrationFor(COST, List.of(), 127, current);
         assertThat(received).contains("\"currentMonthlyTotal\":70390").contains("\"currentMonthlySavings\":17100");

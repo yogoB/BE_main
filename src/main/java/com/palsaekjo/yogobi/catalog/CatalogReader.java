@@ -189,7 +189,8 @@ public class CatalogReader {
                 .addValue("dataMb", dataMb)
                 .addValue("networkType", networkType);
         var plans = jdbc.query("""
-                SELECT p.id, p.name, p.base_price, p.contract_discount_12m, p.contract_discount_24m, c.name AS carrier
+                SELECT p.id, p.name, p.base_price, p.contract_discount_12m, p.contract_discount_24m,
+                       p.promo_months, p.regular_price, c.name AS carrier
                 FROM mobile_plan p JOIN carrier c ON c.id = p.carrier_id
                 WHERE p.active AND p.data_mb >= :dataMb
                   AND (%s)
@@ -198,7 +199,8 @@ public class CatalogReader {
                     rs.getLong("id"), rs.getString("name"), rs.getLong("base_price"),
                     contractDiscount(rs.getObject("contract_discount_24m", Long.class),
                             rs.getObject("contract_discount_12m", Long.class)),
-                    rs.getString("carrier")});
+                    rs.getString("carrier"),
+                    rs.getObject("promo_months", Integer.class), rs.getObject("regular_price", Long.class)});
         if (plans.isEmpty()) {
             return List.of();
         }
@@ -208,7 +210,7 @@ public class CatalogReader {
         for (Object[] p : plans) {
             long id = (Long) p[0];
             var plan = new MobilePlan(id, (String) p[1], (Long) p[2], (Long) p[3],
-                    benefitsByPlan.getOrDefault(id, List.of()));
+                    benefitsByPlan.getOrDefault(id, List.of()), (Integer) p[5], (Long) p[6]);
             result.add(new CandidatePlan(plan, (String) p[4]));
         }
         return result;
@@ -316,21 +318,23 @@ public class CatalogReader {
 
     public java.util.Optional<CandidatePlan> findPlanById(long planId) {
         var plans = jdbc.query("""
-                SELECT p.id, p.name, p.base_price, p.contract_discount_12m, p.contract_discount_24m, c.name AS carrier
+                SELECT p.id, p.name, p.base_price, p.contract_discount_12m, p.contract_discount_24m,
+                       p.promo_months, p.regular_price, c.name AS carrier
                 FROM mobile_plan p JOIN carrier c ON c.id = p.carrier_id
                 WHERE p.id = :id
                 """, new MapSqlParameterSource("id", planId), (rs, i) -> new Object[]{
                     rs.getLong("id"), rs.getString("name"), rs.getLong("base_price"),
                     contractDiscount(rs.getObject("contract_discount_24m", Long.class),
                             rs.getObject("contract_discount_12m", Long.class)),
-                    rs.getString("carrier")});
+                    rs.getString("carrier"),
+                    rs.getObject("promo_months", Integer.class), rs.getObject("regular_price", Long.class)});
         if (plans.isEmpty()) {
             return java.util.Optional.empty();
         }
         Object[] p = plans.get(0);
         long id = (Long) p[0];
         var plan = new MobilePlan(id, (String) p[1], (Long) p[2], (Long) p[3],
-                loadBenefits(List.of(id)).getOrDefault(id, List.of()));
+                loadBenefits(List.of(id)).getOrDefault(id, List.of()), (Integer) p[5], (Long) p[6]);
         return java.util.Optional.of(new CandidatePlan(plan, (String) p[4]));
     }
 

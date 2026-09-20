@@ -32,21 +32,20 @@ public record RecommendationResponse(
      *
      * <p>절감액을 화면이 빼지 않고 여기서 주는 이유는 절대 원칙 2 다 — 금액은 BE 만 만든다.
      * 현재 요금제가 더 싸면 <b>음수 그대로</b> 나간다.
+     *
+     * <p>{@code monthlySavings} 는 언제나 숫자다 — 1개월차는 양쪽 다 아는 금액이다. 반면
+     * {@code semiannualSavings}·{@code annualSavings} 는 <b>{@code null} 일 수 있다</b>(G-66):
+     * 1순위 요금제가 기간 한정 특가인데 종료 후 금액을 모르면 그 기간의 차액도 모른다.
+     * <b>0 이 아니라 null 이다</b> — 0 은 "안 아낀다"는 뜻이라 다른 거짓말이 된다.
      */
-    public record CurrentCost(CostResult cost, long monthlySavings, long annualSavings,
-                             CurrentPlanExclusion excluded) {
+    public record CurrentCost(CostResult cost, long monthlySavings, Long annualSavings,
+                             Long semiannualSavings, CurrentPlanExclusion excluded) {
         /**
          * {@code excluded} 는 지금 요금제가 <b>후보에서 빠진 이유</b>다(D-61). 후보였으면 null 이고
          * 화면은 그때 이유를 말하지 않는다. '변경 최소'가 지금보다 비싸거나 null 인 이유가 여기 있다(G-51).
          */
-        public CurrentCost(CostResult cost, long monthlySavings, long annualSavings) {
-            this(cost, monthlySavings, annualSavings, null);
-        }
-
-        /** 6개월 절감(D-51). 음수면 음수 그대로. */
-        @com.fasterxml.jackson.annotation.JsonProperty("semiannualSavings")
-        public long semiannualSavings() {
-            return monthlySavings * 6;
+        public CurrentCost(CostResult cost, long monthlySavings, Long annualSavings, Long semiannualSavings) {
+            this(cost, monthlySavings, annualSavings, semiannualSavings, null);
         }
     }
 

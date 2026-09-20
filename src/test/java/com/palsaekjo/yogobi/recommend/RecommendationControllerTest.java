@@ -26,13 +26,13 @@ class RecommendationControllerTest {
     private final java.security.Principal member = () -> "7";
     private final org.springframework.mock.web.MockHttpServletRequest http = new org.springframework.mock.web.MockHttpServletRequest();
 
-    private final CostResult best = new CostResult(42, "넷플플랜", "SKT", 55000, 68500, 13500, 162000,
+    private final CostResult best = new CostResult(42, "넷플플랜", "SKT", 55000, 68500, 13500, 162_000L,
             List.of(new BreakdownLine("기본료", 55000, "OFFICIAL", null)));
     private final RecommendationRequest request = new RecommendationRequest(
             new RecommendationRequest.Required(20, List.of(1L), null), null);
     private final List<MissingInput> missing = List.of(new MissingInput("hasFamilyBundle", "확인 필요", "마이페이지"));
     private final RecommendationResponse.CurrentCost current = new RecommendationResponse.CurrentCost(
-            new CostResult(7, "지금", "SKT", 70390, 70390, 0, 0, List.of()), 15390, 184680);
+            new CostResult(7, "지금", "SKT", 70390, 70390, 0, 0L, List.of()), 15390, 184_680L, 92_340L);
 
     /** 추천은 계산만 돌려준다 — 내레이터에 닿지 않는다. 설명 자리는 비어 나간다. */
     @Test

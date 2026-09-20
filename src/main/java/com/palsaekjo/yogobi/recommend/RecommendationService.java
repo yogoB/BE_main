@@ -167,11 +167,22 @@ public class RecommendationService {
         return new RecommendationResponse(accuracy, missing, results, candidates.size(), current, minimalChange);
     }
 
-    /** 현재 요금제를 1순위와 나란히 놓는다. 절감액은 여기서 만든다 — 화면이 두 금액을 빼지 않도록(원칙 2). */
+    /**
+     * 현재 요금제를 1순위와 나란히 놓는다. 절감액은 여기서 만든다 — 화면이 두 금액을 빼지 않도록(원칙 2).
+     *
+     * <p>기간 절감액은 <b>1순위가 그 기간 동안 같은 금액인지</b>에 달려 있다(G-66). 1순위가 기간 한정
+     * 특가이고 종료 후 금액을 모르면 그 기간의 차액도 모르므로 {@code null} 을 준다 — 0 이 아니다.
+     * 지금 요금제 쪽의 특가는 보지 않는다: 여기서 묻는 것은 "옮기면 얼마를 아끼나"이고 그 답은
+     * 옮겨 갈 요금제가 얼마나 오래 그 금액인지에 달려 있다.
+     */
     private static RecommendationResponse.CurrentCost currentCost(CostResult cost, List<CostResult> results,
             CurrentPlanExclusion excluded) {
-        long monthly = cost.monthlyTotal() - results.get(0).monthlyTotal();
-        return new RecommendationResponse.CurrentCost(cost, monthly, monthly * 12, excluded);
+        CostResult top = results.get(0);
+        long monthly = cost.monthlyTotal() - top.monthlyTotal();
+        return new RecommendationResponse.CurrentCost(cost, monthly,
+                top.annualSavings() == null ? null : monthly * 12,
+                top.semiannualSavings() == null ? null : monthly * 6,
+                excluded);
     }
 
     /** {@code currentPlanId} 가 있으면 카탈로그에서 찾는다. 없는 id 는 막지 않고 빈 값으로 둔다(G-30 d). */
@@ -285,11 +296,17 @@ public class RecommendationService {
         return new CalculatorResponse(accuracy, missing, result);
     }
 
+    /**
+     * 계산 결과를 응답 모양으로 옮긴다. <b>기간 한정 특가를 같이 싣는다</b>(G-66) — 그래야
+     * 6·12개월 절감액이 "특가가 계속된다고 치고" 곱한 값인지, 아니면 모르는 값인지 갈린다.
+     */
     private CostResult toResult(CandidatePlan candidate, CostBreakdown breakdown) {
         var lines = breakdown.lines().stream().map(RecommendationService::toLine).toList();
-        return new CostResult(candidate.plan().id(), candidate.plan().name(), candidate.carrier(),
+        var plan = candidate.plan();
+        return new CostResult(plan.id(), plan.name(), candidate.carrier(),
                 breakdown.effectiveMonthlyCost(), breakdown.baseline(),
-                breakdown.monthlySavings(), breakdown.annualSavings(), lines);
+                breakdown.monthlySavings(), breakdown.annualSavings(), lines)
+                .withPromotion(plan.promoMonths(), plan.regularPrice());
     }
 
     private static BreakdownLine toLine(CostLine line) {
@@ -334,37 +351,34 @@ public class RecommendationService {
                 "지금 쓰는 망과 옮길 수 있는 망은 다를 수 있어요. 통신 규격을 '상관없어요'로 두면 같이 봐요")));
     }
 
-    /** 요금제 이름에 박힌 <b>프로모션 기간</b>. 약정 24개월은 프로모션이 아니라 잡지 않는다. */
-    private static final java.util.regex.Pattern PROMO_MONTHS =
-            java.util.regex.Pattern.compile("(\\d{1,2})\\s*개월");
-
     /**
-     * 1순위 요금제 이름에 <b>기간 표기</b>가 있으면 그대로 옮겨 적는다(2026-09-21, 사용자 제보).
+     * 1순위 요금제에 <b>기간 한정 특가</b>가 걸려 있으면 알린다(G-66, 사용자 지시 2026-09-21).
      *
-     * <p>알뜰폰은 3·6·7개월 단위 특가가 흔한데 <b>카탈로그에 그 기간을 담을 칸이 없다</b> —
-     * {@code mobile_plan} 에는 {@code base_price} 와 약정할인 12/24개월뿐이다. 그래서 같은 표에
-     * 두 가지가 섞여 있다: 프로모션가를 {@code base_price} 에 넣은 것(이지모바일 7개월 특가 46,200원)과,
-     * 정상가를 넣고 프로모션은 이름에만 남긴 것(큰사람커넥트 "12개월간 10원" 27,500원).
+     * <p>처음에는 요금제 <b>이름</b>에서 "7개월" 을 정규식으로 긁었다. 이름은 출처에서 온 문자열이라
+     * 거짓은 아니지만, 그걸로는 <b>계산을 고칠 수 없었다</b> — 연 절감액은 여전히 월 × 12 였다.
+     * 이제 {@code mobile_plan.promo_months}·{@code regular_price} 가 카탈로그에 있고 계산이 그것을 본다.
+     * 안내는 계산과 <b>같은 값</b>에서 나온다. 문구와 숫자가 갈라질 자리를 없앤 것이다.
      *
-     * <p><b>연 절감액은 월 × 12 다.</b> 프로모션 종료를 모르므로 이 요금제들에서는 그 값이 틀린다.
-     * 화면의 6·12개월 토글도 같은 값을 쓴다. 고치려면 기간과 정상가를 담는 칸이 필요하고,
-     * 그건 CSV·계산기·화면을 같이 건드리는 일이다(발표 후 과제).
-     *
-     * <p>그때까지는 <b>이름이 말하는 것만</b> 옮긴다. "특가가 N개월이다" 라고 우리가 주장하지 않고
-     * "이름에 N개월이라고 적혀 있다" 라고만 말한다 — 우리가 모르는 것을 아는 척하지 않는 유일한 방법이다.
+     * <p>특가 종료 후 금액을 아는 경우와 모르는 경우를 나눠 말한다. 모르면 기간 절감액이 {@code null} 이고,
+     * 화면은 그 자리를 비운다 — 0 을 넣으면 "안 아낀다"는 거짓말이 된다.
      */
     private static void addPromotionPeriodNotice(List<MissingInput> missing, List<CostResult> results) {
-        if (results.isEmpty()) {
+        if (results.isEmpty() || results.get(0).promoMonths() == null) {
             return;
         }
-        String name = results.get(0).planName();
-        var found = PROMO_MONTHS.matcher(name);
-        if (!found.find() || Integer.parseInt(found.group(1)) >= 24) {
-            return;   // 24개월 이상은 약정이지 특가가 아니다
+        CostResult top = results.get(0);
+        int months = top.promoMonths();
+        if (top.regularPrice() != null) {
+            missing.add(new MissingInput("promotionPeriod",
+                    "1순위 요금제는 " + months + "개월 특가예요 — 이후에는 월 "
+                            + String.format("%,d", top.regularPrice()) + "원이라 그만큼 반영해 계산했어요",
+                    "특가가 끝나는 시점을 달력에 적어 두세요"));
+            return;
         }
         missing.add(new MissingInput("promotionPeriod",
-                "1순위 요금제 이름에 '" + found.group() + "' 이라는 기간 표기가 있어요 — 특가 기간이 끝난 뒤 금액은 저희가 모릅니다",
-                "통신사에서 기간 종료 후 월 요금을 확인해 주세요. 연 절감액은 지금 금액이 12개월 이어진다고 보고 계산해요"));
+                "1순위 요금제는 " + months + "개월 특가인데 그 뒤 금액을 저희가 모릅니다 — 그래서 "
+                        + months + "개월이 넘는 기간의 절감액은 비워 뒀어요",
+                "통신사에서 특가 종료 후 월 요금을 확인해 주세요. 확인되면 저희 카탈로그에도 반영할게요"));
     }
 
     /**

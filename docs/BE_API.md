@@ -218,7 +218,10 @@ AI 연결과 내부 인증은 BE가 담당하며 프론트에는 AI 주소·내�
         "monthlyTotal": 45000,
         "baseline": 63500,
         "monthlySavings": 18500,
-        "annualSavings": 222000,
+        "annualSavings": 222000,        // **null 일 수 있다**(G-66). 아래 promoMonths 참고 — 0 이 아니라 "모른다"이다
+        "semiannualSavings": 111000,    // 같은 규칙. 7개월 특가는 6개월은 알고 12개월은 모른다
+        "promoMonths": null,            // 기간 한정 특가가 유지되는 개월 수. null=특가 아님
+        "regularPrice": null,           // 특가 종료 후 월 요금. null=확인 못 함(추정값을 넣지 않는다)
         "breakdown": [
           { "label": "5G OTT택1 기본료", "amount": 50000, "provenance": "OFFICIAL", "note": null },
           { "label": "약정할인", "amount": -5000, "provenance": "DERIVED", "note": null },

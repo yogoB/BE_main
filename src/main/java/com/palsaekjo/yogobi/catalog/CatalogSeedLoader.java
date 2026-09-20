@@ -42,6 +42,7 @@ public class CatalogSeedLoader implements ApplicationRunner {
         // 합본에 없는 요금제는 물러난다(G-34). 업서트만 하면 이름을 고친 옛 행("케이티엠모바일")과
         // 개발용 더미("5G 웨이브팩" 999999MB)가 영원히 남아 추천 1순위에 올라온다 — 운영에서 실제로 그랬다.
         loadMobilePlans(parts.get("mobile_plan"), true);
+        loadMobilePlanPromos(parts.get("mobile_plan_promo"));
         loadPlanBenefits(parts.get("plan_benefit"));
     }
 
@@ -267,6 +268,59 @@ public class CatalogSeedLoader implements ApplicationRunner {
         try (var statement = connection.createStatement(); var rs = statement.executeQuery(sql)) {
             rs.next();
             return rs.getInt(1);
+        }
+    }
+
+    /**
+     * 기간 한정 특가를 요금제에 붙인다(2026-09-21). {@code (carrier, plan_name)} 으로 매칭한다.
+     *
+     * <p><b>매번 전부 지우고 다시 쓴다.</b> 업서트만 하면 특가가 끝나 합본에서 행을 지워도 DB 에는
+     * 영원히 남는다 — G-53 에서 구독 등급이 그랬고, 특가는 <b>끝나는 것이 정상</b>이라 더 위험하다.
+     *
+     * <p>{@code regular_price} 가 비어 있으면 NULL 로 둔다. 특가 종료 후 금액을 모른다는 뜻이고,
+     * 그 상태에서 기간 절감액은 숫자를 내지 않는다. 추정값을 넣으면 그게 제일 위험한 숫자가 된다.
+     *
+     * <p>매칭 안 되는 행은 조용히 버리지 않고 <b>전체를 실패시킨다</b> — 요금제 이름을 고쳤는데
+     * 특가 행만 옛 이름으로 남으면 특가가 통째로 사라지고 아무도 모른다(plan_benefit 과 같은 규칙).
+     */
+    void loadMobilePlanPromos(Resource promos) throws SQLException, IOException {
+        try (var connection = dataSource.getConnection()) {
+            boolean ownTransaction = connection.getAutoCommit();
+            if (ownTransaction) connection.setAutoCommit(false);
+            try {
+                execute(connection, """
+                        CREATE TEMP TABLE seed_mobile_plan_promo (
+                            carrier TEXT, plan_name TEXT, promo_months TEXT, regular_price TEXT,
+                            source_url TEXT, collected_at TEXT
+                        ) ON COMMIT DROP""");
+                copy(connection, "mobile_plan_promo", promos);
+                try (var check = connection.createStatement();
+                        var rs = check.executeQuery("""
+                                SELECT count(*) FROM seed_mobile_plan_promo s
+                                WHERE btrim(s.plan_name) <> '' AND NOT EXISTS (
+                                    SELECT 1 FROM mobile_plan m JOIN carrier c ON c.id = m.carrier_id
+                                    WHERE c.name = btrim(s.carrier) AND m.name = btrim(s.plan_name))""")) {
+                    if (rs.next() && rs.getInt(1) > 0) {
+                        throw new IllegalArgumentException("mobile_plan_promo 에 없는 요금제(통신사+요금제명) "
+                                + rs.getInt(1) + "건을 참조합니다. mobile_plan 시드와 이름을 맞추세요.");
+                    }
+                }
+                execute(connection, """
+                        UPDATE mobile_plan SET promo_months = NULL, regular_price = NULL
+                         WHERE promo_months IS NOT NULL OR regular_price IS NOT NULL;
+
+                        UPDATE mobile_plan m SET
+                            promo_months  = nullif(btrim(s.promo_months), '')::INT,
+                            regular_price = nullif(btrim(s.regular_price), '')::BIGINT
+                        FROM seed_mobile_plan_promo s JOIN carrier c ON c.name = btrim(s.carrier)
+                        WHERE m.carrier_id = c.id AND m.name = btrim(s.plan_name)
+                          AND btrim(s.promo_months) <> '';
+                        """);
+                if (ownTransaction) connection.commit();
+            } catch (SQLException | IOException | RuntimeException e) {
+                if (ownTransaction) connection.rollback();
+                throw e;
+            }
         }
     }
 

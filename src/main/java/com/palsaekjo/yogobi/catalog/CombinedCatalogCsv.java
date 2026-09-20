@@ -23,12 +23,16 @@ public final class CombinedCatalogCsv {
 
     /** 적재 순서. 혜택은 요금제를, 번들은 티어를 참조하므로 순서를 바꾸지 않는다. */
     public static final List<String> DATASETS = List.of(
-            "mobile_plan", "subscription_service", "subscription_tier", "plan_benefit", "bundle_product");
+            "mobile_plan", "mobile_plan_promo", "subscription_service", "subscription_tier",
+            "plan_benefit", "bundle_product");
     private static final String MARKER = "#@ ";
     private static final String HEADER = """
             # 요고비 카탈로그 원천 데이터셋 — 단일 원본(source of truth). DB는 이 파일의 투영이며 CRUD는 이 파일을 되쓴다.
             # 형식: '#@ <dataset>' 줄이 섹션 경계다. 각 섹션의 첫 비주석 줄은 CSV 헤더, 이후가 데이터 행이다. 그 밖의 '#' 줄은 주석.
-            # 데이터셋: mobile_plan(통신요금) · subscription_service/subscription_tier(구독서비스) · plan_benefit(혜택) · bundle_product(번들).
+            # 데이터셋: mobile_plan(통신요금) · mobile_plan_promo(기간 한정 특가) · subscription_service/subscription_tier(구독서비스) · plan_benefit(혜택) · bundle_product(번들).
+            # mobile_plan_promo: 기간 한정 특가. (carrier, plan_name) 으로 mobile_plan 에 붙는다.
+            #   promo_months  특가가 유지되는 개월 수. 요금제 이름에 적힌 값을 그대로 읽었고 출처는 그 이름이 온 공식 페이지와 같다.
+            #   regular_price 특가 종료 후 월 요금. 모르면 비워 둔다 — 지어내지 않는다. 비어 있으면 그 기간의 절감액을 숫자로 내지 않는다.
             """;
 
     private CombinedCatalogCsv() {

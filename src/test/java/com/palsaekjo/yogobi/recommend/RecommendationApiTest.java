@@ -636,56 +636,66 @@ class RecommendationApiTest {
     }
 
     /**
-     * G-65. 요금제 이름에 <b>기간 표기</b>가 있으면 그대로 옮겨 적는다(2026-09-21, 사용자 제보).
+     * G-66. 기간 한정 특가는 <b>모르면 모른다고 답한다</b>(2026-09-21, 사용자 지시).
      *
-     * <p>알뜰폰은 3·6·7개월 특가가 흔한데 <b>카탈로그에 그 기간을 담을 칸이 없다.</b> 그래서 같은 표에
-     * 두 가지가 섞여 있다 — 프로모션가를 {@code base_price} 에 넣은 것(이지모바일 "7개월 특가" 46,200원)과,
-     * 정상가를 넣고 프로모션은 이름에만 남긴 것(큰사람커넥트 "12개월간 10원" 27,500원).
-     * <b>연 절감액은 월 × 12 라 이 요금제들에서 틀린다.</b>
+     * <p>알뜰폰은 3·6·7개월 특가가 흔한데 카탈로그에 그 기간을 담을 칸이 없었다. 그래서 같은 표에
+     * 특가가를 {@code base_price} 에 넣은 것과 정상가를 넣고 특가는 이름에만 남긴 것이 섞여 있었고,
+     * <b>연 절감액(= 월 × 12)과 화면의 6·12개월 토글이 그 요금제들에서 틀린 값을 보여 주고 있었다.</b>
+     * 운영 1,706건 중 13건이다. 사용자가 실제 결과에서 찾았다.
      *
-     * <p>고치려면 기간·정상가 칸이 필요하고 CSV·계산기·화면을 같이 건드려야 한다(발표 후 과제).
-     * 그때까지는 <b>이름이 말하는 것만</b> 옮긴다 — "특가가 N개월이다" 라고 주장하지 않고
-     * "이름에 그렇게 적혀 있다" 라고만 말한다.
+     * <p>V32 가 {@code promo_months}·{@code regular_price} 를 더했다. 종료 후 금액을 알면 그만큼
+     * 반영하고, <b>모르면 그 기간의 절감액을 {@code null} 로 둔다</b> — 0 을 주면 "안 아낀다"는
+     * 다른 거짓말이 된다. 추정값은 넣지 않는다(D-43).
      */
     @Test
-    void g65_aPlanNameThatMentionsMonthsIsFlagged() throws Exception {
+    void g66_aPromotionalPlanDoesNotPretendToKnowThePeriodTotal() throws Exception {
         jdbc.execute("""
-                INSERT INTO mobile_plan(id,carrier_id,name,network_type,base_price,data_mb,voice_min,sms_cnt,source_url,collected_at)
-                VALUES (7,2,'[무제한]7개월 특가 이지하게','LTE',1000,999999,999999,9999,'http://seed','2026-09-21')""");
+                INSERT INTO mobile_plan(id,carrier_id,name,network_type,base_price,data_mb,voice_min,sms_cnt,
+                    promo_months,regular_price,source_url,collected_at)
+                VALUES (7,2,'7개월 특가(이후 모름)','LTE',1000,999999,999999,9999,7,NULL,'http://seed','2026-09-21')""");
         try {
-            // a — 1순위 이름에 기간이 있으면 알린다.
+            // a — 7개월 특가라 6개월은 알고 12개월은 모른다. 기간마다 따로 판정한다.
             mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
                     {"required":{"monthlyDataGb":20,"wantedServiceIds":[1]},"optional":{"contractType":"NONE"}}"""))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.data.results[0].planName").value("[무제한]7개월 특가 이지하게"))
+                    .andExpect(jsonPath("$.data.results[0].planName").value("7개월 특가(이후 모름)"))
+                    .andExpect(jsonPath("$.data.results[0].monthlySavings").isNumber())
+                    .andExpect(jsonPath("$.data.results[0].semiannualSavings").isNumber())
+                    .andExpect(jsonPath("$.data.results[0].annualSavings").doesNotExist())
+                    .andExpect(jsonPath("$.data.results[0].promoMonths").value(7))
                     .andExpect(jsonPath("$.data.missingInputs[?(@.field=='promotionPeriod')].impact")
-                            .value(org.hamcrest.Matchers.hasItem(org.hamcrest.Matchers.containsString("'7개월' 이라는 기간 표기"))));
+                            .value(org.hamcrest.Matchers.hasItem(org.hamcrest.Matchers.containsString("그 뒤 금액을 저희가 모릅니다"))));
         } finally {
             jdbc.execute("DELETE FROM mobile_plan WHERE id = 7");
         }
 
-        // b — 기간 표기가 없으면 말하지 않는다. 없는 걱정을 만들지 않는다.
-        mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
-                {"required":{"monthlyDataGb":20,"wantedServiceIds":[1]},"optional":{"contractType":"NONE"}}"""))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.results[0].planName").value("넷플플랜"))
-                .andExpect(jsonPath("$.data.missingInputs[?(@.field=='promotionPeriod')]")
-                        .value(org.hamcrest.Matchers.empty()));
-
-        // c — 24개월은 약정이지 특가가 아니다. 잡지 않는다.
+        // b — 종료 후 금액을 알면 기간 값을 낸다. 안내 문구도 그 금액을 적는다.
         jdbc.execute("""
-                INSERT INTO mobile_plan(id,carrier_id,name,network_type,base_price,data_mb,voice_min,sms_cnt,source_url,collected_at)
-                VALUES (8,2,'24개월 약정 요금제','LTE',1000,999999,999999,9999,'http://seed','2026-09-21')""");
+                INSERT INTO mobile_plan(id,carrier_id,name,network_type,base_price,data_mb,voice_min,sms_cnt,
+                    promo_months,regular_price,source_url,collected_at)
+                VALUES (8,2,'7개월 특가(이후 3만원)','LTE',1000,999999,999999,9999,7,30000,'http://seed','2026-09-21')""");
         try {
             mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
                     {"required":{"monthlyDataGb":20,"wantedServiceIds":[1]},"optional":{"contractType":"NONE"}}"""))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.data.results[0].planName").value("24개월 약정 요금제"))
-                    .andExpect(jsonPath("$.data.missingInputs[?(@.field=='promotionPeriod')]")
-                            .value(org.hamcrest.Matchers.empty()));
+                    .andExpect(jsonPath("$.data.results[0].planName").value("7개월 특가(이후 3만원)"))
+                    .andExpect(jsonPath("$.data.results[0].annualSavings").isNumber())
+                    .andExpect(jsonPath("$.data.results[0].regularPrice").value(30000))
+                    .andExpect(jsonPath("$.data.missingInputs[?(@.field=='promotionPeriod')].impact")
+                            .value(org.hamcrest.Matchers.hasItem(org.hamcrest.Matchers.containsString("월 30,000원"))));
         } finally {
             jdbc.execute("DELETE FROM mobile_plan WHERE id = 8");
         }
+
+        // c — 특가가 아니면 아무 말도 하지 않고 기간 값도 그대로 나간다.
+        mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
+                {"required":{"monthlyDataGb":20,"wantedServiceIds":[1]},"optional":{"contractType":"NONE"}}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.results[0].planName").value("넷플플랜"))
+                .andExpect(jsonPath("$.data.results[0].annualSavings").isNumber())
+                .andExpect(jsonPath("$.data.results[0].promoMonths").doesNotExist())
+                .andExpect(jsonPath("$.data.missingInputs[?(@.field=='promotionPeriod')]")
+                        .value(org.hamcrest.Matchers.empty()));
     }
 
     private void assertGap(String kind, String queryText, int expectedCount) {
