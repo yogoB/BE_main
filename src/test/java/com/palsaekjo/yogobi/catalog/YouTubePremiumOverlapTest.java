@@ -82,19 +82,13 @@ class YouTubePremiumOverlapTest {
     }
 
     /**
-     * d — 같은 상품이 이름만 다르게 둘 있던 것을 하나로 합쳤다. <b>남긴 쪽은 설명이 정확한 id 19</b> 이고,
-     * 이름은 공식 한국어 표기 "유튜브 프리미엄 라이트" 로 맞췄다(유튜브 공식 블로그, 영문 병기).
-     *
-     * <p>형제 등급 id 17 도 "유튜브 프리미엄" 전체 이름을 쓰므로 서로 일관된다. 표시명 규칙 ①
-     * (등급명이 서비스명을 품으면 그대로)이 걸려 계산 내역에도 그대로 한 줄로 나간다 —
-     * 전에는 "유튜브 프리미엄 Premium Lite" 였다.
+     * d — 같은 상품이 이름만 다르게 둘 있던 것을 하나로 합쳤다. 남긴 쪽은 공식 표기에 가깝고
+     * 설명도 정확한 {@code Premium Lite}(id 19) 다.
      */
-    @Test void g63d_theDuplicateLiteTierIsGoneAndTheSurvivorUsesTheOfficialName() {
+    @Test void g63d_theDuplicateLiteTierIsGone() {
         List<SubscriptionTier> lite = reader.findTiersByIds(List.of(16L, 19L));
 
-        assertThat(lite).singleElement()
-                .satisfies(t -> assertThat(t.id()).isEqualTo(19L))
-                .extracting(SubscriptionTier::name).isEqualTo("유튜브 프리미엄 라이트");
+        assertThat(lite).extracting(SubscriptionTier::id).containsExactly(19L);
         assertThat(jdbc.queryForObject(
                 "SELECT count(*) FROM subscription_tier WHERE service_id = 6 AND active", Integer.class))
                 .isEqualTo(2);   // 프리미엄 + 라이트

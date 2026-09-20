@@ -1769,7 +1769,7 @@ id,service_id,name,price,concurrent_streams,quality,note,currency,tax_included
 15,5,프리미엄,12900,4,4K,,KRW,true
 17,6,유튜브 프리미엄,14900,,,YouTube Music 포함,KRW,true
 18,7,와우 멤버십,7890,,,쿠팡 와우 혜택과 쿠팡플레이 이용,KRW,true
-19,6,유튜브 프리미엄 라이트,8500,,,대부분의 비음악 영상 광고 없이; 대상 영상 백그라운드·오프라인 재생,KRW,true
+19,6,Premium Lite,8500,,,대부분의 비음악 영상 광고 없이; 대상 영상 백그라운드·오프라인 재생,KRW,true
 20,8,Apple TV,6500,,,Apple 오리지널 콘텐츠,KRW,true
 21,9,스트리밍 플러스,11990,,,스트리밍 + 모바일 오프라인,KRW,true
 22,9,Hi-Fi 스트리밍,13200,,고음질,FLAC 고음질 스트리밍,KRW,true
