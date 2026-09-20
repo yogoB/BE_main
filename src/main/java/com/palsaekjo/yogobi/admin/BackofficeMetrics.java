@@ -385,6 +385,7 @@ public class BackofficeMetrics {
             out.put("unique", totals);           // 창 전체 사람 수(중복 제거)
             out.put("conversion", conversion);   // 백분율. 모집단이 달라 못 내는 단계는 null 이다
             out.put("uniqueDaily", unique);
+            out.put("lastSeen", lastSeen());     // null 인 종류는 한 번도 안 쌓였다는 뜻이다
             out.put("contaminatedUntil", "2026-09-18");   // 횟수 열은 이 날까지 결과 화면 무한 호출로 부풀어 있다
             return out;
         } catch (org.springframework.dao.DataAccessException e) {
@@ -393,6 +394,27 @@ public class BackofficeMetrics {
             log.warn("퍼널 집계를 읽지 못했습니다: {}", e.getMessage());
             return Map.of("windowDays", 14, "unavailable", true);
         }
+    }
+
+    /**
+     * 단계별로 <b>마지막으로 쌓인 날</b>. 한 번도 없으면 {@code null} 이다.
+     *
+     * <p>집계 실패는 삼켜진다 — 지표 때문에 기능이 멈추면 안 되기 때문이다. 그 대가로 화면에서
+     * "아무도 안 했다"와 "못 세고 있다"가 같아 보인다. 실제로 {@code funnel_daily} 의 CHECK 때문에
+     * CALENDAR_SHOWN·RESULT_SAVED 가 2026-09-18~21 사흘 동안 통째로 안 쌓였는데 그렇게 보였다(V31).
+     * 그래서 표에서 읽지 않고 <b>{@link FunnelCounter#ALL} 을 기준으로 좌외부조인</b>한다 —
+     * 행이 아예 없는 종류가 목록에서 사라지지 않고 {@code null} 로 드러난다. 그게 이 값의 전부다.
+     */
+    private Map<String, Object> lastSeen() {
+        var seen = new java.util.HashMap<String, Object>();
+        for (Map<String, Object> row : jdbc.queryForList(
+                "SELECT kind, to_char(max(day), 'YYYY-MM-DD') AS last FROM funnel_event GROUP BY kind"))
+            seen.put((String) row.get("kind"), row.get("last"));
+
+        var out = new LinkedHashMap<String, Object>();
+        for (String kind : new java.util.TreeSet<>(com.palsaekjo.yogobi.common.FunnelCounter.ALL))
+            out.put(kind, seen.get(kind));
+        return out;
     }
 
     /**

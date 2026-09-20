@@ -238,17 +238,34 @@ class FunnelCounterTest {
      * 목록을 고치지 않아도 여기서 자동으로 걸린다.
      */
     @Test void g57f_everyKindActuallyLandsInBothTables() throws Exception {
-        var kinds = new java.util.TreeSet<String>(FunnelCounter.CLIENT_REPORTED);
+        var declared = new java.util.TreeSet<String>();
         for (var f : FunnelCounter.class.getDeclaredFields())
             if (f.getType() == String.class && java.lang.reflect.Modifier.isStatic(f.getModifiers())
                     && java.lang.reflect.Modifier.isPublic(f.getModifiers()))
-                kinds.add((String) f.get(null));
-        assertThat(kinds).hasSizeGreaterThanOrEqualTo(7);   // 상수를 지웠는데 통과하는 일은 없게 한다
+                declared.add((String) f.get(null));
+        assertThat(declared).hasSizeGreaterThanOrEqualTo(5);   // 상수를 지웠는데 통과하는 일은 없게 한다
+        // 대시보드가 "한 번도 안 쌓인 종류"를 찾을 때 쓰는 집합이다. 여기서 빠지면 그 종류는
+        // 표에 행이 없어도 화면에서 사라져 버린다 — 이번 사고가 정확히 그 모양이었다.
+        assertThat(FunnelCounter.ALL).containsAll(declared).containsAll(FunnelCounter.CLIENT_REPORTED);
 
-        for (String kind : kinds) {
+        for (String kind : new java.util.TreeSet<>(FunnelCounter.ALL)) {
             counter.record(kind, "u:1");
             assertThat(counted(kind)).as("%s 가 funnel_daily 에 없다", kind).isEqualTo(1);
             assertThat(events(kind)).as("%s 가 funnel_event 에 없다", kind).isEqualTo(1);
         }
+    }
+
+    /**
+     * G-57 g — <b>한 번도 안 쌓인 종류가 목록에서 사라지지 않는다.</b> 표를 group by 로만 읽으면
+     * 행이 없는 종류는 결과에 아예 안 나오고, 화면에서 "아무도 안 했다"와 구분되지 않는다.
+     * 이번 사고(CALENDAR_SHOWN·RESULT_SAVED 가 사흘간 통째로 누락)를 눈으로 잡는 장치다.
+     */
+    @Test void g57g_lastSeenListsEveryKindIncludingTheOnesNeverRecorded() {
+        counter.record(FunnelCounter.GATE_SHOWN, "ip:203.0.113.9");
+
+        var lastSeen = part("lastSeen");
+        assertThat(lastSeen.keySet()).isEqualTo(new java.util.TreeSet<>(FunnelCounter.ALL));
+        assertThat(lastSeen.get(FunnelCounter.GATE_SHOWN)).isNotNull();
+        assertThat(lastSeen.get(FunnelCounter.RESULT_SAVED)).isNull();   // 없으면 null — 키가 사라지지 않는다
     }
 }

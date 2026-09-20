@@ -45,6 +45,19 @@ public class FunnelCounter {
     public static final java.util.Set<String> CLIENT_REPORTED =
             java.util.Set.of("INPUT_STARTED", "INPUT_COMPLETED");
 
+    /** 서버가 스스로 관측하는 단계. 화면에서 받지 않는다 — 받으면 조회 수를 요청 한 번으로 부풀릴 수 있다. */
+    public static final java.util.Set<String> SERVER_OBSERVED =
+            java.util.Set.of(GATE_SHOWN, REPORT_SHOWN, MEMBER_LOGIN, CALENDAR_SHOWN, RESULT_SAVED);
+
+    /**
+     * 쌓일 수 있는 모든 단계. <b>대시보드가 "한 번도 안 쌓인 종류"를 찾는 데 쓴다</b> — 집계 실패는
+     * 삼켜지므로(기능이 지표 때문에 멈추면 안 된다) 표에 행이 없는 것과 아무도 안 한 것이 같아 보인다.
+     * 종류를 여기 적어 두면 <b>행이 없는 것 자체가 화면에 뜬다.</b> G-57 f 가 상수를 훑어 누락을 막는다.
+     */
+    public static final java.util.Set<String> ALL =
+            java.util.stream.Stream.concat(SERVER_OBSERVED.stream(), CLIENT_REPORTED.stream())
+                    .collect(java.util.stream.Collectors.toUnmodifiableSet());
+
     private final JdbcTemplate jdbc;
 
     public FunnelCounter(JdbcTemplate jdbc) {
