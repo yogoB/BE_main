@@ -1,14 +1,15 @@
 package com.palsaekjo.yogobi.privacy;
 
 import java.time.Instant;
+import java.io.Serializable;
 import java.util.List;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 수집·이용 동의 조회·변경. 필수(ESSENTIAL)는 가입 시 기록하며 철회 불가(계약 이행 근거).
- * 선택(MARKETING)만 이 서비스로 동의/철회한다.
+ * 수집·이용 동의 조회·변경. 필수(ESSENTIAL)는 OAuth 직전 확인해 가입·로그인 시 기록하며
+ * 철회 불가(계약 이행 근거). 선택 항목은 체크한 경우에만 기록한다.
  *
  * <h2>처리방침 버전이 오르면</h2>
  * 기존 기록의 {@code policy_version} 이 뒤처진다. 두 항목의 법적 근거가 달라 처리도 다르다.
@@ -33,6 +34,10 @@ public class ConsentService {
                           Instant agreedAt, Instant withdrawnAt) {
     }
 
+    /** OAuth 직전에 받은 선택 동의. 필수 항목은 이 값이 만들어지기 전에 검증한다. */
+    public record LoginConsent(boolean savingsAlerts, boolean marketing) implements Serializable {
+    }
+
     public List<Consent> view(long userId) {
         return jdbc.query(
                 "SELECT item, policy_version, agreed_at, withdrawn_at FROM user_consent WHERE user_id=? ORDER BY item",
@@ -43,18 +48,53 @@ public class ConsentService {
                 userId);
     }
 
+    /** 가입·로그인 화면에서 확인한 필수 동의와 선택한 항목만 현재 버전으로 기록한다. */
+    @Transactional
+    public void recordLogin(long userId, LoginConsent choices) {
+        agree(userId, "ESSENTIAL");
+        if (choices.savingsAlerts()) agree(userId, "SAVINGS_ALERT");
+        if (choices.marketing()) agree(userId, "MARKETING");
+    }
+
+    private void agree(long userId, String item) {
+        jdbc.update("""
+                INSERT INTO user_consent(user_id, item, policy_version) VALUES (?, ?, ?)
+                ON CONFLICT (user_id, item)
+                DO UPDATE SET policy_version=EXCLUDED.policy_version, agreed_at=now(), withdrawn_at=NULL
+                """, userId, item, PrivacyPolicy.VERSION);
+    }
+
     /** 선택 항목(마케팅) 동의/철회. 동의는 최신 버전으로 갱신, 철회는 withdrawn_at 표시. */
     @Transactional
     public void setMarketing(long userId, boolean agree) {
+        setOptional(userId, "MARKETING", agree);
+    }
+
+    /**
+     * 절감 추천 알림 동의/철회(2026-09-21). 마케팅과 같은 규칙이다.
+     *
+     * <p>이 항목은 로그인할 때 체크만 받고 <b>끌 방법이 없었다.</b> 방침 7조가 처리정지를 약속하는데
+     * 화면에 길이 없으면 빈말이고, 동의를 근거로 처리하는 항목을 못 끄면 그 권리가 반쪽이다
+     * (프론트 세션이 마이페이지 동의 관리를 열면서 지적, 사용자 승인).
+     *
+     * <p>발송 기능은 아직 없다 — 지금 저장하는 것은 <b>동의 증적</b>뿐이다. 그래도 끄는 길은
+     * 먼저 열어 둔다: 보내기 시작한 다음에 끄는 길을 만들면 그 사이에 받은 사람은 끌 수 없었다.
+     */
+    @Transactional
+    public void setSavingsAlert(long userId, boolean agree) {
+        setOptional(userId, "SAVINGS_ALERT", agree);
+    }
+
+    /**
+     * 선택 동의 항목 하나를 켜고 끈다. <b>철회는 행을 지우지 않고 {@code withdrawn_at} 을 찍는다</b> —
+     * 언제 동의했고 언제 철회했는지가 증적이라, 지우면 그 기록이 사라진다.
+     */
+    private void setOptional(long userId, String item, boolean agree) {
         if (agree) {
-            jdbc.update("""
-                    INSERT INTO user_consent(user_id, item, policy_version) VALUES (?, 'MARKETING', ?)
-                    ON CONFLICT (user_id, item)
-                    DO UPDATE SET policy_version=EXCLUDED.policy_version, agreed_at=now(), withdrawn_at=NULL
-                    """, userId, PrivacyPolicy.VERSION);
+            agree(userId, item);
         } else {
-            jdbc.update("UPDATE user_consent SET withdrawn_at=now() WHERE user_id=? AND item='MARKETING' AND withdrawn_at IS NULL",
-                    userId);
+            jdbc.update("UPDATE user_consent SET withdrawn_at=now() WHERE user_id=? AND item=? AND withdrawn_at IS NULL",
+                    userId, item);
         }
     }
 

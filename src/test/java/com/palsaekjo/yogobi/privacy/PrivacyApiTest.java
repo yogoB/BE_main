@@ -111,6 +111,67 @@ class PrivacyApiTest {
         assertThat(id).isPositive();
     }
 
+    /**
+     * G-67. 절감 추천 알림도 <b>끌 수 있어야 한다</b>(2026-09-21, 사용자 승인).
+     *
+     * <p>이 항목은 로그인할 때 체크만 받고 끄는 길이 없었다. 처리방침 7조가 처리정지를 약속하는데
+     * 화면에도 API 에도 길이 없으면 <b>그 약속이 빈말</b>이다. 프론트 세션이 마이페이지 동의 관리를
+     * 열면서 지적했다.
+     *
+     * <p>발송 기능은 아직 없다 — 지금 남는 것은 동의 증적뿐이다. 그래도 끄는 길을 먼저 연다:
+     * <b>보내기 시작한 다음에 만들면 그 사이에 받은 사람은 끌 수 없었다.</b>
+     *
+     * <p>마케팅과 <b>같은 모양</b>이어야 한다. 같은 성격의 선택 항목을 다른 모양으로 두면 화면이
+     * 둘을 다르게 다루게 되고, 언젠가 한쪽만 고쳐진다.
+     */
+    @Test void g67_savingsAlertConsentCanBeTurnedOffAndBackOn() throws Exception {
+        long id = signup("alice@example.com");
+        // 로그인 시 선택하지 않았으면 행이 없다 — 기본은 미동의다.
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM user_consent WHERE user_id=? AND item='SAVINGS_ALERT'",
+                Integer.class, id)).isZero();
+
+        csrf();
+        mvc.perform(post("/api/v1/me/consent/savings-alert").session(session).cookie(cookies).header("X-CSRF-TOKEN", csrf)
+                .contentType("application/json").content("{\"agree\":true}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.agreed").value(true));
+        assertThat(jdbc.queryForObject("SELECT withdrawn_at FROM user_consent WHERE user_id=? AND item='SAVINGS_ALERT'",
+                java.sql.Timestamp.class, id)).isNull();
+
+        csrf();
+        mvc.perform(post("/api/v1/me/consent/savings-alert").session(session).cookie(cookies).header("X-CSRF-TOKEN", csrf)
+                .contentType("application/json").content("{\"agree\":false}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.agreed").value(false));
+        // 철회는 행을 지우지 않고 시각을 찍는다 — 언제 동의했고 언제 철회했는지가 증적이다.
+        assertThat(jdbc.queryForObject("SELECT withdrawn_at FROM user_consent WHERE user_id=? AND item='SAVINGS_ALERT'",
+                java.sql.Timestamp.class, id)).isNotNull();
+
+        // 다시 켤 수 있다. 철회가 끝이 아니다.
+        csrf();
+        mvc.perform(post("/api/v1/me/consent/savings-alert").session(session).cookie(cookies).header("X-CSRF-TOKEN", csrf)
+                .contentType("application/json").content("{\"agree\":true}")).andExpect(status().isOk());
+        assertThat(jdbc.queryForObject("SELECT withdrawn_at FROM user_consent WHERE user_id=? AND item='SAVINGS_ALERT'",
+                java.sql.Timestamp.class, id)).isNull();
+    }
+
+    /**
+     * G-67 b — 마케팅과 같은 방어를 받는다. CSRF·타입 중 하나라도 빠지면 거절한다.
+     *
+     * <p>비인증 POST 는 <b>401 이 아니라 403</b> 이다 — CSRF 필터가 인증보다 먼저 걸린다.
+     * 인증 여부는 같은 경로의 GET 으로 본다(마케팅 테스트도 그렇게 나뉘어 있다).
+     */
+    @Test void g67b_savingsAlertConsentIsGuardedLikeMarketing() throws Exception {
+        mvc.perform(get("/api/v1/me/consent")).andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/v1/me/consent/savings-alert")
+                .contentType("application/json").content("{\"agree\":true}")).andExpect(status().isForbidden());
+        long id = signup("alice@example.com");
+        mvc.perform(post("/api/v1/me/consent/savings-alert").cookie(cookies)
+                .contentType("application/json").content("{\"agree\":true}")).andExpect(status().isForbidden());
+        csrf();
+        mvc.perform(post("/api/v1/me/consent/savings-alert").session(session).cookie(cookies).header("X-CSRF-TOKEN", csrf)
+                .contentType("application/json").content("{\"agree\":\"yes\"}")).andExpect(status().isBadRequest());
+        assertThat(id).isPositive();
+    }
+
     /* ── G-27. 처리방침 버전이 오르면 (2026-09-17) ───────────────────────── */
 
     /** G-27a·d. 새 가입은 처음부터 현재 버전이고, 구버전 기록은 `current:false` 로 드러난다. */

@@ -696,6 +696,26 @@ class RecommendationApiTest {
             jdbc.execute("DELETE FROM mobile_plan WHERE id = 8");
         }
 
+        // c' — 바뀐 뒤 금액이 지금과 **같으면** 아무 말도 하지 않는다. 운영 13건 중 8건이 그렇다
+        //      (이름은 "7개월 특가" 인데 출처가 "월 46,200원 7개월 이후 46,200원/월"). 안 바뀌는데
+        //      바뀐다고 적으면 읽는 사람은 뭔가 바뀐다고 믿는다. 행은 그대로 둔다 — 확인했다는 사실이다.
+        jdbc.execute("""
+                INSERT INTO mobile_plan(id,carrier_id,name,network_type,base_price,data_mb,voice_min,sms_cnt,
+                    promo_months,regular_price,source_url,collected_at)
+                VALUES (9,2,'7개월 특가(금액 그대로)','LTE',1000,999999,999999,9999,7,1000,'http://seed','2026-09-21')""");
+        try {
+            mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
+                    {"required":{"monthlyDataGb":20,"wantedServiceIds":[1]},"optional":{"contractType":"NONE"}}"""))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.results[0].planName").value("7개월 특가(금액 그대로)"))
+                    .andExpect(jsonPath("$.data.results[0].promoMonths").value(7))   // 값은 그대로 싣는다
+                    .andExpect(jsonPath("$.data.results[0].annualSavings").isNumber())
+                    .andExpect(jsonPath("$.data.missingInputs[?(@.field=='promotionPeriod')]")
+                            .value(org.hamcrest.Matchers.empty()));                  // 말은 하지 않는다
+        } finally {
+            jdbc.execute("DELETE FROM mobile_plan WHERE id = 9");
+        }
+
         // c — 특가가 아니면 아무 말도 하지 않고 기간 값도 그대로 나간다.
         mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
                 {"required":{"monthlyDataGb":20,"wantedServiceIds":[1]},"optional":{"contractType":"NONE"}}"""))

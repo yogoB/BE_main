@@ -369,6 +369,13 @@ public class RecommendationService {
         CostResult top = results.get(0);
         int months = top.promoMonths();
         if (top.regularPrice() != null) {
+            // **금액이 안 바뀌면 아무 말도 하지 않는다**(2026-09-21, 프론트 세션 지적). 13건 중 8건이
+            // 그렇다 — 이름은 "7개월 특가" 인데 출처 페이지가 "월 46,200원 7개월 이후 46,200원/월" 이다.
+            // 지금도 46,200원인데 46,200원으로 바뀐다고 적으면 소음이고, 읽는 사람은 뭔가 바뀐다고 믿는다.
+            // 행은 그대로 둔다: "확인했고 안 바뀐다" 는 것도 아는 값이다.
+            if (top.planPriceDelta() != null && top.planPriceDelta() == 0) {
+                return;
+            }
             // 특가가 끝나면 **싸지는** 경우도 있다(장기할인 7743: "12개월 이후 4,800원/월").
             // 그래서 "특가가 끝나요"가 아니라 "금액이 바뀌어요"라고 적는다 — 내려가는데 겁을 주면 안 된다.
             String after = String.format("%,d", top.regularPrice());
