@@ -152,6 +152,143 @@ class BackofficeApiTest {
         assertThat((Integer) harvest.harvest().get("proposedMobilePlans")).isZero();
     }
 
+    /**
+     * G-55 — 스마트초이스가 확인한 청년 파생형 결손은 자동 검토 제안이 되고,
+     * 운영자가 승인한 뒤에만 합본 CSV와 DB에 함께 들어간다.
+     */
+    @Test
+    void requestedYouthPlanBecomesAReviewedProposalThenCsvAndDatabase() throws Exception {
+        String planName = "베이직21GB Y덤";
+        String key = "KT|" + planName;
+        jdbc.update("DELETE FROM catalog_change_request WHERE dataset = 'mobile_plan' AND row_key = ?", key);
+        jdbc.update("DELETE FROM catalog_candidate WHERE kind = 'MOBILE_PLAN' AND query_text = ?", "KT " + planName);
+        jdbc.update("DELETE FROM smartchoice_plan_snapshot WHERE carrier = 'KT' AND plan_name = ?", planName);
+        jdbc.update("INSERT INTO catalog_candidate(kind, query_text, status) VALUES ('MOBILE_PLAN', ?, 'REQUESTED')",
+                "KT " + planName);
+        jdbc.update("""
+                INSERT INTO smartchoice_plan_snapshot
+                    (carrier, plan_name, network_type, contract_months, plan_price, discounted_price,
+                     display_data, source_url, collected_at)
+                VALUES ('KT', ?, '5G', 0, 58000, 0, '42GB + 1Mbps 속도제어',
+                        'https://www.smartchoice.or.kr/', now())
+                """, planName);
+
+        harvest.harvest();
+
+        Map<String, Object> proposal = jdbc.queryForMap(
+                "SELECT id, action, payload::text, review_status FROM catalog_change_request "
+                        + "WHERE dataset = 'mobile_plan' AND row_key = ?", key);
+        assertThat(proposal).containsEntry("action", "CREATE").containsEntry("review_status", "VERIFIED");
+        assertThat((String) proposal.get("payload"))
+                .contains("\"data_mb\":\"43008\"")
+                .contains("\"age_limit\":\"청년\"")
+                .contains("https://product.kt.com/wDic/index.do");
+        assertThat(jdbc.queryForObject(
+                "SELECT status FROM catalog_candidate WHERE kind = 'MOBILE_PLAN' AND query_text = ?",
+                String.class, "KT " + planName)).isEqualTo("PENDING");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM mobile_plan WHERE name = ?", Integer.class, planName))
+                .isZero();
+
+        long requestId = ((Number) proposal.get("id")).longValue();
+        send(post("/api/v1/admin/catalog/requests/" + requestId + "/approve"), loginAsAdmin())
+                .andExpect(status().isOk());
+
+        assertThat(jdbc.queryForMap("SELECT data_mb, age_limit FROM mobile_plan WHERE name = ?", planName))
+                .containsEntry("data_mb", 43008L).containsEntry("age_limit", "청년");
+        assertThat(Files.readString(directory.resolve("catalog_combined.csv")))
+                .contains("KT," + planName + ",5G/LTE,58000,43008");
+        assertThat(jdbc.queryForObject(
+                "SELECT status FROM catalog_candidate WHERE kind = 'MOBILE_PLAN' AND query_text = ?",
+                String.class, "KT " + planName)).isEqualTo("VERIFIED");
+    }
+
+    /** G-55 — SKT의 명시적인 (청년) 파생형과 소수 GB 표기도 같은 안전 경로를 탄다. */
+    @Test
+    void requestedSktYouthPlanUsesItsOfficialBaseRowAndRoundsDecimalGb() {
+        String baseName = "G55 라이트";
+        String planName = baseName + " (청년)";
+        String key = "SKT|" + planName;
+        Long carrierId = jdbc.queryForObject("SELECT id FROM carrier WHERE name = 'SKT'", Long.class);
+        jdbc.update("DELETE FROM catalog_change_request WHERE dataset = 'mobile_plan' AND row_key = ?", key);
+        jdbc.update("DELETE FROM catalog_candidate WHERE kind = 'MOBILE_PLAN' AND query_text = ?", "SKT " + planName);
+        jdbc.update("DELETE FROM smartchoice_plan_snapshot WHERE carrier = 'SKT' AND plan_name = ?", planName);
+        jdbc.update("DELETE FROM mobile_plan WHERE carrier_id = ? AND name IN (?, ?)", carrierId, baseName, planName);
+        try {
+            jdbc.update("""
+                    INSERT INTO mobile_plan
+                        (carrier_id, name, network_type, base_price, data_mb, age_limit, source_url, collected_at)
+                    VALUES (?, ?, 'FIVE_G', 10000, 1024, 'ALL',
+                            'https://m.tworld.co.kr/product/renewal/mobileplan/list', DATE '2026-09-20')
+                    """, carrierId, baseName);
+            jdbc.update("INSERT INTO catalog_candidate(kind, query_text, status) VALUES ('MOBILE_PLAN', ?, 'REQUESTED')",
+                    "SKT " + planName);
+            jdbc.update("""
+                    INSERT INTO smartchoice_plan_snapshot
+                        (carrier, plan_name, network_type, contract_months, plan_price, discounted_price,
+                         display_data, source_url, collected_at)
+                    VALUES ('SKT', ?, '5G', 0, 10000, 0, '1.4GB + 400kbps 속도제어',
+                            'https://www.smartchoice.or.kr/', now())
+                    """, planName);
+
+            harvest.harvest();
+
+            Map<String, Object> proposal = jdbc.queryForMap(
+                    "SELECT payload::text, review_status FROM catalog_change_request "
+                            + "WHERE dataset = 'mobile_plan' AND row_key = ?", key);
+            assertThat(proposal).containsEntry("review_status", "VERIFIED");
+            assertThat((String) proposal.get("payload"))
+                    .contains("\"data_mb\":\"1434\"")
+                    .contains("https://m.tworld.co.kr/product/renewal/mobileplan/list");
+        } finally {
+            jdbc.update("DELETE FROM catalog_change_request WHERE dataset = 'mobile_plan' AND row_key = ?", key);
+            jdbc.update("DELETE FROM smartchoice_plan_snapshot WHERE carrier = 'SKT' AND plan_name = ?", planName);
+            jdbc.update("DELETE FROM catalog_candidate WHERE kind = 'MOBILE_PLAN' AND query_text = ?", "SKT " + planName);
+            jdbc.update("DELETE FROM mobile_plan WHERE carrier_id = ? AND name IN (?, ?)", carrierId, baseName, planName);
+        }
+    }
+
+    /** G-55-e — 데이터를 MB로 확정할 수 없으면 제안을 지어내지 않는다. */
+    @Test
+    void unparseableYouthPlanRemainsARequestedGap() {
+        String baseName = "G55 파서 원본";
+        String planName = baseName + " Y덤";
+        String key = "KT|" + planName;
+        Long carrierId = jdbc.queryForObject("SELECT id FROM carrier WHERE name = 'KT'", Long.class);
+        jdbc.update("DELETE FROM catalog_change_request WHERE dataset = 'mobile_plan' AND row_key = ?", key);
+        jdbc.update("DELETE FROM catalog_candidate WHERE kind = 'MOBILE_PLAN' AND query_text = ?", "KT " + planName);
+        jdbc.update("DELETE FROM smartchoice_plan_snapshot WHERE carrier = 'KT' AND plan_name = ?", planName);
+        jdbc.update("DELETE FROM mobile_plan WHERE carrier_id = ? AND name IN (?, ?)", carrierId, baseName, planName);
+        try {
+            jdbc.update("""
+                    INSERT INTO mobile_plan
+                        (carrier_id, name, network_type, base_price, data_mb, age_limit, source_url, collected_at)
+                    VALUES (?, ?, 'LTE_5G', 10000, 1024, 'ALL',
+                            'https://product.kt.com/wDic/index.do', DATE '2026-09-20')
+                    """, carrierId, baseName);
+            jdbc.update("INSERT INTO catalog_candidate(kind, query_text, status) VALUES ('MOBILE_PLAN', ?, 'REQUESTED')",
+                    "KT " + planName);
+            jdbc.update("""
+                    INSERT INTO smartchoice_plan_snapshot
+                        (carrier, plan_name, network_type, contract_months, plan_price, discounted_price,
+                         display_data, source_url, collected_at)
+                    VALUES ('KT', ?, '5G', 0, 10000, 0, '확인 필요', 'https://www.smartchoice.or.kr/', now())
+                    """, planName);
+
+            harvest.harvest();
+
+            assertThat(jdbc.queryForObject(
+                    "SELECT count(*) FROM catalog_change_request WHERE dataset = 'mobile_plan' AND row_key = ?",
+                    Integer.class, key)).isZero();
+            assertThat(jdbc.queryForObject(
+                    "SELECT status FROM catalog_candidate WHERE kind = 'MOBILE_PLAN' AND query_text = ?",
+                    String.class, "KT " + planName)).isEqualTo("REQUESTED");
+        } finally {
+            jdbc.update("DELETE FROM smartchoice_plan_snapshot WHERE carrier = 'KT' AND plan_name = ?", planName);
+            jdbc.update("DELETE FROM catalog_candidate WHERE kind = 'MOBILE_PLAN' AND query_text = ?", "KT " + planName);
+            jdbc.update("DELETE FROM mobile_plan WHERE carrier_id = ? AND name IN (?, ?)", carrierId, baseName, planName);
+        }
+    }
+
     /** 검수함에서 승인하면 그때 카탈로그가 바뀐다 — 백오피스가 실제로 동작하는지 끝까지 본다. */
     @Test
     void operatorApprovesHarvestedProposalFromBackoffice() throws Exception {

@@ -87,13 +87,15 @@ public class CatalogChangeRequests {
             throw e;
         }
         close(requestId, approverId, "APPROVED", null);
+        updateCandidate(request, "VERIFIED");
         log.info("카탈로그 변경 승인 #{} {} {} {} approver={}", requestId, action, dataset, key, approverId);
         return Map.of("requestId", requestId, "status", "APPROVED");
     }
 
     public Map<String, Object> reject(long approverId, long requestId, String note) {
-        claim(requestId);
+        Map<String, Object> request = claim(requestId);
         close(requestId, approverId, "REJECTED", note);
+        updateCandidate(request, "REJECTED");
         log.info("카탈로그 변경 거절 #{} approver={}", requestId, approverId);
         return Map.of("requestId", requestId, "status", "REJECTED");
     }
@@ -124,6 +126,22 @@ public class CatalogChangeRequests {
                 SET status = ?, decided_by = ?, decided_at = now(), decision_note = ?
                 WHERE id = ? AND status = 'PENDING'""",
                 status, approverId, cut(note), requestId);
+    }
+
+    /** 결손에서 시작한 요금제 CREATE 제안만 같은 상태로 닫는다. */
+    private void updateCandidate(Map<String, Object> request, String status) {
+        if (!"CREATE".equals(request.get("action")) || !"mobile_plan".equals(request.get("dataset"))) return;
+        String key = (String) request.get("row_key");
+        int separator = key == null ? -1 : key.indexOf('|');
+        if (separator < 1) return;
+        try {
+            jdbc.update("""
+                    UPDATE catalog_candidate SET status = ?, updated_at = now()
+                    WHERE kind = 'MOBILE_PLAN' AND query_text = ?
+                    """, status, key.substring(0, separator) + " " + key.substring(separator + 1));
+        } catch (RuntimeException e) {
+            log.warn("결손 상태 갱신 실패 — 카탈로그 처리는 유지: {} ({})", key, e.getClass().getSimpleName());
+        }
     }
 
     private Map<String, String> read(Map<String, Object> request) {

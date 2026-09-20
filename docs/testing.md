@@ -1108,3 +1108,23 @@ V27 부터 채워져 그 전 건은 비어 있고, 그 뒤 건도 그때의 카�
 
 둘 다 "상시 주황" 을 만든다. **카드가 늘 켜져 있으면 진짜 한 건이 섞여도 안 보인다.**
 
+
+## G-55. 스마트초이스가 확인한 청년 파생형 결손은 검수를 거쳐 원본에 들어간다 (2026-09-20)
+
+**검증**: `BackofficeApiTest` (`requestedYouthPlanBecomesAReviewedProposalThenCsvAndDatabase`,
+`requestedSktYouthPlanUsesItsOfficialBaseRowAndRoundsDecimalGb`, `unparseableYouthPlanRemainsARequestedGap`)
+
+스위프는 KT Y덤을 이미 받아 `catalog_candidate`에 남기지만, 이 표는 수집 우선순위일 뿐이라
+검수함과 연결되지 않았다. 스마트초이스를 원본으로 바꾸지 않고, **공식 기본 행과 이름으로
+대응되는 KT `Y덤`·SKT `(청년)` 파생형만** 기존 제안·승인 경로에 올린다.
+
+| | 상황 | 정답 |
+|---|---|---|
+| a | `베이직21GB Y덤` 결손 + 스냅숏 `42GB` | `CREATE` 제안·`VERIFIED`, `data_mb=43008`, `age_limit=청년` |
+| b | 제안 직후 | 결손만 `PENDING`; **CSV·DB는 불변** |
+| c | 운영자 승인 | 합본 CSV와 DB에 같이 반영, 결손은 `VERIFIED` |
+| d | SKT `(청년)` + `1.4GB` | 기본 행을 재사용하고 `data_mb=1434`로 반올림 |
+| e | 기본 행이 없거나 데이터 표기를 안전하게 MB로 바꿀 수 없음 | 제안하지 않고 결손으로 남김 |
+
+음성·문자·망·공식 URL은 각 통신사의 공식 기본 행을 재사용한다. 금액·총 데이터는 정확한 이름의
+스마트초이스 스냅숏에서만 읽는다. 이 대응이 없는 다른 결손까지 자동 승격하지 않는다.

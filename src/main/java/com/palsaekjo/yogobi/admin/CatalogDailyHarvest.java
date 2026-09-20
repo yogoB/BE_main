@@ -4,9 +4,12 @@ import com.palsaekjo.yogobi.catalog.CatalogAuditLog;
 import com.palsaekjo.yogobi.catalog.CatalogChangeRequests;
 import com.palsaekjo.yogobi.catalog.SubscriptionPriceOracle;
 import com.palsaekjo.yogobi.user.AdminAccount;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -42,6 +45,8 @@ public class CatalogDailyHarvest {
      * 조용히 지나간다. 요금제 5만원에서 100원은 0.2%지만 1,100원에서는 9%다.
      */
     private static final long SUBSCRIPTION_TOLERANCE_WON = 0;
+    private static final Pattern DATA_AMOUNT = Pattern.compile("^\\s*([0-9]+(?:\\.[0-9]+)?)\\s*(GB|MB)",
+            Pattern.CASE_INSENSITIVE);
 
     private final JdbcTemplate jdbc;
     private final CatalogChangeRequests requests;
@@ -98,6 +103,8 @@ public class CatalogDailyHarvest {
      * 스냅샷은 무약정(contract_months 최소) 정상가를 기준으로 본다 — 우리 `base_price` 와 같은 성격의 값이다.
      */
     private int harvestPlans(long proposer) {
+        int made = harvestMissingYouthPlans(proposer, planLimit);
+        if (made >= planLimit) return made;
         List<Map<String, Object>> differences = jdbc.queryForList("""
                 SELECT c.name AS carrier, m.name AS plan_name, m.base_price AS ours, s.plan_price AS theirs
                 FROM mobile_plan m
@@ -108,17 +115,96 @@ public class CatalogDailyHarvest {
                     ORDER BY s.contract_months ASC, s.collected_at DESC LIMIT 1) s ON TRUE
                 WHERE m.active AND abs(s.plan_price - m.base_price) > ?
                 ORDER BY abs(s.plan_price - m.base_price) DESC
-                LIMIT ?""", TOLERANCE_WON, planLimit);
+                LIMIT ?""", TOLERANCE_WON, planLimit - made);
 
-        int made = 0;
         for (Map<String, Object> row : differences) {
             String key = row.get("carrier") + "|" + row.get("plan_name");
             if (pending("mobile_plan", key)) continue;
             String price = String.valueOf(((Number) row.get("theirs")).longValue());
-            if (propose(proposer, "mobile_plan", key, Map.of("base_price", price),
+            if (propose(proposer, CatalogAuditLog.Action.UPDATE, "mobile_plan", key, Map.of("base_price", price),
                     "일일 수집(스마트초이스): 기존 " + row.get("ours") + "원 → " + price + "원")) made++;
         }
         return made;
+    }
+
+    /**
+     * 공식 기본 행과 정확히 대응되는 KT Y덤·SKT (청년) 결손만 CREATE 제안으로 올린다(G-55).
+     * 다른 결손은 음성·문자·가입 조건을 알 수 없으므로 자동 승격하지 않는다.
+     */
+    private int harvestMissingYouthPlans(long proposer, int limit) {
+        if (limit <= 0) return 0;
+        List<Map<String, Object>> rows = jdbc.queryForList("""
+                SELECT DISTINCT ON (g.id) g.id AS candidate_id,
+                       btrim(s.carrier) AS carrier, btrim(s.plan_name) AS plan_name,
+                       s.plan_price::text AS base_price, s.display_data,
+                       CASE m.network_type
+                           WHEN 'FIVE_G' THEN '5G' WHEN 'THREE_G' THEN '3G'
+                           WHEN 'LTE_5G' THEN '5G/LTE' ELSE m.network_type END AS network_type,
+                       coalesce(m.voice_min::text, '') AS voice_min,
+                       coalesce(m.sms_cnt::text, '') AS sms_cnt,
+                       coalesce(m.contract_discount_12m::text, '') AS contract_discount_12m,
+                       coalesce(m.contract_discount_24m::text, '') AS contract_discount_24m,
+                       m.source_url, m.collected_at::text AS collected_at
+                  FROM catalog_candidate g
+                  JOIN smartchoice_plan_snapshot s
+                    ON g.query_text = btrim(s.carrier) || ' ' || btrim(s.plan_name)
+                  JOIN carrier c
+                    ON replace(lower(btrim(c.name)), ' ', '') = replace(lower(btrim(s.carrier)), ' ', '')
+                  JOIN mobile_plan m
+                    ON m.carrier_id = c.id AND m.active AND m.name = CASE
+                        WHEN btrim(s.plan_name) LIKE '% Y덤'
+                            THEN left(btrim(s.plan_name), length(btrim(s.plan_name)) - length(' Y덤'))
+                        WHEN btrim(s.plan_name) LIKE '% (청년)'
+                            THEN left(btrim(s.plan_name), length(btrim(s.plan_name)) - length(' (청년)'))
+                        END
+                 WHERE g.kind = 'MOBILE_PLAN' AND g.status IN ('REQUESTED', 'IN_PROGRESS')
+                   AND ((replace(upper(btrim(s.carrier)), ' ', '') = 'KT'
+                         AND btrim(s.plan_name) LIKE '% Y덤')
+                     OR (replace(upper(btrim(s.carrier)), ' ', '') = 'SKT'
+                         AND btrim(s.plan_name) LIKE '% (청년)'))
+                   AND s.contract_months = 0
+                   AND NOT EXISTS (
+                       SELECT 1 FROM mobile_plan target
+                        WHERE target.carrier_id = c.id AND target.name = btrim(s.plan_name))
+                 ORDER BY g.id, s.collected_at DESC
+                 LIMIT ?
+                """, limit);
+
+        int made = 0;
+        for (Map<String, Object> row : rows) {
+            Long dataMb = dataMb((String) row.get("display_data"));
+            if (dataMb == null) continue;
+            var values = new LinkedHashMap<String, String>();
+            for (String field : List.of("carrier", "plan_name", "network_type", "base_price", "voice_min",
+                    "sms_cnt", "contract_discount_12m", "contract_discount_24m", "source_url", "collected_at"))
+                values.put(field, String.valueOf(row.get(field)));
+            values.put("data_mb", String.valueOf(dataMb));
+            values.put("age_limit", "청년");
+            String key = values.get("carrier") + "|" + values.get("plan_name");
+            if (pending("mobile_plan", key)) continue;
+            if (propose(proposer, CatalogAuditLog.Action.CREATE, "mobile_plan", key, values,
+                    "일일 수집(스마트초이스): 공식 기본 행의 청년 파생형")) {
+                jdbc.update("UPDATE catalog_candidate SET status = 'PENDING', updated_at = now() WHERE id = ?",
+                        row.get("candidate_id"));
+                made++;
+            }
+        }
+        return made;
+    }
+
+    /** 스마트초이스의 "42GB + 1Mbps" 형식에서 월 기본 제공량만 MB로 읽는다. */
+    private static Long dataMb(String display) {
+        if (display == null) return null;
+        if (display.strip().startsWith("무제한")) return 999999L;
+        var match = DATA_AMOUNT.matcher(display);
+        if (!match.find()) return null;
+        try {
+            BigDecimal amount = new BigDecimal(match.group(1));
+            if ("GB".equalsIgnoreCase(match.group(2))) amount = amount.multiply(BigDecimal.valueOf(1024));
+            return amount.setScale(0, RoundingMode.HALF_UP).longValueExact();
+        } catch (ArithmeticException | NumberFormatException e) {
+            return null;
+        }
     }
 
     /**
@@ -172,7 +258,8 @@ public class CatalogDailyHarvest {
                 if (Math.abs(offer.price() - stored) <= SUBSCRIPTION_TOLERANCE_WON) continue;
                 String key = String.valueOf(tier.get("id"));
                 if (pending("subscription_tier", key)) continue;
-                if (propose(proposer, "subscription_tier", key, Map.of("price", String.valueOf(offer.price())),
+                if (propose(proposer, CatalogAuditLog.Action.UPDATE, "subscription_tier", key,
+                        Map.of("price", String.valueOf(offer.price())),
                         "일일 수집(" + serviceName + " 공식 페이지): 기존 " + stored + "원 → " + offer.price()
                                 + "원. 원문: " + offer.evidence())) made++;
             }
@@ -188,9 +275,10 @@ public class CatalogDailyHarvest {
         return count != null && count > 0;
     }
 
-    private boolean propose(long proposer, String dataset, String key, Map<String, String> values, String reason) {
+    private boolean propose(long proposer, CatalogAuditLog.Action action, String dataset, String key,
+                            Map<String, String> values, String reason) {
         try {
-            requests.propose(proposer, CatalogAuditLog.Action.UPDATE, dataset, key, values, reason);
+            requests.propose(proposer, action, dataset, key, values, reason);
             return true;
         } catch (RuntimeException e) {
             log.warn("수집 제안 실패 — 건너뜀: {} {} ({})", dataset, key, e.getClass().getSimpleName());

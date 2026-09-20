@@ -17,9 +17,11 @@ public class SmartChoicePriceOracle implements PriceOracle {
     private static final int CONTRACT_MONTHS = 24;
 
     private final SmartChoiceClient client;
+    private final SmartChoiceSnapshotReader snapshots;
 
-    public SmartChoicePriceOracle(SmartChoiceClient client) {
+    public SmartChoicePriceOracle(SmartChoiceClient client, SmartChoiceSnapshotReader snapshots) {
         this.client = client;
+        this.snapshots = snapshots;
     }
 
     @Override
@@ -29,6 +31,8 @@ public class SmartChoicePriceOracle implements PriceOracle {
 
     @Override
     public Optional<Long> officialPrice(String carrier, String planName, long dataMb, String networkType) {
+        var collected = snapshots.lookup(carrier, planName).found();
+        if (collected.isPresent()) return Optional.of(collected.get().planPrice());
         if (!client.enabled()) return Optional.empty();
         int data = (int) Math.min(Math.max(dataMb, 0), SmartChoiceClient.UNLIMITED);
         for (SmartChoiceRecommendation found : client.recommend(data, SmartChoiceClient.UNLIMITED,
