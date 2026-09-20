@@ -336,4 +336,32 @@ class FunnelCounterTest {
         assertThat(events(FunnelCounter.CALENDAR_SHOWN)).isZero();
         assertThat(events("INPUT_STARTED")).isZero();
     }
+
+    /**
+     * G-59 — 보고서 §9.2 "결과 도달률". 분모는 입력을 시작한 사람, 분자는 그중 결과 화면까지 간 사람이다.
+     * 비회원은 게이트(ip: 키), 회원은 리포트(u: 키)로 도달하고 <b>두 경로 모두 이어져야 한다</b> —
+     * 한쪽만 세면 회원이 많은 날과 비회원이 많은 날의 값이 서로 다른 뜻이 된다.
+     */
+    @Test void g59a_resultReachRateJoinsBothTheGuestAndMemberPaths() {
+        seen(0, "INPUT_STARTED", "ip:203.0.113.9");
+        seen(0, FunnelCounter.GATE_SHOWN, "ip:203.0.113.9");   // 비회원: 입력 → 게이트에서 결과를 봤다
+        seen(0, "INPUT_STARTED", "u:1");
+        seen(1, FunnelCounter.REPORT_SHOWN, "u:1");            // 회원: 다른 날이어도 창 안이면 이어진다
+        seen(0, "INPUT_STARTED", "ip:203.0.113.10");           // 입력만 하고 떠났다
+
+        var kpi = part("kpi");
+        assertThat(kpi.get("resultReachRate")).isEqualTo(66.7);   // 3명 중 2명
+        assertThat(kpi.get("resultReachOf")).isEqualTo(3L);
+        assertThat(kpi).doesNotContainKey("resultReachRateNote");  // 값이 있으면 이유를 달지 않는다
+    }
+
+    /** G-59 b — 입력 시작이 한 건도 없으면 0%가 아니라 null 이고, 왜 없는지를 같이 낸다. */
+    @Test void g59b_withoutAnyInputTheRateIsNullWithItsReason() {
+        seen(0, FunnelCounter.GATE_SHOWN, "ip:203.0.113.9");
+
+        var kpi = part("kpi");
+        assertThat(kpi.get("resultReachRate")).isNull();
+        assertThat(kpi.get("resultReachOf")).isEqualTo(0L);
+        assertThat((String) kpi.get("resultReachRateNote")).contains("입력 시작");
+    }
 }

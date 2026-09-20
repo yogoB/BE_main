@@ -745,14 +745,16 @@ JWT 절대 수명 24시간·유휴 제한 2시간(refresh 없음, D-48). 상태�
              "topSaved": [{carrier, plan, count}], "savedTotal": 3 },
 "funnel":  { …기존…, "unique": {gateShown, memberLogin, reportShown, calendarShown, resultSaved},   // 창 전체 **사람 수**(actor_key 중복 제거). 일별 값의 합이 아니다 — 2026-09-21
              "conversion": {"loginToReport": 62.5, "reportToCalendar": 40.0, "reportToSaved": null,
+                            "inputToResult": 66.7,   // 보고서 §9.2 결과 도달률과 같은 값
                             "gateToLogin": null},   // 백분율. 못 내는 단계는 **키를 지우지 않고 null** — 0 은 "다 이탈"이라는 거짓말이 된다
              "uniqueDaily": [{date, …}],
+             "inputStarted": 12,   // 결과 도달률의 분모(입력을 시작한 사람 수)
              "lastSeen": {"GATE_SHOWN":"2026-09-21", "RESULT_SAVED":null, …},   // 단계별 마지막으로 쌓인 날. **null 은 한 번도 안 쌓였다는 뜻**이고 키는 사라지지 않는다
              "contaminatedUntil": "2026-09-18" }   // 횟수 열은 그날까지 무한 호출로 부풀어 있음
 "activity": [{date, signups, reports, proposals, applied}],   // 14일. 퍼널과 시간축이 같다
 "activityWindowDays": 14,
 "kpi":     { "source": "최종보고서 §9.2",   // 못 내는 KPI 는 **키를 지우지 않고 null + Note**. 키가 없으면 화면이 "아직 안 만들었나"로 읽고, 0 이면 거짓이 된다
-             "resultReachRate": null, "resultReachRateNote": "입력 시작을 아직 세지 않는다 — 분모가 없다…",
+             "resultReachRate": 66.7, "resultReachOf": 12,   // 입력 시작이 0건이면 null + resultReachRateNote
              "calcErrorRate": null,   "calcErrorRateNote": "배포 전 골든 감사 결과이지 런타임 지표가 아니다",
              "savingOpportunityRate": 41.7, "savingOpportunityOf": 12, "savingOpportunityThreshold": 5000 },
 "weeklyActivity": […]   // activity 의 뒤 7일. 배포된 화면이 쓰는 옛 키이고, 화면이 옮겨 가면 지운다

@@ -86,14 +86,15 @@ public class BackofficeMetrics {
         // 결손 "대기" 는 아직 손대지 않은 것 + 진행 중인 것이다 — /admin/gaps 기본 목록과 같은 범위여야
         // 뱃지와 목록 건수가 어긋나지 않는다(2026-09-18).
         out.put("gaps", count("SELECT count(*) FROM catalog_candidate WHERE status IN ('REQUESTED', 'IN_PROGRESS')"));
-        out.put("funnel", funnel());
+        var funnel = funnel();
+        out.put("funnel", funnel);
         out.put("endpoints", endpoints());
         out.put("health", health());
         out.put("quality", quality());
         out.put("stats", stats());
         var savings = savings();
         out.put("savings", savings);
-        out.put("kpi", kpi(savings));
+        out.put("kpi", kpi(savings, funnel));
         return out;
     }
 
@@ -350,7 +351,8 @@ public class BackofficeMetrics {
                                bool_or(kind = 'MEMBER_LOGIN')   AS login,
                                bool_or(kind = 'REPORT_SHOWN')   AS report,
                                bool_or(kind = 'CALENDAR_SHOWN') AS calendar,
-                               bool_or(kind = 'RESULT_SAVED')   AS saved
+                               bool_or(kind = 'RESULT_SAVED')   AS saved,
+                               bool_or(kind = 'INPUT_STARTED')  AS started
                           FROM funnel_event WHERE day > CURRENT_DATE - 14
                          GROUP BY actor_key
                     )
@@ -361,7 +363,9 @@ public class BackofficeMetrics {
                            count(*) FILTER (WHERE saved)    AS "resultSaved",
                            count(*) FILTER (WHERE login AND report)    AS "loginAndReport",
                            count(*) FILTER (WHERE report AND calendar) AS "reportAndCalendar",
-                           count(*) FILTER (WHERE report AND saved)    AS "reportAndSaved"
+                           count(*) FILTER (WHERE report AND saved)    AS "reportAndSaved",
+                           count(*) FILTER (WHERE started)                     AS "inputStarted",
+                           count(*) FILTER (WHERE started AND (gate OR report)) AS "startedAndReached"
                       FROM actor
                     """);
             var totals = new LinkedHashMap<String, Long>();
@@ -372,6 +376,10 @@ public class BackofficeMetrics {
             conversion.put("loginToReport", rate(reach, "loginAndReport", "memberLogin"));
             conversion.put("reportToCalendar", rate(reach, "reportAndCalendar", "reportShown"));
             conversion.put("reportToSaved", rate(reach, "reportAndSaved", "reportShown"));
+            // 보고서 §9.2 "결과 도달률". 분모는 입력을 시작한 사람, 분자는 그중 결과 화면까지 간 사람이다.
+            // 비회원은 게이트(ip: 키), 회원은 리포트(u: 키)로 도달하고 입력 시작도 같은 키로 찍히므로
+            // 두 경로 모두 이어진다 — 익명으로 시작해 중간에 로그인한 사람도 게이트를 먼저 밟아 분자에 든다.
+            conversion.put("inputToResult", rate(reach, "startedAndReached", "inputStarted"));
             // 게이트 → 로그인은 **낼 수 없다.** 비회원은 ip: 키, 회원은 u: 키라 같은 사람을 이을 방법이 없다.
             // 둘의 나눗셈은 전환율처럼 보이지만 서로 다른 모집단이다. gateDropEstimate 가 그 한계의 이름이다.
             conversion.put("gateToLogin", null);
@@ -384,6 +392,7 @@ public class BackofficeMetrics {
             out.put("daily", daily);
             out.put("unique", totals);           // 창 전체 사람 수(중복 제거)
             out.put("conversion", conversion);   // 백분율. 모집단이 달라 못 내는 단계는 null 이다
+            out.put("inputStarted", ((Number) reach.get("inputStarted")).longValue());   // 결과 도달률의 분모
             out.put("uniqueDaily", unique);
             out.put("lastSeen", lastSeen());     // null 인 종류는 한 번도 안 쌓였다는 뜻이다
             out.put("contaminatedUntil", "2026-09-18");   // 횟수 열은 이 날까지 결과 화면 무한 호출로 부풀어 있다
@@ -422,19 +431,26 @@ public class BackofficeMetrics {
      * 화면이 셋을 나란히 세우는데, 못 내는 칸을 지우면 "아직 안 만들었나"로 읽히고 0 을 넣으면 거짓이 된다.
      * 각 칸에 {@code *Note} 를 붙여 <b>왜</b> 못 내는지를 여기서 말한다. 한계가 사는 곳이 여기이기 때문이다.
      *
-     * <p><b>결과 도달률</b>은 분모가 "입력 시작 사용자"인데 입력은 전부 화면 안에서 일어나 서버에 닿지 않는다.
-     * {@code POST /api/v1/events} 로 {@code INPUT_STARTED} 가 들어오기 시작하면 그때 값이 생긴다.
+     * <p><b>결과 도달률</b>의 분모는 "입력 시작 사용자"다. 입력은 전부 화면 안에서 일어나 서버에 닿지 않으므로
+     * 화면이 {@code POST /api/v1/events} 로 알려 준다(2026-09-21 부터). 분자는 그중 결과 화면까지 간 사람이고,
+     * 두 합계의 나눗셈이 아니라 <b>같은 행위자가 두 단계를 다 밟았는지</b>로 센다. 입력이 한 건도 없으면
+     * {@code null} 이고 이유를 {@code resultReachRateNote} 로 같이 낸다.
      * <b>계산 오류율</b>은 런타임 값이 아니라 배포 전 골든 감사 결과다 — 대시보드가 낼 숫자가 아니다.
      * <b>절감 기회 발견률</b>만 지금 낼 수 있다: 월 {@value #OPPORTUNITY_THRESHOLD}원 이상 순절감이 가능한
      * 회원 ÷ 유효 계산 회원. 분모는 {@code member_savings} 행이 있는 회원이다 — 지금 요금제를 알려주지 않아
      * 비교가 성립하지 않은 조회는 애초에 행이 없다(모름 ≠ 0).
      */
-    private static Map<String, Object> kpi(Map<String, Object> savings) {
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> kpi(Map<String, Object> savings, Map<String, Object> funnel) {
         var out = new LinkedHashMap<String, Object>();
         out.put("source", "최종보고서 §9.2");
 
-        out.put("resultReachRate", null);
-        out.put("resultReachRateNote", "입력 시작을 아직 세지 않는다 — 분모가 없다. POST /api/v1/events 의 INPUT_STARTED 가 쌓이면 낸다");
+        var conversion = (Map<String, Object>) funnel.get("conversion");
+        Object reach = conversion == null ? null : conversion.get("inputToResult");
+        out.put("resultReachRate", reach);
+        out.put("resultReachOf", funnel.get("inputStarted"));
+        if (reach == null)
+            out.put("resultReachRateNote", "입력 시작이 아직 한 건도 없다 — 분모가 없다. 화면이 POST /api/v1/events 로 INPUT_STARTED 를 보내면 낸다");
 
         out.put("calcErrorRate", null);
         out.put("calcErrorRateNote", "배포 전 골든 감사(scripts/golden_audit.py) 결과이지 런타임 지표가 아니다");
