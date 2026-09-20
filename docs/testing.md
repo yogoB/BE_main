@@ -1154,3 +1154,32 @@ V27 부터 채워져 그 전 건은 비어 있고, 그 뒤 건도 그때의 카�
 전환율처럼 보이지만 서로 다른 모집단이고, 회원이 많은 날은 100%를 넘는다. 못 내는 비율은 **키를
 지우지 말고 null 로 낸다** — 키가 없으면 화면이 "아직 안 만들었나"로 읽고, 0 이면 "다 이탈했다"로 읽는다.
 `gateDropEstimate`가 이 한계에 붙인 이름이고 그 이름은 그대로 둔다.
+
+## G-57. 화면만 아는 단계는 받되 서버가 보는 단계는 받지 않는다 — 그리고 모든 단계가 실제로 쌓인다 (2026-09-21)
+
+**검증**: `FunnelCounterTest` (`g57a_clientReportedStageIsRecorded`,
+`g57b_serverObservedStagesAreNotAcceptedFromTheClient`, `g57c_unknownKindIsDroppedWithoutAnError`,
+`g57d_savingOpportunityRateUsesTheReportThreshold`, `g57e_unavailableKpisCarryTheirReason`,
+`g57f_everyKindActuallyLandsInBothTables`)
+
+보고서 §9.2 "결과 도달률"의 분모는 **입력 시작 사용자**인데 입력은 전부 브라우저 안에서 끝나
+서버에 아무 요청도 오지 않는다. `POST /api/v1/events`로 화면이 알려 준다.
+
+| | 상황 | 정답 |
+|---|---|---|
+| a | `{"kind":"INPUT_STARTED"}` | 204, 두 표에 1건 |
+| b | `{"kind":"REPORT_SHOWN"}` 등 서버 관측 5종 | 204, **0건** — 거절도 하지 않는다 |
+| c | 모르는 종류·빈 본문 | 204, 0건 |
+| d | 절감 9,000 / 5,000 / 4,999원 세 회원 | `savingOpportunityRate = 66.7`, 기준 5,000원은 **포함** |
+| e | 아직 못 내는 KPI | 키는 있고 값은 `null`, `*Note` 에 이유 |
+| f | `FunnelCounter` 의 모든 종류 | 전부 `funnel_daily`·`funnel_event` 양쪽에 쌓인다 |
+
+**b 가 보안 조건이다.** 서버가 스스로 관측하는 단계를 화면이 보낼 수 있게 하면 요청 한 번으로
+리포트 조회 수를 부풀릴 수 있고, 그러면 퍼널 전체가 증거로서 죽는다. 공개 경로가 받는 집합은
+`FunnelCounter.CLIENT_REPORTED` 뿐이다.
+
+**f 는 이미 새어 나간 사고를 막는 그물이다.** `funnel_daily.kind` 의 CHECK 가 D-36 당시의 세 종류만
+허용하는데 D-52 에서 `CALENDAR_SHOWN`·`RESULT_SAVED` 를 부르기 시작했다. 집계 실패는 삼켜지므로
+(기능이 지표 때문에 멈추면 안 된다) WARN 한 줄만 남고, **두 단계가 2026-09-18 부터 한 건도 안 쌓였다.**
+화면에서는 "아직 아무도 안 했다"와 구분되지 않았다. V31 이 종류를 넓혔고, 이 테스트는 상수를
+**반사로 훑어** 새 단계를 추가해도 목록을 고치지 않고 걸리게 한다 — 하나 고치고 끝내지 않기 위해서다.

@@ -539,6 +539,24 @@ JWT 절대 수명 24시간·유휴 제한 2시간(refresh 없음, D-48). 상태�
 | 상한 | 발신지당 15분 60회(초과 429), 표 전체 10,000행 |
 | 같은 이름 | 행이 늘지 않고 `requested_cnt` 만 오른다 → 백오피스 결손 보드 상단으로 |
 
+### 4-11. 화면 단계 알림 — `POST /api/v1/events` (공개, 2026-09-21)
+
+화면 안에서만 일어나 **서버가 볼 수 없는** 퍼널 단계를 받는다. 보고서 §9.2 "결과 도달률"의 분모가
+입력 시작 사용자인데, 입력은 브라우저에서 끝나 아무 요청도 오지 않는다.
+
+```json
+{ "kind": "INPUT_STARTED" }   →   204 No Content (본문 없음)
+```
+
+| 규칙 | 값 |
+|---|---|
+| 받는 `kind` | `INPUT_STARTED` · `INPUT_COMPLETED` 뿐이다(`FunnelCounter.CLIENT_REPORTED`) |
+| 안 받는 `kind` | `GATE_SHOWN` · `REPORT_SHOWN` · `MEMBER_LOGIN` · `CALENDAR_SHOWN` · `RESULT_SAVED` — **서버가 스스로 관측한다.** 화면이 보낼 수 있게 하면 요청 한 번으로 조회 수를 부풀릴 수 있다(G-57 b) |
+| 모르는 `kind`·빈 본문 | **204, 조용히 버린다.** 화면이 새 이벤트를 먼저 배포해도 콘솔에 빨간 줄이 뜨면 안 된다 |
+| 응답 | 언제나 204. 무엇을 받았는지 알려주지 않는다 |
+| 중복 | 같은 사람(회원 `u:<id>` / 비회원 `ip:<발신지>`)은 하루에 종류당 한 번만 쌓인다 |
+| 상한 | 발신지당 `evt:` 버킷 — 추천 예산과 분리돼 있어 서로 갉아먹지 않는다 |
+
 ### 5-3b. 저장한 결과 — `/api/v1/me/saved-results` (D-51)
 
 회원 전용·CSRF 필요. **금액은 저장 시점에 BE 가 계산기로 다시 만들어 스냅숏**으로 둔다 — 화면 숫자를 되돌려 보내지 않는다(절대 원칙 2·4).
@@ -719,7 +737,7 @@ JWT 절대 수명 24시간·유휴 제한 2시간(refresh 없음, D-48). 상태�
             "recommendationsToday": 41, "reportShownToday": 41, "reportViewersToday": 9 },   // 횟수 ≫ 사람이면 반복 호출 의심
 "quality": { "carrierNameVariants": {"count":0,"sample":[]}, "duplicateTierNames": {…}, "samePriceTiers": {…},
              "placeholderPlans": {…}, "plansWithoutSource": {…}, "mnoNetworkGaps": {"count":1,"sample":["SKT · LTE 1건"]} },   // 3건 미만이면 얇다고 센다 — 0 과 1 은 사용자에게 같다
-"savings": { "basis": "CURRENT_PLAN", "members": 12, "improved": 10,     // D-54. 진단 기준이다 — 실제 이전 여부는 모른다
+"savings": { "basis": "CURRENT_PLAN", "members": 12, "improved": 10, "opportunity": 5, "opportunityThreshold": 5000,   // D-54. 진단 기준 — 실제 이전 여부는 모른다. opportunity 는 월 5,000원 이상(보고서 §9.2)
              "monthlyTotal": 256080, "monthlyMedian": 17100, "monthlyAverage": 21340, "monthlyMax": 51010,
              "annualTotalEstimate": 3072960,                            // 월 × 12. 1년치 실측이 아니다
              "histogram": [{"bucket":"1~3만","count":5}], "daily": [{"date":"2026-09-18","savedCount":3,"monthlySum":41000}] },
@@ -731,6 +749,10 @@ JWT 절대 수명 24시간·유휴 제한 2시간(refresh 없음, D-48). 상태�
              "uniqueDaily": [{date, …}], "contaminatedUntil": "2026-09-18" }   // 횟수 열은 그날까지 무한 호출로 부풀어 있음
 "activity": [{date, signups, reports, proposals, applied}],   // 14일. 퍼널과 시간축이 같다
 "activityWindowDays": 14,
+"kpi":     { "source": "최종보고서 §9.2",   // 못 내는 KPI 는 **키를 지우지 않고 null + Note**. 키가 없으면 화면이 "아직 안 만들었나"로 읽고, 0 이면 거짓이 된다
+             "resultReachRate": null, "resultReachRateNote": "입력 시작을 아직 세지 않는다 — 분모가 없다…",
+             "calcErrorRate": null,   "calcErrorRateNote": "배포 전 골든 감사 결과이지 런타임 지표가 아니다",
+             "savingOpportunityRate": 41.7, "savingOpportunityOf": 12, "savingOpportunityThreshold": 5000 },
 "weeklyActivity": […]   // activity 의 뒤 7일. 배포된 화면이 쓰는 옛 키이고, 화면이 옮겨 가면 지운다
 ```
 카운터·타이머(`narration.*`)는 프로세스 수명이다 — 재시작하면 0. 나머지는 DB.

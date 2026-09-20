@@ -35,6 +35,16 @@ public class FunnelCounter {
     /** 회원이 결과를 마이페이지에 저장했다. */
     public static final String RESULT_SAVED = "RESULT_SAVED";
 
+    /**
+     * 화면이 알려 주는 단계다. <b>서버가 볼 수 없는 것만 여기 있다</b> — 입력은 전부 브라우저 안에서
+     * 일어나 요청이 오지 않는다. 보고서 §9.2 "결과 도달률"의 분모가 {@code INPUT_STARTED} 다.
+     *
+     * <p>위의 다섯은 <b>절대 넣지 않는다.</b> 서버가 직접 관측하는 값이라, 화면이 보낼 수 있게 하면
+     * 누구나 요청 한 번으로 리포트 조회 수를 부풀릴 수 있다. 공개 경로가 받는 것은 이 집합뿐이다.
+     */
+    public static final java.util.Set<String> CLIENT_REPORTED =
+            java.util.Set.of("INPUT_STARTED", "INPUT_COMPLETED");
+
     private final JdbcTemplate jdbc;
 
     public FunnelCounter(JdbcTemplate jdbc) {

@@ -113,7 +113,7 @@ public class SecurityConfig {
                 .securityContext(c -> c.securityContextRepository(new RequestAttributeSecurityContextRepository()))
                 .requestCache(c -> c.disable()).formLogin(c -> c.disable()).httpBasic(c -> c.disable()).logout(c -> c.disable())
                 .csrf(c -> c.ignoringRequestMatchers("/api/v1/recommendations", "/api/v1/recommendations/narrate",
-                        "/api/v1/calculator", "/api/v1/catalog/gaps"))
+                        "/api/v1/calculator", "/api/v1/catalog/gaps", "/api/v1/events"))
                 .authorizeHttpRequests(a -> a
                         // BE 가 내주던 화면 넷(`/`·`index.html`·`account.html`·`account.js`·`catalog-report.js`)은 지웠다
                         // (2026-09-20). 프론트가 따로 배포되고, 그 페이지들은 D-34 로 사라진 비밀번호
@@ -122,6 +122,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/v1/recommendations", "/api/v1/recommendations/narrate", "/api/v1/calculator",
                                 // 화면에서 못 찾은 것을 결손으로 남기는 공개 경로(D-56). 응답은 언제나 같다.
                                 "/api/v1/catalog/gaps",
+                                // 화면만 볼 수 있는 퍼널 단계(입력 시작 등). 받는 종류가 화이트리스트로 좁고
+                                // 서버가 관측하는 단계는 받지 않는다 — FunnelEventController 참고.
+                                "/api/v1/events",
                                 "/api/v1/catalog/reports", "/api/v1/reports",
                                 // 백오피스 로그인만 공개다(D-32). 나머지 /admin/** 은 아래에서 ADMIN 전용.
                                 // 가입·로그인은 Google 하나뿐이다(D-34) — 아래 /oauth2 경로가 그 입구다.
@@ -158,6 +161,9 @@ public class SecurityConfig {
                                         || path.equals("/api/v1/recommendations/narrate")
                                         || path.equals("/api/v1/calculator")))
                                 limits.check("calc:" + clientKey(req), calcLimit);
+                            // 이벤트는 별도 버킷이다. 화면이 많이 보내도 추천 예산을 갉아먹지 않는다.
+                            if ("POST".equals(req.getMethod()) && path.equals("/api/v1/events"))
+                                limits.check("evt:" + clientKey(req), calcLimit);
                             if (path.equals("/oauth2/authorization/google")) google.requireEnabled();
                             chain.doFilter(req, res);
                         } catch (ApiException ex) { error(json, res, ex); }

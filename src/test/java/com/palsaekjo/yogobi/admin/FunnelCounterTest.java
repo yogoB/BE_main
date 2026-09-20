@@ -48,10 +48,12 @@ class FunnelCounterTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired AuthTokens tokens;
     @Autowired BackofficeMetrics metrics;
+    @Autowired FunnelCounter counter;
 
     @BeforeEach void clear() {
         jdbc.update("DELETE FROM funnel_daily");
         jdbc.update("DELETE FROM funnel_event");   // 사람 수·전환율이 앞 테스트의 행위자를 물려받지 않게 한다
+        jdbc.update("DELETE FROM member_savings");
         jdbc.execute("TRUNCATE app_user, auth_rate_limit CASCADE");   // 같은 이메일을 여러 테스트가 쓴다
     }
 
@@ -121,9 +123,12 @@ class FunnelCounterTest {
                 + " ON CONFLICT DO NOTHING", daysAgo, kind, actor);
     }
 
+    /** {@code unique}·{@code conversion} 은 funnel 안, {@code kpi} 는 최상위다. */
     @SuppressWarnings("unchecked")
     private java.util.Map<String, Object> part(String key) {
-        var funnel = (java.util.Map<String, Object>) metrics.dashboard().get("funnel");
+        var dashboard = metrics.dashboard();
+        if (dashboard.containsKey(key)) return (java.util.Map<String, Object>) dashboard.get(key);
+        var funnel = (java.util.Map<String, Object>) dashboard.get("funnel");
         return (java.util.Map<String, Object>) funnel.get(key);
     }
 
@@ -159,5 +164,91 @@ class FunnelCounterTest {
         // 비회원은 ip: 키, 회원은 u: 키다. 모집단이 달라 이을 수 없다 — 나눠서 100% 를 만들지 않는다.
         assertThat(conversion).containsKey("gateToLogin");
         assertThat(conversion.get("gateToLogin")).isNull();
+    }
+
+    private void sendEvent(String body) throws Exception {
+        mvc.perform(post("/api/v1/events").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isNoContent());
+    }
+
+    private long events(String kind) {
+        return jdbc.queryForObject("SELECT count(*) FROM funnel_event WHERE kind = ?", Long.class, kind);
+    }
+
+    /** G-57 a — 화면만 아는 단계는 받는다. 보고서 §9.2 "결과 도달률"의 분모다. */
+    @Test void g57a_clientReportedStageIsRecorded() throws Exception {
+        sendEvent("""
+                {"kind":"INPUT_STARTED"}""");
+
+        assertThat(events("INPUT_STARTED")).isEqualTo(1);
+    }
+
+    /**
+     * G-57 b — <b>서버가 스스로 보는 단계는 받지 않는다.</b> 받으면 요청 한 번으로 리포트 조회 수를
+     * 부풀릴 수 있고, 그러면 퍼널이 증거로서 죽는다. 거절도 하지 않는다 — 조용히 버린다.
+     */
+    @Test void g57b_serverObservedStagesAreNotAcceptedFromTheClient() throws Exception {
+        for (String forged : new String[] {FunnelCounter.REPORT_SHOWN, FunnelCounter.MEMBER_LOGIN,
+                FunnelCounter.GATE_SHOWN, FunnelCounter.CALENDAR_SHOWN, FunnelCounter.RESULT_SAVED})
+            sendEvent("{\"kind\":\"" + forged + "\"}");
+
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM funnel_event", Long.class)).isZero();
+    }
+
+    /** G-57 c — 모르는 종류·빈 본문도 204 다. 지표 때문에 화면 콘솔이 시끄러워지면 안 된다. */
+    @Test void g57c_unknownKindIsDroppedWithoutAnError() throws Exception {
+        sendEvent("""
+                {"kind":"NOT_A_STAGE"}""");
+        sendEvent("{}");
+
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM funnel_event", Long.class)).isZero();
+    }
+
+    /** G-57 d — 절감 기회 발견률은 월 5,000원 이상 회원 ÷ 유효 계산 회원이다(보고서 §9.2). */
+    @Test void g57d_savingOpportunityRateUsesTheReportThreshold() {
+        long a = TestMembers.create(jdbc, "a@example.com");
+        long b = TestMembers.create(jdbc, "b@example.com");
+        long c = TestMembers.create(jdbc, "c@example.com");
+        jdbc.update("INSERT INTO member_savings (user_id, monthly_savings) VALUES (?, 9000)", a);
+        jdbc.update("INSERT INTO member_savings (user_id, monthly_savings) VALUES (?, 5000)", b);   // 경계는 포함
+        jdbc.update("INSERT INTO member_savings (user_id, monthly_savings) VALUES (?, 4999)", c);   // 경계 바로 아래
+
+        var kpi = part("kpi");
+        assertThat(kpi.get("savingOpportunityRate")).isEqualTo(66.7);   // 3명 중 2명
+        assertThat(kpi.get("savingOpportunityOf")).isEqualTo(3L);
+        assertThat(kpi.get("savingOpportunityThreshold")).isEqualTo(5000);
+    }
+
+    /** G-57 e — 아직 못 내는 KPI 는 키를 지우지도, 0 을 넣지도 않는다. 왜 못 내는지를 같이 낸다. */
+    @Test void g57e_unavailableKpisCarryTheirReason() {
+        var kpi = part("kpi");
+        assertThat(kpi).containsKey("resultReachRate");
+        assertThat(kpi.get("resultReachRate")).isNull();
+        assertThat((String) kpi.get("resultReachRateNote")).contains("입력 시작");
+        assertThat(kpi.get("calcErrorRate")).isNull();
+    }
+
+    /**
+     * G-57 f — <b>부를 수 있는 모든 단계가 두 표에 실제로 들어가는지 쓸어본다.</b>
+     *
+     * <p>이 테스트가 없어서 CALENDAR_SHOWN·RESULT_SAVED 가 2026-09-18 부터 한 건도 안 쌓였다.
+     * {@code funnel_daily.kind} 의 CHECK 가 D-36 당시의 세 종류만 허용했는데, 집계 실패는 삼켜지도록
+     * 되어 있어(기능이 지표 때문에 멈추면 안 된다) WARN 한 줄만 남고 화면에서는 "아직 아무도 안 했다"와
+     * 구분되지 않았다. 한 종류만 고치고 끝내지 않도록 <b>상수를 반사로 훑는다</b> — 새 단계를 추가하면
+     * 목록을 고치지 않아도 여기서 자동으로 걸린다.
+     */
+    @Test void g57f_everyKindActuallyLandsInBothTables() throws Exception {
+        var kinds = new java.util.TreeSet<String>(FunnelCounter.CLIENT_REPORTED);
+        for (var f : FunnelCounter.class.getDeclaredFields())
+            if (f.getType() == String.class && java.lang.reflect.Modifier.isStatic(f.getModifiers())
+                    && java.lang.reflect.Modifier.isPublic(f.getModifiers()))
+                kinds.add((String) f.get(null));
+        assertThat(kinds).hasSizeGreaterThanOrEqualTo(7);   // 상수를 지웠는데 통과하는 일은 없게 한다
+
+        for (String kind : kinds) {
+            counter.record(kind, "u:1");
+            assertThat(counted(kind)).as("%s 가 funnel_daily 에 없다", kind).isEqualTo(1);
+            assertThat(events(kind)).as("%s 가 funnel_event 에 없다", kind).isEqualTo(1);
+        }
     }
 }

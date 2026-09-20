@@ -21,6 +21,9 @@ import org.springframework.stereotype.Component;
 public class BackofficeMetrics {
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(BackofficeMetrics.class);
 
+    /** 보고서 §9.2 "절감 기회 발견률"의 기준선. 이보다 적은 절감은 옮길 이유가 못 된다고 본 값이다. */
+    private static final int OPPORTUNITY_THRESHOLD = 5000;
+
     /** 화면에 보여줄 엔드포인트 수. 꼬리까지 나열하면 읽히지 않는다. */
     private static final int TOP_ENDPOINTS = 8;
 
@@ -88,7 +91,9 @@ public class BackofficeMetrics {
         out.put("health", health());
         out.put("quality", quality());
         out.put("stats", stats());
-        out.put("savings", savings());
+        var savings = savings();
+        out.put("savings", savings);
+        out.put("kpi", kpi(savings));
         return out;
     }
 
@@ -114,6 +119,7 @@ public class BackofficeMetrics {
                     )
                     SELECT count(*) AS "members",
                            count(*) FILTER (WHERE amount > 0) AS "improved",
+                           count(*) FILTER (WHERE amount >= 5000) AS "opportunity",
                            coalesce(sum(amount) FILTER (WHERE amount > 0), 0) AS "monthlyTotal",
                            coalesce(round(percentile_cont(0.5) WITHIN GROUP (
                                ORDER BY CASE WHEN amount > 0 THEN amount END)), 0) AS "monthlyMedian",
@@ -122,6 +128,7 @@ public class BackofficeMetrics {
                     FROM latest
                     """);
             out.putAll(core);
+            out.put("opportunityThreshold", OPPORTUNITY_THRESHOLD);   // 화면이 기준을 스스로 적지 않게 같이 보낸다
             long monthlyTotal = ((Number) core.get("monthlyTotal")).longValue();
             out.put("annualTotalEstimate", monthlyTotal * 12);   // 월 × 12. 1년치 실측이 아니다
             out.put("histogram", rows("""
@@ -386,6 +393,40 @@ public class BackofficeMetrics {
             log.warn("퍼널 집계를 읽지 못했습니다: {}", e.getMessage());
             return Map.of("windowDays", 14, "unavailable", true);
         }
+    }
+
+    /**
+     * 최종보고서 §9.2 의 핵심 KPI 3종. <b>낼 수 있는 것만 값이 있고 나머지는 null 이다</b> —
+     * 화면이 셋을 나란히 세우는데, 못 내는 칸을 지우면 "아직 안 만들었나"로 읽히고 0 을 넣으면 거짓이 된다.
+     * 각 칸에 {@code *Note} 를 붙여 <b>왜</b> 못 내는지를 여기서 말한다. 한계가 사는 곳이 여기이기 때문이다.
+     *
+     * <p><b>결과 도달률</b>은 분모가 "입력 시작 사용자"인데 입력은 전부 화면 안에서 일어나 서버에 닿지 않는다.
+     * {@code POST /api/v1/events} 로 {@code INPUT_STARTED} 가 들어오기 시작하면 그때 값이 생긴다.
+     * <b>계산 오류율</b>은 런타임 값이 아니라 배포 전 골든 감사 결과다 — 대시보드가 낼 숫자가 아니다.
+     * <b>절감 기회 발견률</b>만 지금 낼 수 있다: 월 {@value #OPPORTUNITY_THRESHOLD}원 이상 순절감이 가능한
+     * 회원 ÷ 유효 계산 회원. 분모는 {@code member_savings} 행이 있는 회원이다 — 지금 요금제를 알려주지 않아
+     * 비교가 성립하지 않은 조회는 애초에 행이 없다(모름 ≠ 0).
+     */
+    private static Map<String, Object> kpi(Map<String, Object> savings) {
+        var out = new LinkedHashMap<String, Object>();
+        out.put("source", "최종보고서 §9.2");
+
+        out.put("resultReachRate", null);
+        out.put("resultReachRateNote", "입력 시작을 아직 세지 않는다 — 분모가 없다. POST /api/v1/events 의 INPUT_STARTED 가 쌓이면 낸다");
+
+        out.put("calcErrorRate", null);
+        out.put("calcErrorRateNote", "배포 전 골든 감사(scripts/golden_audit.py) 결과이지 런타임 지표가 아니다");
+
+        Object members = savings.get("members"), opportunity = savings.get("opportunity");
+        if (members instanceof Number below && opportunity instanceof Number above && below.longValue() > 0) {
+            out.put("savingOpportunityRate", Math.round(above.longValue() * 1000.0 / below.longValue()) / 10.0);
+            out.put("savingOpportunityOf", below.longValue());
+        } else {
+            out.put("savingOpportunityRate", null);
+            out.put("savingOpportunityNote", "유효 계산 회원이 아직 없다");
+        }
+        out.put("savingOpportunityThreshold", OPPORTUNITY_THRESHOLD);
+        return out;
     }
 
     /**
