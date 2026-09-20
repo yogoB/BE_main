@@ -88,15 +88,34 @@ class TierDisplayNameTest {
                 .extracting(SubscriptionTier::name).isEqualTo("넷플릭스 스탠다드");   // 광고형이 더 싸지만 고르지 않는다
     }
 
-    /** e — 카탈로그 전체에서 표시명이 겹치지 않는다. 겹치면 c 가 막으려던 모호함이 되돌아온다. */
-    @Test void g61e_noTwoActiveTiersShareADisplayName() {
-        List<String> duplicated = jdbc.queryForList("""
-                SELECT CASE WHEN position(s.name in t.name) > 0 THEN t.name
-                            ELSE s.name || ' ' || t.name END AS label
-                  FROM subscription_tier t JOIN subscription_service s ON s.id = t.service_id
-                 WHERE t.active AND s.active
-                 GROUP BY 1 HAVING count(*) > 1""", String.class);
+    /**
+     * e — <b>낱말만 겹치는 경우.</b> 전체 포함만 보던 첫 규칙이 이걸 놓쳐 운영 설명 문장에
+     * "카카오 이모티콘 플러스 이모티콘 플러스" 가 나갔다(내레이터 세션이 찾아 알려 줬다, 2026-09-21).
+     * 서비스명 끝과 등급명 앞이 겹치면 접고, 등급명이 이미 브랜드를 말하면 그대로 둔다.
+     */
+    @Test void g61e_overlappingWordsAreFoldedInsteadOfRepeated() {
+        assertThat(CatalogReader.tierDisplayName("YouTube Music", "Music Premium 개인"))
+                .isEqualTo("YouTube Music Premium 개인");
+        assertThat(CatalogReader.tierDisplayName("카카오 이모티콘 플러스", "이모티콘 플러스"))
+                .isEqualTo("카카오 이모티콘 플러스");          // 겹친 부분이 등급명 전부다
+        assertThat(CatalogReader.tierDisplayName("Google One", "Google AI Plus 2TB"))
+                .isEqualTo("Google AI Plus 2TB");        // 등급명이 이미 브랜드를 말한다
+        assertThat(CatalogReader.tierDisplayName("Google One", "Basic 100GB"))
+                .isEqualTo("Google One Basic 100GB");    // 안 겹치면 그대로 붙인다
+    }
 
-        assertThat(duplicated).isEmpty();
+    /**
+     * f — 카탈로그 <b>전체</b>에서 표시명이 겹치지 않는다. 겹치면 c 가 막으려던 모호함이 되돌아온다.
+     * 규칙이 자바에 있으므로 SQL 로 흉내 내지 않고 <b>같은 메서드를 돌려</b> 확인한다 —
+     * 사본을 만들면 둘이 어긋나는 날이 온다.
+     */
+    @Test void g61f_noTwoActiveTiersShareADisplayName() {
+        List<String> labels = jdbc.query("""
+                SELECT s.name AS service_name, t.name AS tier_name
+                  FROM subscription_tier t JOIN subscription_service s ON s.id = t.service_id
+                 WHERE t.active AND s.active""",
+                (rs, i) -> CatalogReader.tierDisplayName(rs.getString("service_name"), rs.getString("tier_name")));
+
+        assertThat(labels).hasSizeGreaterThan(100).doesNotHaveDuplicates();
     }
 }
