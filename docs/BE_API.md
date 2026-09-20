@@ -670,7 +670,7 @@ JWT 절대 수명 24시간·유휴 제한 2시간(refresh 없음, D-48). 상태�
 |---|---|---|
 | POST | `/api/v1/admin/login` | 운영자 로그인 `{id,password}`. 실패는 401 하나로만 답한다 (D-32) |
 | GET | `/api/v1/admin/session` | 관리자 여부 확인 |
-| GET | `/api/v1/admin/dashboard` | 사용 지표. 블록 다섯 — `health`(내레이터 실패 종류별·지연·마지막 성공) · `quality`(카탈로그 품질 7종, 아래) · `funnel`(D-36 게이트 퍼널 14일, **사람 수와 횟수를 나눠 센다**) · `savings`(찾아 준 절감액, D-54·D-59) · 통계 |
+| GET | `/api/v1/admin/dashboard` | 사용 지표. 블록 다섯 — `health`(내레이터 실패 종류별·지연·마지막 성공) · `quality`(카탈로그 품질 7종, 아래) · `funnel`(D-36 게이트 퍼널 14일, **사람 수와 횟수를 나눠 센다**. 전환율은 행위자 교집합, G-56) · `savings`(찾아 준 절감액, D-54·D-59) · 통계 |
 | POST | `/api/v1/admin/harvest/run` | 일일 수집 즉시 실행 (정기: 매일 09:00 KST) |
 
 **`quality` 블록 7종** — 각 항목은 `{count, sample[]}` 이다.
@@ -725,7 +725,12 @@ JWT 절대 수명 24시간·유휴 제한 2시간(refresh 없음, D-48). 상태�
              "histogram": [{"bucket":"1~3만","count":5}], "daily": [{"date":"2026-09-18","savedCount":3,"monthlySum":41000}] },
 "stats":   { "windowDays": 7, "topRecommended": [{carrier, plan, count}], "dataGbHistogram": [{dataGb, count}],
              "topSaved": [{carrier, plan, count}], "savedTotal": 3 },
-"funnel":  { …기존…, "unique": {gateShown, memberLogin, reportShown, calendarShown, resultSaved},
+"funnel":  { …기존…, "unique": {gateShown, memberLogin, reportShown, calendarShown, resultSaved},   // 창 전체 **사람 수**(actor_key 중복 제거). 일별 값의 합이 아니다 — 2026-09-21
+             "conversion": {"loginToReport": 62.5, "reportToCalendar": 40.0, "reportToSaved": null,
+                            "gateToLogin": null},   // 백분율. 못 내는 단계는 **키를 지우지 않고 null** — 0 은 "다 이탈"이라는 거짓말이 된다
              "uniqueDaily": [{date, …}], "contaminatedUntil": "2026-09-18" }   // 횟수 열은 그날까지 무한 호출로 부풀어 있음
+"activity": [{date, signups, reports, proposals, applied}],   // 14일. 퍼널과 시간축이 같다
+"activityWindowDays": 14,
+"weeklyActivity": […]   // activity 의 뒤 7일. 배포된 화면이 쓰는 옛 키이고, 화면이 옮겨 가면 지운다
 ```
 카운터·타이머(`narration.*`)는 프로세스 수명이다 — 재시작하면 0. 나머지는 DB.

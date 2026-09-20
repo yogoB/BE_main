@@ -50,7 +50,12 @@ public class BackofficeMetrics {
                 "signedUp7d", count("SELECT count(*) FROM app_user WHERE created_at > now() - interval '7 days'"),
                 "withSubscription", count("SELECT count(DISTINCT user_id) FROM user_subscription WHERE ended_at IS NULL"),
                 "activeSessions", count("SELECT count(*) FROM auth_session WHERE expires_at > now()")));
-        out.put("weeklyActivity", activity());
+        // 한 번만 조회하고 두 이름으로 낸다. weeklyActivity 는 배포된 화면이 쓰는 옛 키이고,
+        // activity 가 퍼널과 시간축이 맞는 14일이다. 화면이 옮겨 가면 옛 키를 지운다.
+        var activity = activity();
+        out.put("activity", activity);
+        out.put("activityWindowDays", activity.size());
+        out.put("weeklyActivity", activity.subList(Math.max(0, activity.size() - 7), activity.size()));
         out.put("catalog", Map.of(
                 "sourceDiverged", store.diverged(),   // 외부 원본이 레포 CSV 를 덮고 있는가(D-24 단일 원본 위반)
                 "mobilePlans", count("SELECT count(*) FROM mobile_plan WHERE active"),
@@ -329,12 +334,40 @@ public class BackofficeMetrics {
                       LEFT JOIN funnel_event f ON f.day = d.day::date
                      GROUP BY d.day ORDER BY d.day DESC
                     """);
+            // 창 전체의 **사람 수**. 일별 값을 더하면 사흘 온 사람이 3 이 된다 — 그건 사람-일이지 사람이 아니다.
+            // actor_key 로 묶어 한 번만 센다. 같은 CTE 에서 단계 교집합도 나오므로 전환율을 여기서 만든다.
+            Map<String, Object> reach = jdbc.queryForMap("""
+                    WITH actor AS (
+                        SELECT actor_key,
+                               bool_or(kind = 'GATE_SHOWN')     AS gate,
+                               bool_or(kind = 'MEMBER_LOGIN')   AS login,
+                               bool_or(kind = 'REPORT_SHOWN')   AS report,
+                               bool_or(kind = 'CALENDAR_SHOWN') AS calendar,
+                               bool_or(kind = 'RESULT_SAVED')   AS saved
+                          FROM funnel_event WHERE day > CURRENT_DATE - 14
+                         GROUP BY actor_key
+                    )
+                    SELECT count(*) FILTER (WHERE gate)     AS "gateShown",
+                           count(*) FILTER (WHERE login)    AS "memberLogin",
+                           count(*) FILTER (WHERE report)   AS "reportShown",
+                           count(*) FILTER (WHERE calendar) AS "calendarShown",
+                           count(*) FILTER (WHERE saved)    AS "resultSaved",
+                           count(*) FILTER (WHERE login AND report)    AS "loginAndReport",
+                           count(*) FILTER (WHERE report AND calendar) AS "reportAndCalendar",
+                           count(*) FILTER (WHERE report AND saved)    AS "reportAndSaved"
+                      FROM actor
+                    """);
             var totals = new LinkedHashMap<String, Long>();
             for (String k : List.of("gateShown", "memberLogin", "reportShown", "calendarShown", "resultSaved")) {
-                long sum = 0;
-                for (Map<String, Object> row : unique) sum += ((Number) row.get(k)).longValue();
-                totals.put(k, sum);
+                totals.put(k, ((Number) reach.get(k)).longValue());
             }
+            var conversion = new LinkedHashMap<String, Object>();
+            conversion.put("loginToReport", rate(reach, "loginAndReport", "memberLogin"));
+            conversion.put("reportToCalendar", rate(reach, "reportAndCalendar", "reportShown"));
+            conversion.put("reportToSaved", rate(reach, "reportAndSaved", "reportShown"));
+            // 게이트 → 로그인은 **낼 수 없다.** 비회원은 ip: 키, 회원은 u: 키라 같은 사람을 이을 방법이 없다.
+            // 둘의 나눗셈은 전환율처럼 보이지만 서로 다른 모집단이다. gateDropEstimate 가 그 한계의 이름이다.
+            conversion.put("gateToLogin", null);
             var out = new LinkedHashMap<String, Object>();
             out.put("windowDays", 14);
             out.put("gateShown", gate);          // 비회원이 결과를 받아 게이트를 만난 횟수 (실측)
@@ -342,7 +375,8 @@ public class BackofficeMetrics {
             out.put("memberLogin", login);       // Google 로그인 성공 (실측)
             out.put("gateDropEstimate", Math.max(0, gate - report));
             out.put("daily", daily);
-            out.put("unique", totals);           // 사람 수 — 단계별 전환율은 이걸로 낸다
+            out.put("unique", totals);           // 창 전체 사람 수(중복 제거)
+            out.put("conversion", conversion);   // 백분율. 모집단이 달라 못 내는 단계는 null 이다
             out.put("uniqueDaily", unique);
             out.put("contaminatedUntil", "2026-09-18");   // 횟수 열은 이 날까지 결과 화면 무한 호출로 부풀어 있다
             return out;
@@ -354,11 +388,24 @@ public class BackofficeMetrics {
         }
     }
 
-    /** 최근 7일 일별 가입 수. 가입이 없는 날도 0으로 채워 그래프가 끊기지 않게 한다. */
     /**
-     * 최근 7일 활동. 가입만으로는 대부분 0 이라 화면이 비어 보인다 —
+     * 전환율(%). 모수가 0 이면 <b>0 이 아니라 null</b> 이다 — 아무도 안 온 것과 와서 다 나간 것은 다르다.
+     * 소수 한 자리까지만 남긴다. 표본이 두 자리인데 소수점 아래를 늘려 봐야 정밀해지지 않는다.
+     */
+    private static Double rate(Map<String, Object> row, String numerator, String denominator) {
+        long below = ((Number) row.get(denominator)).longValue();
+        if (below == 0) return null;
+        long above = ((Number) row.get(numerator)).longValue();
+        return Math.round(above * 1000.0 / below) / 10.0;
+    }
+
+    /**
+     * 최근 14일 활동. 가입만으로는 대부분 0 이라 화면이 비어 보인다 —
      * 실제로 움직이는 운영 활동(제보·수집 제안·카탈로그 반영)을 같이 낸다.
      * 표가 없는 환경에서는 빈 목록이고, 화면은 "기록 없음"으로 적는다(0 으로 적지 않는다).
+     *
+     * <p>창이 <b>퍼널과 같은 14일</b>이다(2026-09-21). 대시보드가 두 그래프를 나란히 놓는데 시간축이
+     * 다르면 눈으로 비교할 수 없다. 오래된 {@code weeklyActivity} 키는 이 목록의 뒤 7일이다.
      */
     private List<Map<String, Object>> activity() {
         try {
@@ -376,7 +423,7 @@ public class BackofficeMetrics {
                              WHERE a.created_at >= day AND a.created_at < day + interval '1 day'
                                AND a.outcome = 'APPLIED') AS applied
                     FROM generate_series(
-                        date_trunc('day', now()) - interval '6 days', date_trunc('day', now()), interval '1 day') AS day
+                        date_trunc('day', now()) - interval '13 days', date_trunc('day', now()), interval '1 day') AS day
                     ORDER BY day""");
         } catch (DataAccessException e) {
             return List.of();

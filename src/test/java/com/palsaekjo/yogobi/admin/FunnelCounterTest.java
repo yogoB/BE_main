@@ -51,6 +51,7 @@ class FunnelCounterTest {
 
     @BeforeEach void clear() {
         jdbc.update("DELETE FROM funnel_daily");
+        jdbc.update("DELETE FROM funnel_event");   // 사람 수·전환율이 앞 테스트의 행위자를 물려받지 않게 한다
         jdbc.execute("TRUNCATE app_user, auth_rate_limit CASCADE");   // 같은 이메일을 여러 테스트가 쓴다
     }
 
@@ -112,5 +113,51 @@ class FunnelCounterTest {
         assertThat(funnel.get("gateShown")).isEqualTo(2L);       // 실측
         assertThat(funnel.get("reportShown")).isEqualTo(1L);     // 실측
         assertThat(funnel.get("gateDropEstimate")).isEqualTo(2L - 1L);   // 뺄셈이라 이름에 Estimate 가 붙는다
+    }
+
+    /** funnel_event 에 날짜·종류·행위자를 직접 넣는다. 며칠에 걸친 표본을 MockMvc 로는 만들 수 없다. */
+    private void seen(int daysAgo, String kind, String actor) {
+        jdbc.update("INSERT INTO funnel_event (day, kind, actor_key) VALUES (CURRENT_DATE - ?, ?, ?)"
+                + " ON CONFLICT DO NOTHING", daysAgo, kind, actor);
+    }
+
+    @SuppressWarnings("unchecked")
+    private java.util.Map<String, Object> part(String key) {
+        var funnel = (java.util.Map<String, Object>) metrics.dashboard().get("funnel");
+        return (java.util.Map<String, Object>) funnel.get(key);
+    }
+
+    /** G-56 a — 사흘 온 한 사람은 1 이다. 일별 값을 더하면 3 이 되는데 그건 사람-일이지 사람이 아니다. */
+    @Test void g56a_uniqueCountsPeopleNotPersonDays() {
+        seen(0, FunnelCounter.REPORT_SHOWN, "u:1");
+        seen(1, FunnelCounter.REPORT_SHOWN, "u:1");
+        seen(2, FunnelCounter.REPORT_SHOWN, "u:1");
+
+        assertThat(part("unique").get("reportShown")).isEqualTo(1L);
+    }
+
+    /** G-56 b — 전환율은 같은 행위자가 두 단계를 다 밟았는지로 낸다. 두 합계의 나눗셈이 아니다. */
+    @Test void g56b_conversionCountsActorsPresentInBothStages() {
+        seen(0, FunnelCounter.MEMBER_LOGIN, "u:1");
+        seen(0, FunnelCounter.REPORT_SHOWN, "u:1");
+        seen(3, FunnelCounter.RESULT_SAVED, "u:1");   // 같은 사람, 다른 날 — 창 안이면 이어진다
+        seen(0, FunnelCounter.MEMBER_LOGIN, "u:2");   // 로그인만 하고 리포트는 안 봤다
+
+        var conversion = part("conversion");
+        assertThat(conversion.get("loginToReport")).isEqualTo(50.0);    // 로그인 2명 중 1명
+        assertThat(conversion.get("reportToSaved")).isEqualTo(100.0);   // 리포트 1명 중 1명
+    }
+
+    /** G-56 c — 못 내는 비율은 0 이 아니라 null 이다. 0%는 "다 이탈했다"는 말이라 거짓이 된다. */
+    @Test void g56c_unmeasurableRatesAreNullNotZero() {
+        seen(0, FunnelCounter.GATE_SHOWN, "ip:203.0.113.9");
+        seen(0, FunnelCounter.MEMBER_LOGIN, "u:1");
+
+        var conversion = part("conversion");
+        // 아무도 리포트를 안 봤다 → 모수 0
+        assertThat(conversion.get("reportToCalendar")).isNull();
+        // 비회원은 ip: 키, 회원은 u: 키다. 모집단이 달라 이을 수 없다 — 나눠서 100% 를 만들지 않는다.
+        assertThat(conversion).containsKey("gateToLogin");
+        assertThat(conversion.get("gateToLogin")).isNull();
     }
 }
