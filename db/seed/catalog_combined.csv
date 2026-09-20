@@ -1714,9 +1714,9 @@ KT엠모바일,"[최대 46만원] 데이터, 통화 모두 필요한 만큼만!"
 "프리티 (SKT, KT망)",(SKT)음성기본1G+1M,LTE,22000,1024,999999,999999,,,ALL,https://www.mvnohub.kr/product/products/7331.do,2026-09-16
 #@ mobile_plan_promo
 carrier,plan_name,promo_months,regular_price,source_url,collected_at
-A모바일(에넥스텔레콤),[Npay 5천] 10GB/100분 (6개월),6,,https://www.mvnohub.kr/product/products/7752.do,2026-09-16
-A모바일(에넥스텔레콤),[Npay 5천] 10GB/100분 (9개월),9,,https://www.mvnohub.kr/product/products/7753.do,2026-09-16
-A모바일(에넥스텔레콤),[Npay 5천] 4.5GB+1Mbps (7개월),7,,https://www.mvnohub.kr/product/products/7755.do,2026-09-16
+A모바일(에넥스텔레콤),[Npay 5천] 10GB/100분 (6개월),6,13200,https://www.mvnohub.kr/product/products/7752.do,2026-09-21
+A모바일(에넥스텔레콤),[Npay 5천] 10GB/100분 (9개월),9,12100,https://www.mvnohub.kr/product/products/7753.do,2026-09-21
+A모바일(에넥스텔레콤),[Npay 5천] 4.5GB+1Mbps (7개월),7,11000,https://www.mvnohub.kr/product/products/7755.do,2026-09-21
 KCT (티플러스),티플 5GB(5GB/300분)_12개월할인,12,11000,https://www.mvnohub.kr/product/products/7179.do,2026-09-21
 KCT (티플러스),티플포유(5G/100분)_12개월할인,12,8800,https://www.mvnohub.kr/product/products/7174.do,2026-09-21
 이지모바일,12개월 알차게 쓰자,12,19800,https://www.mvnohub.kr/product/products/5508.do,2026-09-21
@@ -1725,8 +1725,8 @@ KCT (티플러스),티플포유(5G/100분)_12개월할인,12,8800,https://www.mv
 이지모바일,[무제한]7개월 특가 71GB+3Mbps 이지하게!,7,39600,https://www.mvnohub.kr/product/products/6092.do,2026-09-21
 이지모바일,[무제한]7개월 특가 매일5GB+5Mbps 이지하게!,7,46200,https://www.mvnohub.kr/product/products/6094.do,2026-09-21
 이지모바일,[특가] 6개월 베스트 요금제 모음집!,6,44000,https://www.mvnohub.kr/product/products/6444.do,2026-09-21
-큰사람커넥트,[12개월간 990원 특가] 4.5기가 990원 요금제!,12,,https://www.mvnohub.kr/product/products/7744.do,2026-09-16
-큰사람커넥트,[SK] 12개월간 10원! 저렴한 장기할인 요금제,12,,https://www.mvnohub.kr/product/products/7743.do,2026-09-16
+큰사람커넥트,[12개월간 990원 특가] 4.5기가 990원 요금제!,12,9900,https://www.mvnohub.kr/product/products/7744.do,2026-09-21
+큰사람커넥트,[SK] 12개월간 10원! 저렴한 장기할인 요금제,12,4800,https://www.mvnohub.kr/product/products/7743.do,2026-09-21
 #@ subscription_service
 id,name,category,official_url
 1,넷플릭스,OTT,https://www.netflix.com/signup/planform
