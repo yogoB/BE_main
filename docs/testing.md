@@ -1188,3 +1188,25 @@ V27 부터 채워져 그 전 건은 비어 있고, 그 뒤 건도 그때의 카�
 **g 는 같은 사고를 눈으로 잡는 장치다**(프론트 세션 제안, 2026-09-21). 표를 `GROUP BY` 로만 읽으면
 행이 없는 종류는 결과에 아예 안 나오고 "아무도 안 했다"와 구분되지 않는다. `FunnelCounter.ALL` 을
 기준으로 좌외부조인해 **행이 없는 것 자체가 화면에 뜨게** 한다.
+
+## G-58. 놓친 단계는 남아 있는 기록에서만 되살린다 (2026-09-21)
+
+**검증**: `FunnelCounterTest` (`g58a_missedSavesAreRestoredFromTheRowsThatRemain`,
+`g58b_todayIsLeftToLiveCountingInTheCountTable`, `g58c_stagesWithoutEvidenceAreNotInvented`)
+
+V31 이 CHECK 를 넓혀도 2026-09-18~21 에 안 쌓인 값은 돌아오지 않는다. `FunnelBackfill` 이
+되살릴 수 있는 것만 되살린다.
+
+| | 상황 | 정답 |
+|---|---|---|
+| a | 같은 회원이 3일 전에 두 번, 다른 회원이 3일 전 한 번, 첫 회원이 2일 전 한 번 저장 | 사람-일 3건. 일별 횟수는 3일 전 `3`·2일 전 `1` |
+| a' | 복원을 두 번 실행 | 값이 그대로다 |
+| b | 오늘 저장한 건 | `funnel_event` 에는 들어가고 **`funnel_daily` 에는 안 들어간다** |
+| c | `CALENDAR_SHOWN`·`INPUT_STARTED` | **0건 — 만들지 않는다** |
+
+**c 가 이 케이스의 이유다.** `RESULT_SAVED` 는 `saved_result` 에 누가·언제가 행으로 남아 있어
+추정이 아니라 복원이다. 변경 시점 판정은 읽기 응답일 뿐 아무 행도 남기지 않고, 화면 입력 단계는
+그 시절에 존재하지 않던 신호다. **다른 값으로 대신 세우면 그 순간 퍼널이 증거이기를 그만둔다.**
+
+**b 는 두 번 세지 않기 위한 경계다.** `funnel_event` 는 (날짜·종류·행위자)가 기본키라 오늘까지
+넣어도 중복이 안 생기지만, `funnel_daily` 는 횟수를 누적하므로 오늘은 실시간 집계가 주인이다.

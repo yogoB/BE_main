@@ -49,11 +49,13 @@ class FunnelCounterTest {
     @Autowired AuthTokens tokens;
     @Autowired BackofficeMetrics metrics;
     @Autowired FunnelCounter counter;
+    @Autowired com.palsaekjo.yogobi.common.FunnelBackfill backfill;
 
     @BeforeEach void clear() {
         jdbc.update("DELETE FROM funnel_daily");
         jdbc.update("DELETE FROM funnel_event");   // 사람 수·전환율이 앞 테스트의 행위자를 물려받지 않게 한다
         jdbc.update("DELETE FROM member_savings");
+        jdbc.update("DELETE FROM saved_result");
         jdbc.execute("TRUNCATE app_user, auth_rate_limit CASCADE");   // 같은 이메일을 여러 테스트가 쓴다
     }
 
@@ -267,5 +269,71 @@ class FunnelCounterTest {
         assertThat(lastSeen.keySet()).isEqualTo(new java.util.TreeSet<>(FunnelCounter.ALL));
         assertThat(lastSeen.get(FunnelCounter.GATE_SHOWN)).isNotNull();
         assertThat(lastSeen.get(FunnelCounter.RESULT_SAVED)).isNull();   // 없으면 null — 키가 사라지지 않는다
+    }
+
+    /** {@code counted()} 는 종류당 한 행만 본다 — 복원은 여러 날에 걸치므로 날짜를 집어서 읽는다. */
+    private long savedOn(int daysAgo) {
+        return jdbc.queryForList("SELECT count FROM funnel_daily WHERE kind = 'RESULT_SAVED' AND day = CURRENT_DATE - ?",
+                Long.class, daysAgo).stream().findFirst().orElse(0L);
+    }
+
+    private void saved(long userId, int daysAgo) {
+        jdbc.update("""
+                INSERT INTO saved_result (user_id, request, cost, saved_at)
+                VALUES (?, '{}'::jsonb, '{}'::jsonb, now() - make_interval(days => ?))""", userId, daysAgo);
+    }
+
+    /**
+     * G-58 — 놓친 {@code RESULT_SAVED} 를 {@code saved_result} 에서 되살린다. 저장은 행이 남으므로
+     * 추정이 아니라 복원이다. 사람은 하루에 한 번만 세고, 여러 번 돌려도 결과가 같아야 한다.
+     */
+    @Test void g58a_missedSavesAreRestoredFromTheRowsThatRemain() {
+        long a = TestMembers.create(jdbc, "a@example.com");
+        long b = TestMembers.create(jdbc, "b@example.com");
+        saved(a, 3);
+        saved(a, 3);   // 같은 사람이 같은 날 두 번 저장 — 사람 수로는 1 이다
+        saved(b, 3);
+        saved(a, 2);
+
+        backfill.backfill();
+
+        assertThat(events(FunnelCounter.RESULT_SAVED)).isEqualTo(3);   // (a,3일전) (b,3일전) (a,2일전)
+        assertThat(savedOn(3)).isEqualTo(3);
+
+        assertThat(savedOn(2)).isEqualTo(1);
+
+        backfill.backfill();   // 두 번 돌려도 같아야 한다
+        assertThat(events(FunnelCounter.RESULT_SAVED)).isEqualTo(3);
+        assertThat(savedOn(3)).isEqualTo(3);
+        assertThat(savedOn(2)).isEqualTo(1);
+    }
+
+    /**
+     * G-58 b — <b>오늘치는 {@code funnel_daily} 에 넣지 않는다.</b> 오늘은 배포된 순간부터 실시간
+     * 집계가 주인이라, 복원이 거기에 더하면 두 번 세게 된다. 사람 수({@code funnel_event})는
+     * 기본키가 막아 주므로 오늘까지 넣는다.
+     */
+    @Test void g58b_todayIsLeftToLiveCountingInTheCountTable() {
+        long a = TestMembers.create(jdbc, "a@example.com");
+        saved(a, 0);
+
+        backfill.backfill();
+
+        assertThat(events(FunnelCounter.RESULT_SAVED)).isEqualTo(1);   // 사람 수는 들어간다
+        assertThat(counted(FunnelCounter.RESULT_SAVED)).isZero();      // 횟수는 실시간 집계에 맡긴다
+    }
+
+    /**
+     * G-58 c — <b>근거가 없는 단계는 만들지 않는다.</b> 변경 시점 판정은 읽기 응답일 뿐 아무 행도
+     * 남기지 않아 되살릴 수 없다. 다른 값으로 대신 세우면 그 순간 퍼널이 증거이기를 그만둔다.
+     */
+    @Test void g58c_stagesWithoutEvidenceAreNotInvented() {
+        long a = TestMembers.create(jdbc, "a@example.com");
+        saved(a, 2);
+
+        backfill.backfill();
+
+        assertThat(events(FunnelCounter.CALENDAR_SHOWN)).isZero();
+        assertThat(events("INPUT_STARTED")).isZero();
     }
 }
