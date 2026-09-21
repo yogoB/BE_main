@@ -32,7 +32,7 @@ AI 모델의 출력은 이용 조건을 확인한 자료에서 추출한 후보�
 위 5개는 **`db/seed/catalog_combined.csv` 한 파일로 합쳐 원천 데이터셋**이 됐다. 개별 파일은 변환 이력으로 남아 있다.
 
 ```
-#@ mobile_plan                ← 통신요금 1,722행
+#@ mobile_plan                ← 통신요금 1,721행
 #@ mobile_plan_promo          ← 기간 한정 특가 13행 (V32, 2026-09-21)
 #@ mobile_plan_benefit_price  ← 조건부 할인가 13행 (V34, 2026-09-21)
 #@ subscription_service       ← 구독서비스
