@@ -9,6 +9,9 @@ RUN chmod +x gradlew
 RUN ./gradlew --no-daemon dependencies > /dev/null 2>&1 || true
 COPY src ./src
 COPY db ./db
+# 골든 케이스 수를 산출물에 심는다(백오피스 "계산 오류율"). 세는 곳이 이 파일 하나뿐이라 같이 넣는다 —
+# 없으면 스탬프가 비고 대시보드는 개수를 null 로 낸다(빌드는 안 깨진다).
+COPY docs/testing.md ./docs/testing.md
 RUN ./gradlew --no-daemon clean bootJar
 
 # 런타임 스테이지: JRE 만 있으면 된다 (이미지 작게)
