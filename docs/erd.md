@@ -40,6 +40,8 @@ erDiagram
         bigint contract_discount_24m
         int promo_months
         bigint regular_price
+        bigint benefit_price
+        text benefit_label
         text age_limit
         text source_url
         date collected_at
@@ -109,6 +111,18 @@ erDiagram
 아니다. `regular_price` 는 **"N개월 이후 B원/월" 의 B** 다 — 이름과 달리 "정가"가 아니고, 13건 중
 5건은 이 값이 `base_price` 보다 **싸다**(장기할인·약정형). NULL 이면 <b>확인하지 못했다</b>는 뜻이고
 그때는 그 기간의 절감액을 숫자로 내지 않는다. 추정값을 넣지 않는다(D-43).
+
+**조건형 할인**(V34, 2026-09-21). `benefit_price` 는 **조건을 채운 사용자만 내는 금액**이고
+`benefit_label` 은 출처가 그 금액을 부르는 이름 그대로다(예: `최대 할인가(VAT포함)`). 둘은 같이
+있거나 같이 NULL 이다.
+
+기간형과 **다른 종류라서 칸을 따로 뒀다.** `promo_months` 는 달력이라 누구에게나 같고 우리가
+알지만, 조건형은 사용자마다 다르고 **우리는 모른다.** KB리브모바일 페이지가 `기본료 → 최종 혜택가`
+를 적으면서 그 조건은 어디에도 안 쓴다.
+
+**순위에는 쓰지 않는다**(G-72). 조건을 채웠는지 모르는 값으로 1순위를 정하면 조건을 못 채운
+사용자에게 없는 금액을 약속하는 셈이다. 대신 `missingInputs` 로 있다는 사실만 알린다 —
+숨기면 그 요금제는 기본료로 밀려 영영 안 보인다.
 
 `base_price` 의 뜻은 바꾸지 않았다 — **지금(1개월차) 내는 금액**이다. 기존 계산·정렬이 전부 이 값을
 쓰므로 의미를 바꾸면 순위가 통째로 흔들린다.

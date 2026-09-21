@@ -190,7 +190,8 @@ public class CatalogReader {
                 .addValue("networkType", networkType);
         var plans = jdbc.query("""
                 SELECT p.id, p.name, p.base_price, p.contract_discount_12m, p.contract_discount_24m,
-                       p.promo_months, p.regular_price, c.name AS carrier
+                       p.promo_months, p.regular_price, p.benefit_price, p.benefit_label,
+                       c.name AS carrier
                 FROM mobile_plan p JOIN carrier c ON c.id = p.carrier_id
                 WHERE p.active AND p.data_mb >= :dataMb
                   AND (%s)
@@ -200,7 +201,8 @@ public class CatalogReader {
                     contractDiscount(rs.getObject("contract_discount_24m", Long.class),
                             rs.getObject("contract_discount_12m", Long.class)),
                     rs.getString("carrier"),
-                    rs.getObject("promo_months", Integer.class), rs.getObject("regular_price", Long.class)});
+                    rs.getObject("promo_months", Integer.class), rs.getObject("regular_price", Long.class),
+                    rs.getObject("benefit_price", Long.class), rs.getString("benefit_label")});
         if (plans.isEmpty()) {
             return List.of();
         }
@@ -210,7 +212,8 @@ public class CatalogReader {
         for (Object[] p : plans) {
             long id = (Long) p[0];
             var plan = new MobilePlan(id, (String) p[1], (Long) p[2], (Long) p[3],
-                    benefitsByPlan.getOrDefault(id, List.of()), (Integer) p[5], (Long) p[6]);
+                    benefitsByPlan.getOrDefault(id, List.of()), (Integer) p[5], (Long) p[6],
+                    (Long) p[7], (String) p[8]);
             result.add(new CandidatePlan(plan, (String) p[4]));
         }
         return result;
@@ -275,6 +278,46 @@ public class CatalogReader {
     /** 망 필터가 지운 요금제 수와 그중 최저 기본료, 그리고 남은 후보의 최저 기본료. */
     public record CheaperOnOtherNetwork(long excludedCount, long cheapestExcluded, long cheapestKept) { }
 
+    /**
+     * 조건을 채우면 <b>지금 1순위보다 싸지는</b> 요금제(2026-09-21). 없으면 빈 Optional 이다.
+     *
+     * <p>조건부 할인가는 순위에 쓰지 않는다 — 조건 충족 여부를 우리가 모르기 때문이다. 그런데
+     * 쓰지 않으면 그 요금제는 <b>기본료로 경쟁해 상위에 못 든다.</b> KB리브모바일이 정확히 그렇다:
+     * `LTE 7GB+(밀리의서재)` 는 기본료 22,900원이라 밀리지만 혜택가는 3,900원이다.
+     *
+     * <p>그래서 순위는 그대로 두고 <b>있다는 사실만</b> 돌려준다. 사용자가 조건을 채울 수 있는지는
+     * 사용자만 안다 — 우리가 대신 판단하지 않고, 대신 숨기지도 않는다.
+     *
+     * <p>비교는 <b>기본료끼리</b>가 아니라 "이 요금제의 혜택가" 대 "후보 중 가장 싼 기본료"다.
+     * 구독 금액은 후보마다 같으므로 그 차이가 곧 총액 차이의 하한이다.
+     */
+    public Optional<BenefitPricedPlan> cheaperIfConditionMet(long dataMb, String networkType) {
+        var params = new MapSqlParameterSource().addValue("dataMb", dataMb).addValue("networkType", networkType);
+        Long cheapestBase = jdbc.queryForObject("""
+                SELECT min(p.base_price) FROM mobile_plan p
+                WHERE p.active AND p.data_mb >= :dataMb AND (%s) AND (%s)
+                """.formatted(NETWORK_MATCHES, OPEN_TO_ALL), params, Long.class);
+        if (cheapestBase == null) {
+            return Optional.empty();
+        }
+        var found = jdbc.query("""
+                SELECT c.name AS carrier, p.name, p.base_price, p.benefit_price, p.benefit_label
+                  FROM mobile_plan p JOIN carrier c ON c.id = p.carrier_id
+                 WHERE p.active AND p.benefit_price IS NOT NULL AND p.data_mb >= :dataMb
+                   AND (%s) AND (%s)
+                 ORDER BY p.benefit_price LIMIT 1
+                """.formatted(NETWORK_MATCHES, OPEN_TO_ALL), params,
+                (rs, i) -> new BenefitPricedPlan(rs.getString("carrier"), rs.getString("name"),
+                        rs.getLong("base_price"), rs.getLong("benefit_price"), rs.getString("benefit_label")));
+        if (found.isEmpty() || found.get(0).benefitPrice() >= cheapestBase) {
+            return Optional.empty();   // 조건을 채워도 더 싸지 않으면 할 말이 없다
+        }
+        return Optional.of(found.get(0));
+    }
+
+    /** 조건부 할인가가 붙은 요금제 하나. {@code label} 은 출처가 그 금액을 부르는 이름 그대로다. */
+    public record BenefitPricedPlan(String carrier, String name, long basePrice, long benefitPrice, String label) { }
+
     /** 계산기용 단건 조회. 없으면 빈 Optional (호출부가 404 로 변환). */
     /**
      * 지금 쓰는 요금제가 <b>후보에서 빠진 이유</b>(D-61). 후보였으면 이 값 자체가 없다.
@@ -319,7 +362,8 @@ public class CatalogReader {
     public java.util.Optional<CandidatePlan> findPlanById(long planId) {
         var plans = jdbc.query("""
                 SELECT p.id, p.name, p.base_price, p.contract_discount_12m, p.contract_discount_24m,
-                       p.promo_months, p.regular_price, c.name AS carrier
+                       p.promo_months, p.regular_price, p.benefit_price, p.benefit_label,
+                       c.name AS carrier
                 FROM mobile_plan p JOIN carrier c ON c.id = p.carrier_id
                 WHERE p.id = :id
                 """, new MapSqlParameterSource("id", planId), (rs, i) -> new Object[]{
@@ -327,14 +371,16 @@ public class CatalogReader {
                     contractDiscount(rs.getObject("contract_discount_24m", Long.class),
                             rs.getObject("contract_discount_12m", Long.class)),
                     rs.getString("carrier"),
-                    rs.getObject("promo_months", Integer.class), rs.getObject("regular_price", Long.class)});
+                    rs.getObject("promo_months", Integer.class), rs.getObject("regular_price", Long.class),
+                    rs.getObject("benefit_price", Long.class), rs.getString("benefit_label")});
         if (plans.isEmpty()) {
             return java.util.Optional.empty();
         }
         Object[] p = plans.get(0);
         long id = (Long) p[0];
         var plan = new MobilePlan(id, (String) p[1], (Long) p[2], (Long) p[3],
-                loadBenefits(List.of(id)).getOrDefault(id, List.of()), (Integer) p[5], (Long) p[6]);
+                loadBenefits(List.of(id)).getOrDefault(id, List.of()), (Integer) p[5], (Long) p[6],
+                (Long) p[7], (String) p[8]);
         return java.util.Optional.of(new CandidatePlan(plan, (String) p[4]));
     }
 

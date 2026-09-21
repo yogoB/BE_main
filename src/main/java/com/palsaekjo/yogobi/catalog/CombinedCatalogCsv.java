@@ -23,7 +23,7 @@ public final class CombinedCatalogCsv {
 
     /** 적재 순서. 혜택은 요금제를, 번들은 티어를 참조하므로 순서를 바꾸지 않는다. */
     public static final List<String> DATASETS = List.of(
-            "mobile_plan", "mobile_plan_promo", "subscription_service", "subscription_tier",
+            "mobile_plan", "mobile_plan_promo", "mobile_plan_benefit_price", "subscription_service", "subscription_tier",
             "plan_benefit", "bundle_product");
     private static final String MARKER = "#@ ";
     private static final String HEADER = """
@@ -33,6 +33,9 @@ public final class CombinedCatalogCsv {
             # mobile_plan_promo: 기간 한정 특가. (carrier, plan_name) 으로 mobile_plan 에 붙는다.
             #   promo_months  특가가 유지되는 개월 수. 요금제 이름에 적힌 값을 그대로 읽었고 출처는 그 이름이 온 공식 페이지와 같다.
             #   regular_price 특가 종료 후 월 요금. 모르면 비워 둔다 — 지어내지 않는다. 비어 있으면 그 기간의 절감액을 숫자로 내지 않는다.
+            # mobile_plan_benefit_price: 조건부 할인가. 기간형과 다르다 — 사람마다 다르고 조건 충족이 정한다.
+            #   benefit_price 조건을 채웠을 때의 월 요금. **순위 계산에 쓰지 않는다** — 조건 충족 여부를 우리가 모른다.
+            #   benefit_label 출처가 그 금액을 부르는 이름 그대로. 조건을 지어내지 않기 위한 칸이다.
             """;
 
     private CombinedCatalogCsv() {

@@ -727,6 +727,50 @@ class RecommendationApiTest {
                         .value(org.hamcrest.Matchers.empty()));
     }
 
+    /**
+     * G-72. <b>조건형 할인은 알리되 순위를 바꾸지 않는다</b>(V34, 사용자 지시 2026-09-21).
+     *
+     * <p>KB리브모바일 페이지는 {@code 기본료 → 최종 혜택가} 두 단계로 적는데(48,900 → 23,000)
+     * <b>그 조건이 페이지 어디에도 없다.</b> SKT 망 요금제는 아예 "최대 할인가" 라고 쓴다 — "최대" 는
+     * 누구나 그 값은 아니라는 뜻이다. 조건을 채웠는지 <b>우리는 모른다.</b>
+     *
+     * <p>그래서 두 가지가 동시에 참이어야 한다. 하나라도 깨지면 사용자가 손해를 본다.
+     * <ul>
+     *   <li>순위에 <b>안 쓴다</b> — 쓰면 조건을 못 채운 사용자에게 없는 금액을 약속한다(절대 원칙 1)</li>
+     *   <li>그래도 <b>알린다</b> — 안 알리면 기본료로 밀려 그 요금제는 영영 안 보인다(G-71 의 남은 한계)</li>
+     * </ul>
+     */
+    @Test
+    void g72_conditionalDiscountIsAnnouncedButNeverRanked() throws Exception {
+        // 혜택가 3,900원 — 후보 중 가장 싼 기본료(45,000)의 10분의 1 이다. 순위가 이 값을 보면 1순위가 된다.
+        jdbc.execute("""
+                INSERT INTO mobile_plan(id,carrier_id,name,network_type,base_price,data_mb,voice_min,sms_cnt,
+                                        benefit_price,benefit_label,source_url,collected_at)
+                VALUES (9,2,'혜택플랜','LTE',60000,100000,999999,9999,3900,'최대 할인가(VAT포함)',
+                        'https://m.liivm.com/','2026-09-21')""");
+        try {
+            String body = mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
+                    {"required":{"monthlyDataGb":20,"wantedServiceIds":[1]},"optional":{"contractType":"NONE"}}"""))
+                    .andExpect(status().isOk())
+                    // a — 1순위는 그대로다. 혜택플랜은 기본료 60,000원이라 가장 비싸다.
+                    .andExpect(jsonPath("$.data.results[0].planName").value("넷플플랜"))
+                    // b — 어떤 결과의 월액도 가장 싼 기본료 밑으로 내려가지 않는다. 내려갔다면 혜택가가 샌 것이다.
+                    .andExpect(jsonPath("$.data.results[?(@.monthlyTotal < 45000)]")
+                            .value(org.hamcrest.Matchers.empty()))
+                    // c — 대신 안내로 나간다. 금액과 **출처가 부르는 이름 그대로**를 싣는다(D-43).
+                    .andExpect(jsonPath("$.data.missingInputs[?(@.field=='carrierBenefitCondition')]")
+                            .value(org.hamcrest.Matchers.hasSize(1)))
+                    .andReturn().getResponse().getContentAsString();
+
+            assertThat(body).contains("월 3,900원").contains("최대 할인가(VAT포함)")
+                    .contains("기본료 60,000원");   // 조건을 못 채우면 이 금액이라는 것도 같이 말한다
+            // d — 조건 자체는 **지어내지 않는다.** 출처에 없는 말이 응답에 있으면 그 순간 D-43 위반이다.
+            assertThat(body).doesNotContain("실적").doesNotContain("카드");
+        } finally {
+            jdbc.execute("DELETE FROM mobile_plan WHERE id = 9");
+        }
+    }
+
     private void assertGap(String kind, String queryText, int expectedCount) {
         assertThat(jdbc.queryForObject(
                 "SELECT requested_cnt FROM catalog_candidate WHERE kind=? AND query_text=?",

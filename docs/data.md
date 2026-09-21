@@ -32,12 +32,18 @@ AI 모델의 출력은 이용 조건을 확인한 자료에서 추출한 후보�
 위 5개는 **`db/seed/catalog_combined.csv` 한 파일로 합쳐 원천 데이터셋**이 됐다. 개별 파일은 변환 이력으로 남아 있다.
 
 ```
-#@ mobile_plan            ← 통신요금 1,706행
-#@ subscription_service   ← 구독서비스 6행
-#@ subscription_tier      ← 구독티어 17행
-#@ plan_benefit           ← 제휴혜택 46행
-#@ bundle_product         ← 번들 7행
+#@ mobile_plan                ← 통신요금 1,722행
+#@ mobile_plan_promo          ← 기간 한정 특가 13행 (V32, 2026-09-21)
+#@ mobile_plan_benefit_price  ← 조건부 할인가 13행 (V34, 2026-09-21)
+#@ subscription_service       ← 구독서비스
+#@ subscription_tier          ← 구독티어
+#@ plan_benefit               ← 제휴혜택
+#@ bundle_product             ← 번들
 ```
+
+`mobile_plan_promo` · `mobile_plan_benefit_price` 두 섹션은 `(carrier, plan_name)` 으로
+`mobile_plan` 행에 붙고 **매번 전부 지우고 다시 쓴다** — 업서트만 하면 끝난 특가가 남는다.
+이름이 어긋나면 적재 전체가 실패한다: 다른 요금제의 금액을 우리 행에 넣는 것보다 안 올라가는 쪽이 낫다.
 
 - `#@ <dataset>` 줄이 섹션 경계, 각 섹션 첫 비주석 줄이 CSV 헤더다. 그 밖의 `#` 줄은 주석. 줄바꿈은 **LF**.
 - **원본은 이 파일, DB는 투영이다.** 쓰기는 파일(원자적 교체) → DB 전체 재적재 순서이며 DB 실패 시 파일을 되돌린다.

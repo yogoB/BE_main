@@ -253,7 +253,9 @@ AI 연결과 내부 인증은 BE가 담당하며 프론트에는 AI 주소·내�
 | `results[]` | object[] | 실질월비용 오름차순 상위 5개 |
 | `results[].monthlyTotal` | long(원) | 실질 월 총비용(유일한 비교 기준) |
 | `results[].baseline` | long(원) | 할인 없이 정가 합 |
-| `results[].monthlySavings` / `semiannualSavings` / `annualSavings` | long(원) | `baseline - monthlyTotal` / ×6 / ×12. `current` 에도 같은 세 값이 있다(D-51) |
+| `results[].monthlySavings` / `semiannualSavings` / `annualSavings` | long(원)\|null | `baseline - monthlyTotal` 과 그 6·12개월 값. `current` 에도 같은 세 값이 있다(D-51). **단순 ×6·×12 가 아니다** — 특가가 그 기간 안에 끝나면 종료 후 금액으로 나눠 계산하고, 종료 후 금액을 모르면 `null` 이다(G-66) |
+| `results[].promoMonths` | int\|null | **기간 한정 특가**가 유지되는 개월 수. `null` 이면 특가가 아니다(G-66) |
+| `results[].regularPrice` | long(원)\|null | 특가 종료 후 월 요금. `null` 은 **확인하지 못했다**는 뜻이고, 그때 `semiannualSavings`·`annualSavings` 도 `null` 이다 — 0 이 아니다. 추정값을 넣지 않는다 |
 | `results[].breakdown[]` | object[] | 항목별 내역. `amount` 할인은 음수. `provenance`·`note` |
 | `results[].breakdown[].note` | string\|null | 꼬리표. `"제휴 혜택 적용"` · `"번들 적용"`(2026-09-20). **묶음은 음수 줄을 만들지 않는다** — 등급 여러 줄이 한 줄로 바뀌므로 음수만 보면 "할인 없음"으로 읽힌다 |
 | `minimalChange` | object\|null | **번호이동 없이 요금제만 바꿀 때** 가장 싼 조합(D-55). `results[]` 와 같은 모양. 현재 통신사를 모르거나 그 통신사에 후보가 없으면 `null`. `results[0]` 과 같을 수 있다 |
@@ -269,6 +271,22 @@ AI 연결과 내부 인증은 BE가 담당하며 프론트에는 AI 주소·내�
 | `message` · `reasons[]` · `notices[]` | — | **D-50(2026-09-18): 추천 본체에서는 항상 `null`·`[]`·`[]`.** 아래 `POST /api/v1/recommendations/narrate` 가 준다 |
 | `message` | string | (narrate) 1순위 조합을 설명하는 3~5문장. **내레이터의 결정론적 템플릿이라 모델 키가 없어도 나온다.** AI에 닿지 못하면 `null`이고 화면은 자체 최소 문구로 대체한다 |
 | `reasons[]` | string[] | 1순위 조합에 대한 사유 0~3개(화면 "왜 나에게 이 상품이 추천됐나요?"). **보조 정보** — 요청에 없는 금액이 섞인 줄은 BE·AI가 폐기한다. **모델 장애 시에는 내레이터가 규칙으로 만든 사유가 온다**(D-38). BE가 AI에 아예 닿지 못하면 빈 배열이고, 결손으로 `results`가 비어도 빈 배열 |
+
+#### `missingInputs[].field` 중 **입력창이 없는 것**
+
+대부분의 `field` 는 사용자가 채울 선택 입력이지만, 아래 넷은 **화면에 입력창이 없다.**
+"비어 있다"가 아니라 "알아 둘 것이 있다"는 뜻이라 안내 자리를 같이 쓴다.
+
+| `field` | 언제 | 무엇을 말하나 |
+|---|---|---|
+| `ageLimit` | 후보에 자격 제한 요금제가 섞였을 때 | 청년·시니어 전용이 있다 |
+| `networkType` | 망을 좁혀 더 싼 요금제가 빠졌을 때 | 빠진 건수와 기본료 차액(G-64) |
+| `promotionPeriod` | 1순위가 기간 한정 특가일 때 | N개월 뒤 금액 변동. **안 바뀌면 아무 말도 하지 않는다** |
+| `carrierBenefitCondition` | 조건을 채우면 더 싼 요금제가 있을 때 | 그 금액과 **출처 표기 그대로**의 이름(G-72) |
+
+`carrierBenefitCondition` 의 금액은 **순위에 들어가지 않는다.** 조건 충족 여부를 서버가 모르기
+때문이다 — `results[]` 는 언제나 기본료 기준이다. 화면도 이 금액을 결과 카드 금액 자리에 넣지 않는다.
+조건 문구는 출처 페이지에 없어 **싣지 않는다**(D-43) — 통신사에서 확인하라고 보낸다.
 
 ### 설명 — `POST /api/v1/recommendations/narrate` (D-50)
 

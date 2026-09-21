@@ -17,11 +17,18 @@ public record MobilePlan(
         long planContractDiscount,
         List<PlanBenefit> benefits,
         Integer promoMonths,
-        Long regularPrice
+        Long regularPrice,
+        /**
+         * 조건을 채웠을 때의 월 요금. <b>계산에도 정렬에도 쓰지 않는다</b> — 조건 충족 여부를 우리가
+         * 모르기 때문이다. 있다는 사실만 화면에 알린다(절대 원칙 1 과 같은 논리).
+         */
+        Long benefitPrice,
+        /** 출처가 그 금액을 부르는 이름 그대로("최종 혜택가"·"최대 할인가"). 조건을 지어내지 않는다. */
+        String benefitLabel
 ) {
     /** 특가가 없는 요금제. 테스트와 계산기 경로가 쓴다. */
     public MobilePlan(long id, String name, long basePrice, long planContractDiscount, List<PlanBenefit> benefits) {
-        this(id, name, basePrice, planContractDiscount, benefits, null, null);
+        this(id, name, basePrice, planContractDiscount, benefits, null, null, null, null);
     }
 
     // 기간 판정은 여기 두지 않는다 — 응답을 만드는 CostResult 가 기간별로 따로 낸다(G-66).

@@ -160,6 +160,7 @@ public class RecommendationService {
                 unknownServiceIds, foreignPriced);
         addAgeRestrictionNotice(missing, dataMb, networkType);
         addNetworkNarrowingNotice(missing, dataMb, networkType);
+        addConditionalDiscountNotice(missing, dataMb, networkType);
         addPromotionPeriodNotice(missing, results);
         addFamilyBundleCarrierNotice(missing, familyDiscount, currentCarrier, results);
         addUnknownCurrentPlanNotice(missing, optional, currentPlan);
@@ -349,6 +350,33 @@ public class RecommendationService {
                         + String.format("%,d", missed.cheapestKept() - missed.cheapestExcluded())
                         + "원 더 싼 것도 있어요",
                 "지금 쓰는 망과 옮길 수 있는 망은 다를 수 있어요. 통신 규격을 '상관없어요'로 두면 같이 봐요")));
+    }
+
+    /**
+     * <b>조건형 할인</b>을 알린다 — 기간형(위의 특가)과 다른 종류다(사용자 지시 2026-09-21).
+     *
+     * <table><tr><th></th><th>기간형</th><th>조건형</th></tr>
+     * <tr><td>예</td><td>7개월 뒤 금액 변동</td><td>KB 실적을 채우면 할인</td></tr>
+     * <tr><td>누구에게나</td><td>예</td><td><b>아니오</b></td></tr>
+     * <tr><td>우리가 아는가</td><td>예(달력)</td><td><b>아니오(사용자마다 다르다)</b></td></tr></table>
+     *
+     * <p><b>순위에는 쓰지 않는다.</b> 조건을 채웠는지 모르는 값으로 1순위를 정하면 조건을 못 채운
+     * 사용자에게 없는 금액을 약속하는 셈이다 — 절대 원칙 1("미사용 혜택은 0원")과 같은 논리다.
+     * 그렇다고 숨기면 그 요금제는 기본료로 밀려 <b>영영 안 보인다.</b> 그래서 순위는 그대로 두고
+     * 있다는 사실만 알린다. 조건을 채울 수 있는지는 사용자만 안다.
+     *
+     * <p>조건 자체는 <b>적지 않는다.</b> 출처 페이지에 조건이 없다(KB리브모바일은 금액 옆에
+     * "최대 할인가(VAT포함)" 라고만 쓴다). 그래서 금액과 <b>출처가 부르는 이름 그대로</b>만 싣고,
+     * 조건은 통신사에서 확인하라고 보낸다 — 지어내면 그 순간 D-43 위반이다.
+     */
+    private void addConditionalDiscountNotice(List<MissingInput> missing, long dataMb, String networkType) {
+        catalog.cheaperIfConditionMet(dataMb, networkType).ifPresent(cheaper -> missing.add(new MissingInput(
+                "carrierBenefitCondition",
+                cheaper.carrier() + " '" + cheaper.name() + "' 는 조건을 채우면 월 "
+                        + String.format("%,d", cheaper.benefitPrice()) + "원이에요(출처 표기: "
+                        + cheaper.label() + ") — 조건 충족 여부를 저희가 알 수 없어 순위에는 넣지 않았어요",
+                "할인 조건은 통신사에서 확인해 주세요. 조건을 못 채우면 기본료 "
+                        + String.format("%,d", cheaper.basePrice()) + "원으로 계산됩니다")));
     }
 
     /**

@@ -43,6 +43,7 @@ public class CatalogSeedLoader implements ApplicationRunner {
         // 개발용 더미("5G 웨이브팩" 999999MB)가 영원히 남아 추천 1순위에 올라온다 — 운영에서 실제로 그랬다.
         loadMobilePlans(parts.get("mobile_plan"), true);
         loadMobilePlanPromos(parts.get("mobile_plan_promo"));
+        loadMobilePlanBenefitPrices(parts.get("mobile_plan_benefit_price"));
         loadPlanBenefits(parts.get("plan_benefit"));
     }
 
@@ -315,6 +316,54 @@ public class CatalogSeedLoader implements ApplicationRunner {
                         FROM seed_mobile_plan_promo s JOIN carrier c ON c.name = btrim(s.carrier)
                         WHERE m.carrier_id = c.id AND m.name = btrim(s.plan_name)
                           AND btrim(s.promo_months) <> '';
+                        """);
+                if (ownTransaction) connection.commit();
+            } catch (SQLException | IOException | RuntimeException e) {
+                if (ownTransaction) connection.rollback();
+                throw e;
+            }
+        }
+    }
+
+    /**
+     * 조건부 할인가를 요금제에 붙인다(2026-09-21). 특가 적재와 같은 규칙이다 —
+     * <b>매번 전부 지우고 다시 쓰고</b>, 이름이 안 맞는 행이 있으면 전체를 실패시킨다.
+     *
+     * <p>기간형과 다른 종류라 칼럼도 섹션도 따로 둔다. 한 칸에 섞으면 "달력이 정하는 값"과
+     * "사람마다 다른 값"이 같은 자리에 앉고, 그때부터 어느 쪽인지 코드가 물어봐야 한다.
+     */
+    void loadMobilePlanBenefitPrices(Resource prices) throws SQLException, IOException {
+        try (var connection = dataSource.getConnection()) {
+            boolean ownTransaction = connection.getAutoCommit();
+            if (ownTransaction) connection.setAutoCommit(false);
+            try {
+                execute(connection, """
+                        CREATE TEMP TABLE seed_mobile_plan_benefit_price (
+                            carrier TEXT, plan_name TEXT, benefit_price TEXT, benefit_label TEXT,
+                            source_url TEXT, collected_at TEXT
+                        ) ON COMMIT DROP""");
+                copy(connection, "mobile_plan_benefit_price", prices);
+                try (var check = connection.createStatement();
+                        var rs = check.executeQuery("""
+                                SELECT count(*) FROM seed_mobile_plan_benefit_price s
+                                WHERE btrim(s.plan_name) <> '' AND NOT EXISTS (
+                                    SELECT 1 FROM mobile_plan m JOIN carrier c ON c.id = m.carrier_id
+                                    WHERE c.name = btrim(s.carrier) AND m.name = btrim(s.plan_name))""")) {
+                    if (rs.next() && rs.getInt(1) > 0) {
+                        throw new IllegalArgumentException("mobile_plan_benefit_price 에 없는 요금제(통신사+요금제명) "
+                                + rs.getInt(1) + "건을 참조합니다. mobile_plan 시드와 이름을 맞추세요.");
+                    }
+                }
+                execute(connection, """
+                        UPDATE mobile_plan SET benefit_price = NULL, benefit_label = NULL
+                         WHERE benefit_price IS NOT NULL OR benefit_label IS NOT NULL;
+
+                        UPDATE mobile_plan m SET
+                            benefit_price = nullif(btrim(s.benefit_price), '')::BIGINT,
+                            benefit_label = nullif(btrim(s.benefit_label), '')
+                        FROM seed_mobile_plan_benefit_price s JOIN carrier c ON c.name = btrim(s.carrier)
+                        WHERE m.carrier_id = c.id AND m.name = btrim(s.plan_name)
+                          AND btrim(s.benefit_price) <> '';
                         """);
                 if (ownTransaction) connection.commit();
             } catch (SQLException | IOException | RuntimeException e) {

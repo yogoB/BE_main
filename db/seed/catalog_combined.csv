@@ -4,6 +4,9 @@
 # mobile_plan_promo: 기간 한정 특가. (carrier, plan_name) 으로 mobile_plan 에 붙는다.
 #   promo_months  특가가 유지되는 개월 수. 요금제 이름에 적힌 값을 그대로 읽었고 출처는 그 이름이 온 공식 페이지와 같다.
 #   regular_price 특가 종료 후 월 요금. 모르면 비워 둔다 — 지어내지 않는다. 비어 있으면 그 기간의 절감액을 숫자로 내지 않는다.
+# mobile_plan_benefit_price: 조건부 할인가. 기간형과 다르다 — 사람마다 다르고 조건 충족이 정한다.
+#   benefit_price 조건을 채웠을 때의 월 요금. **순위 계산에 쓰지 않는다** — 조건 충족 여부를 우리가 모른다.
+#   benefit_label 출처가 그 금액을 부르는 이름 그대로. 조건을 지어내지 않기 위한 칸이다.
 #@ mobile_plan
 carrier,plan_name,network_type,base_price,data_mb,voice_min,sms_cnt,contract_discount_12m,contract_discount_24m,age_limit,source_url,collected_at
 SKT,베스트 Max(Google AI),5G,129000,999999,999999,,,,ALL,https://m.tworld.co.kr/product/renewal/mobileplan/list,2026-09-08
@@ -1742,6 +1745,21 @@ KCT (티플러스),티플포유(5G/100분)_12개월할인,12,8800,https://www.mv
 이지모바일,[특가] 6개월 베스트 요금제 모음집!,6,44000,https://www.mvnohub.kr/product/products/6444.do,2026-09-21
 큰사람커넥트,[12개월간 990원 특가] 4.5기가 990원 요금제!,12,9900,https://www.mvnohub.kr/product/products/7744.do,2026-09-21
 큰사람커넥트,[SK] 12개월간 10원! 저렴한 장기할인 요금제,12,4800,https://www.mvnohub.kr/product/products/7743.do,2026-09-21
+#@ mobile_plan_benefit_price
+carrier,plan_name,benefit_price,benefit_label,source_url,collected_at
+KB리브모바일,5G 든든무제한 150GB+,23000,최종 혜택가,https://m.liivm.com/,2026-09-21
+KB리브모바일,LTE 71GB+(초알뜰),9900,최종 혜택가,https://m.liivm.com/,2026-09-21
+KB리브모바일,5G 95GB+(초알뜰),18500,최종 혜택가,https://m.liivm.com/,2026-09-21
+KB리브모바일,LTE 7GB+(쿠팡),5900,최종 혜택가,https://m.liivm.com/,2026-09-21
+KB리브모바일,LTE 15GB+(100분)(쿠팡),13400,최종 혜택가,https://m.liivm.com/,2026-09-21
+KB리브모바일,LTE 71GB+(쿠팡),17900,최종 혜택가,https://m.liivm.com/,2026-09-21
+KB리브모바일,LTE 150GB+(쿠팡),25400,최종 혜택가,https://m.liivm.com/,2026-09-21
+KB리브모바일,LTE 7GB+(밀리의서재),3900,최종 혜택가,https://m.liivm.com/,2026-09-21
+KB리브모바일,LTE 무제한 7GB+,17600,최대 할인가(VAT포함),https://m.liivm.com/,2026-09-21
+KB리브모바일,LTE 실속 15GB+(100분),25300,최대 할인가(VAT포함),https://m.liivm.com/,2026-09-21
+KB리브모바일,LTE 무제한 11GB+,34100,최대 할인가(VAT포함),https://m.liivm.com/,2026-09-21
+KB리브모바일,LTE 무제한 100GB+,42900,최대 할인가(VAT포함),https://m.liivm.com/,2026-09-21
+KB리브모바일,LTE 실속 1GB(100분),2200,최대 할인가(VAT포함),https://m.liivm.com/,2026-09-21
 #@ subscription_service
 id,name,category,official_url
 1,넷플릭스,OTT,https://www.netflix.com/signup/planform
