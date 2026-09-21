@@ -89,6 +89,9 @@ class YouTubePremiumOverlapTest {
         List<SubscriptionTier> lite = reader.findTiersByIds(List.of(16L, 19L));
 
         assertThat(lite).extracting(SubscriptionTier::id).containsExactly(19L);
+        // 이름은 공식 한국어 표기다. 퇴역한 16 이 그 이름을 쥐고 있어 한 번 실패했다 — V33 이 풀었다(G-68).
+        assertThat(lite).singleElement()
+                .extracting(SubscriptionTier::name).isEqualTo("유튜브 프리미엄 라이트");
         assertThat(jdbc.queryForObject(
                 "SELECT count(*) FROM subscription_tier WHERE service_id = 6 AND active", Integer.class))
                 .isEqualTo(2);   // 프리미엄 + 라이트

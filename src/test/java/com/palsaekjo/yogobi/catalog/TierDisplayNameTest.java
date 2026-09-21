@@ -123,4 +123,53 @@ class TierDisplayNameTest {
 
         assertThat(labels).hasSizeGreaterThan(100).doesNotHaveDuplicates();
     }
+
+    /**
+     * G-68. <b>퇴역한 등급의 이름을 다시 쓸 수 있다</b>(V33, 2026-09-21).
+     *
+     * <p>이 테스트가 없어서 운영을 5분 죽였다. `UNIQUE (service_id, name)` 이 <b>비활성 행에도</b>
+     * 걸려, 합본에서 내린 등급이 이름을 영원히 쥐고 있었다. 중복 등급을 하나로 합치고 살아남은 쪽에
+     * 그 이름을 주려다 기동이 실패했다.
+     *
+     * <p><b>테스트는 전부 통과했었다</b> — 새 DB 에는 퇴역 행이 존재한 적이 없기 때문이다.
+     * 그래서 여기서는 <b>운영의 모양을 일부러 만든다</b>: 같은 이름을 쥔 비활성 행을 먼저 넣고,
+     * 그 이름을 다른 활성 행에 준다. 퇴역 행이 없는 DB 에서만 도는 테스트는 이 종류를 영영 못 잡는다.
+     */
+    @Test void g68_aRetiredTierDoesNotHoldItsNameHostage() {
+        long service = serviceId("넷플릭스");
+        jdbc.update("""
+                INSERT INTO subscription_tier (id, service_id, name, price, currency, tax_included, active)
+                VALUES (9001, ?, '물러난 등급', 1000, 'KRW', true, FALSE)""", service);
+        try {
+            // 퇴역 행이 그 이름을 쥐고 있으면 여기서 터진다 — 운영에서 실제로 그렇게 터졌다.
+            jdbc.update("""
+                    INSERT INTO subscription_tier (id, service_id, name, price, currency, tax_included, active)
+                    VALUES (9002, ?, '물러난 등급', 2000, 'KRW', true, TRUE)""", service);
+
+            assertThat(jdbc.queryForObject(
+                    "SELECT count(*) FROM subscription_tier WHERE service_id = ? AND name = '물러난 등급'",
+                    Integer.class, service)).isEqualTo(2);
+            // 퇴역 행은 이름을 그대로 간직한다 — 예전에 그 id 로 저장한 결과가 같은 이름으로 읽혀야 한다.
+            assertThat(jdbc.queryForObject(
+                    "SELECT name FROM subscription_tier WHERE id = 9001", String.class)).isEqualTo("물러난 등급");
+        } finally {
+            jdbc.update("DELETE FROM subscription_tier WHERE id IN (9001, 9002)");
+        }
+    }
+
+    /** G-68 b — <b>활성끼리는 여전히 겹칠 수 없다.</b> 제약을 느슨하게 한 것이지 없앤 것이 아니다. */
+    @Test void g68b_activeTiersStillCannotShareAName() {
+        long service = serviceId("넷플릭스");
+        jdbc.update("""
+                INSERT INTO subscription_tier (id, service_id, name, price, currency, tax_included, active)
+                VALUES (9003, ?, '겹치면 안 되는 이름', 1000, 'KRW', true, TRUE)""", service);
+        try {
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbc.update("""
+                    INSERT INTO subscription_tier (id, service_id, name, price, currency, tax_included, active)
+                    VALUES (9004, ?, '겹치면 안 되는 이름', 2000, 'KRW', true, TRUE)""", service))
+                    .isInstanceOf(org.springframework.dao.DuplicateKeyException.class);
+        } finally {
+            jdbc.update("DELETE FROM subscription_tier WHERE id IN (9003, 9004)");
+        }
+    }
 }
