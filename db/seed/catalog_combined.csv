@@ -1712,6 +1712,21 @@ KT엠모바일,"[최대 46만원] 데이터, 통화 모두 필요한 만큼만!"
 "프리티 (SKT, KT망)",(KT)5G 든든한200분5G,5G,25300,5120,200,100,,,ALL,https://www.mvnohub.kr/product/products/7404.do,2026-09-16
 "프리티 (SKT, KT망)",(SKT)든든한200분6G,LTE,25300,6144,200,100,,,ALL,https://www.mvnohub.kr/product/products/7068.do,2026-09-16
 "프리티 (SKT, KT망)",(SKT)음성기본1G+1M,LTE,22000,1024,999999,999999,,,ALL,https://www.mvnohub.kr/product/products/7331.do,2026-09-16
+KB리브모바일,5G 든든무제한 150GB+,5G,48900,999999,999999,999999,,,ALL,https://m.liivm.com/,2026-09-21
+KB리브모바일,LTE 71GB+(초알뜰),LTE,39900,999999,999999,999999,,,ALL,https://m.liivm.com/,2026-09-21
+KB리브모바일,5G 95GB+(초알뜰),5G,49900,999999,999999,999999,,,ALL,https://m.liivm.com/,2026-09-21
+KB리브모바일,LTE 71GB+(혜택형),LTE,33000,999999,999999,999999,,,ALL,https://m.liivm.com/,2026-09-21
+KB리브모바일,5G 95GB+(혜택형),5G,40900,999999,999999,999999,,,ALL,https://m.liivm.com/,2026-09-21
+KB리브모바일,LTE 7GB+(쿠팡),LTE,24900,999999,999999,999999,,,ALL,https://m.liivm.com/,2026-09-21
+KB리브모바일,LTE 15GB+(100분)(쿠팡),LTE,34900,999999,100,100,,,ALL,https://m.liivm.com/,2026-09-21
+KB리브모바일,LTE 71GB+(쿠팡),LTE,41900,999999,999999,999999,,,ALL,https://m.liivm.com/,2026-09-21
+KB리브모바일,LTE 150GB+(쿠팡),LTE,51900,999999,999999,999999,,,ALL,https://m.liivm.com/,2026-09-21
+KB리브모바일,LTE 7GB+(밀리의서재),LTE,22900,999999,999999,999999,,,ALL,https://m.liivm.com/,2026-09-21
+KB리브모바일,LTE 무제한 7GB+,LTE,22000,999999,999999,999999,,,ALL,https://m.liivm.com/,2026-09-21
+KB리브모바일,LTE 실속 15GB+(100분),LTE,29700,999999,100,100,,,ALL,https://m.liivm.com/,2026-09-21
+KB리브모바일,LTE 무제한 11GB+,LTE,38500,999999,999999,999999,,,ALL,https://m.liivm.com/,2026-09-21
+KB리브모바일,LTE 무제한 100GB+,LTE,47300,999999,999999,999999,,,ALL,https://m.liivm.com/,2026-09-21
+KB리브모바일,LTE 실속 1GB(100분),LTE,6600,1024,100,100,,,ALL,https://m.liivm.com/,2026-09-21
 #@ mobile_plan_promo
 carrier,plan_name,promo_months,regular_price,source_url,collected_at
 A모바일(에넥스텔레콤),[Npay 5천] 10GB/100분 (6개월),6,13200,https://www.mvnohub.kr/product/products/7752.do,2026-09-21
