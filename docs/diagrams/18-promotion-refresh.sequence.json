@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "요고비 · 기간 한정 특가 일일 갱신 (AI 계약 §9)",
+    "quality_profile": "showcase",
+    "column_fit": "spread",
+    "viewBox": [
+      1080,
+      560
+    ]
+  },
+  "participants": [
+    {
+      "id": "cron",
+      "type": "backend",
+      "label": "CatalogDailyHarvest",
+      "sublabel": "매일 09:00 KST"
+    },
+    {
+      "id": "oracle",
+      "type": "backend",
+      "label": "PlanPromotionOracle",
+      "sublabel": "쿨다운 6시간·읽기 90초"
+    },
+    {
+      "id": "narrator",
+      "type": "external",
+      "label": "내레이터 서버",
+      "sublabel": "읽고 인용만 한다"
+    },
+    {
+      "id": "review",
+      "type": "backend",
+      "label": "검수함",
+      "sublabel": "catalog_change_request"
+    },
+    {
+      "id": "operator",
+      "type": "frontend",
+      "label": "운영자",
+      "sublabel": "승인해야 반영된다"
+    }
+  ],
+  "messages": [
+    {
+      "id": "pick",
+      "from": "cron",
+      "to": "oracle",
+      "y": 170,
+      "label": "특가 표시된 요금제의 상품 번호",
+      "note": "이미 promo_months 가 있는 행만. 새 특가를 찾지 않는다 — 발견은 사람의 검수 절차다. 번호는 source_url 에서 뽑고 형식이 다르면 버린다",
+      "variant": "emphasis"
+    },
+    {
+      "id": "call",
+      "from": "oracle",
+      "to": "narrator",
+      "y": 212,
+      "label": "POST /operations/plans/promotions/check",
+      "note": "1~30개. 저쪽이 상품마다 1.2초를 쉬며 읽으므로 30개면 약 36초다 — 읽기 제한을 90초로 둔 이유"
+    },
+    {
+      "id": "rows",
+      "from": "narrator",
+      "to": "oracle",
+      "y": 254,
+      "label": "promotions[] + failures[]",
+      "note": "200 안에서 행 단위로 갈린다. 한 상품을 못 읽어도 나머지는 온다. regularPrice 는 'N개월 이후 B원/월' 의 B 이고 지금보다 쌀 수도 있다",
+      "variant": "emphasis"
+    },
+    {
+      "id": "keep",
+      "from": "oracle",
+      "to": "cron",
+      "y": 296,
+      "label": "못 읽은 번호는 그대로 둔다",
+      "note": "못 읽은 것과 특가가 끝난 것은 다르다. 지우는 제안을 아예 만들지 않는다 — 특가 종료는 사람이 합본에서 행을 빼는 것으로만 일어난다",
+      "variant": "security"
+    },
+    {
+      "id": "drift",
+      "from": "cron",
+      "to": "review",
+      "y": 338,
+      "label": "이름이 어긋나면 제안하지 않는다",
+      "note": "다른 상품의 값을 우리 행에 넣을 수 없다. PROMOTION_NAME_DRIFT 로 운영 타임라인에만 남긴다"
+    },
+    {
+      "id": "propose",
+      "from": "cron",
+      "to": "review",
+      "y": 380,
+      "label": "달라진 것만 UPDATE 제안",
+      "note": "dataset=mobile_plan_promo. 같은 대상의 PENDING 제안이 있으면 또 만들지 않는다 — 매일 같은 줄이 쌓이면 검수함이 못 쓰게 된다"
+    },
+    {
+      "id": "approve",
+      "from": "operator",
+      "to": "review",
+      "y": 422,
+      "label": "승인",
+      "note": "승인 전에는 합본 CSV 도 DB 도 바뀌지 않는다(D-28). 원문 인용이 제안에 붙어 있어 사람이 그 자리에서 대조한다",
+      "variant": "emphasis"
+    },
+    {
+      "id": "apply",
+      "from": "review",
+      "to": "cron",
+      "y": 464,
+      "label": "합본 CSV → DB 반영",
+      "note": "기간 절감액이 여기서 바뀐다. regular_price 가 차면 12개월 값이 빈칸에서 숫자로 돌아온다(G-66)"
+    }
+  ]
+}

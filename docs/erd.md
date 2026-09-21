@@ -1,7 +1,7 @@
 # DB ERD
 
 > **마이그레이션에서 재구성해 손으로 묶었다.** 원본은 `db/migration/V*.sql` 이고, 이 문서와 어긋나면
-> 마이그레이션이 옳다. 최종 확인 **2026-09-20 · V1~V29 · 테이블 29개**.
+> 마이그레이션이 옳다. 최종 확인 **2026-09-21 · V1~V33 · 테이블 29개**.
 >
 > 제약(CHECK·UNIQUE)과 인덱스는 싣지 않았다 — 그림이 읽히지 않는다. 필요하면 마이그레이션을 본다.
 
@@ -38,6 +38,8 @@ erDiagram
         bigint sms_cnt
         bigint contract_discount_12m
         bigint contract_discount_24m
+        int promo_months
+        bigint regular_price
         text age_limit
         text source_url
         date collected_at
@@ -102,6 +104,19 @@ erDiagram
     subscription_service ||--o{ merchant_alias : "service_id"
 ```
 
+
+**기간 한정 특가**(V32, 2026-09-21). `promo_months` 는 특가가 유지되는 개월 수이고 NULL 이면 특가가
+아니다. `regular_price` 는 **"N개월 이후 B원/월" 의 B** 다 — 이름과 달리 "정가"가 아니고, 13건 중
+5건은 이 값이 `base_price` 보다 **싸다**(장기할인·약정형). NULL 이면 <b>확인하지 못했다</b>는 뜻이고
+그때는 그 기간의 절감액을 숫자로 내지 않는다. 추정값을 넣지 않는다(D-43).
+
+`base_price` 의 뜻은 바꾸지 않았다 — **지금(1개월차) 내는 금액**이다. 기존 계산·정렬이 전부 이 값을
+쓰므로 의미를 바꾸면 순위가 통째로 흔들린다.
+
+**등급 이름의 유일성은 활성 행에만 걸린다**(V33, 2026-09-21). `subscription_tier` 의
+`UNIQUE (service_id, name)` 이 비활성 행에도 걸려 있어, 합본에서 내린 등급이 그 이름을 영원히
+점유했다 — 이름을 재사용하려다 **운영이 5분 죽었다**. 부분 유니크 인덱스로 바꿔 퇴역 행은 이름을
+간직하되 점유하지 않는다. 예전에 그 id 로 저장한 결과도 같은 이름으로 읽힌다.
 
 ## 회원·인증
 

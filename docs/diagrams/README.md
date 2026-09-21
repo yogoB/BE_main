@@ -31,7 +31,8 @@
 | [14 결제 업로드](14-payment-import.html) | 회원 Mock JSON 검증·가맹점 정규화·외부 결제 분석본 저장 | `subscription/MePaymentController.java`, `PaymentImportService.java`, `port/MockMydataProvider.java`, `MerchantNormalizer.java` |
 | [15 검수 CSV 발행과 DB 반영](15-catalog-refresh.html) | 운영자 검수·승인 파일 발행, 60초마다 전체 트랜잭션 반영 | `scripts/catalog_csv.py`(레포 루트), `catalog/CatalogCsvSync.java`, `CatalogSeedLoader.java`, V9 |
 | [16 비회원 정보 오류 제보](16-catalog-report.html) | CSRF·입력·빈도·대상 검증 후 PENDING 접수 | `catalog/CatalogReportController.java`, `user/AuthRateLimit.java`, `SecurityConfig.java` |
-| **[17 결과·설명 분리 · 후보 제외 사유](17-narrate-split.html)** `신규 2026-09-20` | 표를 먼저 그리고 설명은 펼칠 때 받는다(D-50). 지금 요금제가 후보에서 빠진 이유를 서버가 말한다(D-61) | `recommend/RecommendationController.java`, `RecommendationService.java`, `catalog/CatalogReader.java`, `recommend/NarratorClient.java` |
+| **[17 결과·설명 분리 · 후보 제외 사유](17-narrate-split.html)** | 표를 먼저 그리고 설명은 펼칠 때 받는다(D-50). 지금 요금제가 후보에서 빠진 이유를 서버가 말한다(D-61) | `recommend/RecommendationController.java`, `RecommendationService.java`, `catalog/CatalogReader.java`, `recommend/NarratorClient.java` |
+| **[18 기간 한정 특가 일일 갱신](18-promotion-refresh.html)** `신규 2026-09-21` | 09:00 배치가 공식 페이지로 특가를 다시 확인해 달라진 것만 검수함에 올린다(AI 계약 §9). **못 읽은 상품은 기존 값을 그대로 둔다** — 못 읽은 것과 특가가 끝난 것은 다르다 | `admin/CatalogDailyHarvest.java`, `catalog/PlanPromotionOracle.java`, `catalog/CatalogChangeRequests.java` |
 
 ## 읽는 방법과 현재 제한
 
