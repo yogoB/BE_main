@@ -21,15 +21,23 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
     private final AuthService members;
     private final AuthTokens tokens;
+    private final GoogleLogin google;
 
-    public AuthController(AuthService members, AuthTokens tokens) {
-        this.members = members; this.tokens = tokens;
+    public AuthController(AuthService members, AuthTokens tokens, GoogleLogin google) {
+        this.members = members; this.tokens = tokens; this.google = google;
     }
 
     @GetMapping("/auth/csrf")
     public ApiResponse<Map<String, String>> csrf(CsrfToken token, HttpServletResponse response) {
         response.setHeader("Cache-Control", "no-store");
         return ApiResponse.ok(Map.of("headerName", token.getHeaderName(), "token", token.getToken()));
+    }
+
+    /** OAuth 시작 전에 필수·선택 동의를 같은 HTTP 세션에 보관한다. */
+    @PostMapping("/auth/consent")
+    public ApiResponse<Map<String, Boolean>> consent(@RequestBody JsonNode body, HttpServletRequest request) {
+        google.rememberConsent(request, body);
+        return ApiResponse.ok(Map.of("accepted", true));
     }
 
     @GetMapping("/me/sessions")

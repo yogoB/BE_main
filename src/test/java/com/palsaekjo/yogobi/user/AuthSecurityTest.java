@@ -154,6 +154,12 @@ class AuthSecurityTest {
     }
     record Flow(Browser browser, Map<String,String> query, MockHttpSession session) { }
     Flow start(Browser browser) throws Exception {
+        browser.post("/api/v1/auth/consent", Map.of(
+                "age14", true, "terms", true, "privacy", true, "savingsAlerts", false, "marketing", false))
+                .andExpect(status().isOk());
+        return oauth(browser);
+    }
+    Flow oauth(Browser browser) throws Exception {
         var req = withCookies(get("/oauth2/authorization/google"), browser.cookies);
         if (browser.session != null && !browser.session.isInvalid()) req.session(browser.session);
         var r = mvc.perform(req).andExpect(status().is3xxRedirection()).andReturn();
@@ -203,6 +209,28 @@ class AuthSecurityTest {
         mvc.perform(get("/api/v1/me")).andExpect(status().isUnauthorized());
         mvc.perform(get("/api/v1/me/subscriptions")).andExpect(status().isUnauthorized());
         mvc.perform(get("/api/v1/me/detections")).andExpect(status().isUnauthorized());
+    }
+
+    @Test void googleLoginRequiresServerSideConsentAndPersistsOptionalChoices() throws Exception {
+        mvc.perform(get("/oauth2/authorization/google"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.field").value("consent"));
+
+        Browser browser = new Browser();
+        browser.post("/api/v1/auth/consent", Map.of(
+                "age14", false, "terms", true, "privacy", true, "savingsAlerts", true, "marketing", true))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.field").value("age14"));
+        browser.post("/api/v1/auth/consent", Map.of(
+                "age14", true, "terms", true, "privacy", true, "savingsAlerts", true, "marketing", true))
+                .andExpect(status().isOk());
+
+        Flow flow = oauth(browser);
+        callback(flow, grant(flow, "consented-user", "consented@example.com", claims -> {}, RSA))
+                .andExpect(redirectedUrl("https://frontend.example/#auth=success"));
+        assertEquals(Set.of("ESSENTIAL", "SAVINGS_ALERT", "MARKETING"), new HashSet<>(jdbc.queryForList(
+                "SELECT item FROM user_consent WHERE user_id=(SELECT id FROM app_user WHERE email='consented@example.com')",
+                String.class)));
     }
 
     @Test void cookiesAreHttpOnlyHostOnlySecureAndTokensNeverAppearInJson() throws Exception {
@@ -259,13 +287,17 @@ class AuthSecurityTest {
      * 곳은 **로그인 입구 자체**다. X-Forwarded-For 를 바꿔도 같은 발신지로 센다.
      */
     @Test void ipRateLimitCountsTheRealPeerAndIgnoresForwardedForSpoofing() throws Exception {
-        for (int i = 0; i < 40; i++)
-            mvc.perform(get("/oauth2/authorization/google").header("X-Forwarded-For", "192.0.2." + i))
-                    .andExpect(status().is3xxRedirection());
+        // 동의 POST + OAuth GET 이 로그인 한 번에 두 번 센다. 운영 상한은 2000이고 테스트만 40으로 낮춘다.
+        for (int i = 0; i < 20; i++) start(new Browser());
         mvc.perform(get("/oauth2/authorization/google").header("X-Forwarded-For", "198.51.100.1"))
                 .andExpect(status().isTooManyRequests());
         // 프론트 nginx 가 넘기는 X-Client-IP 는 발신지별 버킷이다(H-1) — 한 사람이 막혀도 다른 사람은 들어온다.
-        mvc.perform(get("/oauth2/authorization/google").header("X-Client-IP", "203.0.113.7"))
+        Browser other = new Browser(); other.csrf();
+        mvc.perform(postJson("/api/v1/auth/consent", Map.of(
+                        "age14", true, "terms", true, "privacy", true, "savingsAlerts", false, "marketing", false))
+                        .session(other.session).header("X-CSRF-TOKEN", other.csrf).header("X-Client-IP", "203.0.113.7"))
+                .andExpect(status().isOk());
+        mvc.perform(get("/oauth2/authorization/google").session(other.session).header("X-Client-IP", "203.0.113.7"))
                 .andExpect(status().is3xxRedirection());
     }
 

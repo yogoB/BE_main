@@ -239,7 +239,8 @@ BE가 `Authorization: Bearer <NARRATOR_INTERNAL_TOKEN>`으로 호출한다. 사�
 |---|---|---|
 | POST | `/api/v1/auth/logout` `/logout-all` | 로그아웃 · 이 회원의 모든 로그인 무효화 |
 | GET | `/api/v1/auth/csrf` | 회원 변경·비회원 제보 요청용 CSRF 토큰 |
-| GET | `/oauth2/authorization/google` → `/login/oauth2/code/google` | **유일한 가입·로그인 경로**(D-34). 콜백 후 `AUTH_RETURN_URL#auth=...` |
+| POST | `/api/v1/auth/consent` | OAuth 직전 동의 세션 저장 `{age14,terms,privacy,savingsAlerts,marketing}`. 앞의 3개는 `true` 필수 |
+| GET | `/oauth2/authorization/google` → `/login/oauth2/code/google` | **유일한 가입·로그인 경로**(D-34). 같은 HTTP 세션의 필수 동의가 없으면 400, 콜백 후 `AUTH_RETURN_URL#auth=...` |
 | POST | `/api/v1/me/nickname` | 닉네임 변경 — `{nickname}` (D-22) |
 | GET | `/api/v1/me` | 인증된 현재 회원 조회 |
 | GET/DELETE | `/api/v1/me/sessions` `/{id}` | 로그인 세션 목록 · 개별 세션 폐기 |
@@ -515,8 +516,9 @@ IP 버킷 키는 프론트 nginx 가 넘기는 `X-Client-IP`(Fly 엣지가 준 �
 ### 개인정보 (V5 마이그레이션)
 삭제권(파기): V2 개인 테이블(`user_subscription`·`payment_record`·`detection_result`) FK에 `ON DELETE CASCADE` 부여.
 `DELETE app_user`로 일반 이용 데이터가 파기된다(auth_session·auth_email_token은 V3/V4에서 이미 cascade). V6의 별도 법정 보존 사본은 이 FK 경로에 연결하지 않는다.
-`user_consent`(id, user_id FK cascade, item `ESSENTIAL|MARKETING`, policy_version, agreed_at, withdrawn_at, UNIQUE(user_id,item)):
-필수는 가입 시 자동 기록(계약 이행), 선택은 `/me/consent/marketing`로 동의/철회. 보유기간 초과분은 `RetentionService`가 파기.
+`user_consent`(id, user_id FK cascade, item `ESSENTIAL|SAVINGS_ALERT|MARKETING`, policy_version, agreed_at, withdrawn_at, UNIQUE(user_id,item)):
+OAuth 직전 서버 세션에서 필수 동의를 검증하고 가입·로그인 성공 시 필수와 체크한 선택 항목을 기록한다.
+마케팅은 `/me/consent/marketing`로 동의/철회한다. 보유기간 초과분은 `RetentionService`가 파기.
 
 ### 법정 보존 예외 (V6, 2026-09-12 팀원 리뷰 반영)
 `payment_record`는 사용자 반입 외부 구독 분석 내역이며 CASCADE·12개월 보유 정책을 유지한다.

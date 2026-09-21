@@ -36,17 +36,19 @@ IP 기반 요청 제한은 기존 `auth_rate_limit`의 해시 버킷으로 15분
 
 ## 수집·이용 동의
 
-- **필수(ESSENTIAL)**: 가입(`AuthService.signup`·`googleLogin`) 시 현재 정책 버전으로 자동 기록. 계약 이행 근거이므로 철회 불가.
-- **선택(MARKETING)**: 기본 미동의(행 없음). `POST /api/v1/me/consent/marketing`로 동의/철회. 철회는 `withdrawn_at` 표시.
+- **필수(ESSENTIAL)**: OAuth 직전 `age14`·`terms`·`privacy`를 모두 확인하고, 가입·로그인 성공 시 현재 정책 버전으로 기록. 계약 이행 근거이므로 철회 불가.
+- **선택(SAVINGS_ALERT)**: 절감 추천 알림 동의. 기본 미동의(행 없음), OAuth 직전 체크한 경우에만 기록. 발송 기능은 아직 없다.
+- **선택(MARKETING)**: 이벤트·혜택 정보 수신 동의. 기본 미동의(행 없음). OAuth 직전 체크하거나 `POST /api/v1/me/consent/marketing`로 동의하며, 후자에서 철회하면 `withdrawn_at`을 표시한다.
 - `user_consent`는 `(user_id, item)` UNIQUE. 재동의는 버전·시각 갱신.
 
 ### 처리방침 버전이 오르면 (2026-09-17 신설)
 
-기존 회원의 `policy_version`이 뒤처진다. **두 항목의 근거가 달라 처리도 다르다.**
+기존 회원의 `policy_version`이 뒤처진다. **필수와 선택 항목의 근거가 달라 처리도 다르다.**
 
 | 항목 | 근거 | 버전이 오르면 |
 |---|---|---|
 | ESSENTIAL | 계약 이행 | **고지**다. 서비스를 막지 않는다. 사용자가 확인하면 그 시점을 새 버전으로 기록 |
+| SAVINGS_ALERT | 동의 | **자동 승계하지 않는다.** 다시 체크해야 현재 버전 동의로 기록 |
 | MARKETING | 동의 | **자동 승계하지 않는다.** 기록은 남기고 `current:false`로 드러내며, 다시 받아야 유효 |
 
 - `GET /api/v1/me/consent`의 각 항목에 `current`(현재 방침 버전인가)가 실린다.

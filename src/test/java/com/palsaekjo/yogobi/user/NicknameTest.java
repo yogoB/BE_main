@@ -86,7 +86,8 @@ class NicknameTest {
     }
 
     @Test void g14b_generatesNicknameFromEmailLocalPartOnGoogleSignup() {
-        var member = members.googleLogin(googleUser("google-1", "seunghun@example.com"));
+        var member = members.googleLogin(googleUser("google-1", "seunghun@example.com"),
+                new com.palsaekjo.yogobi.privacy.ConsentService.LoginConsent(false, false));
         // 이름이 없으므로 이메일 앞부분 + 숫자 5자다.
         assertThat(member.nickname()).matches("seunghun\\d{5}");
         assertThat(member.googleLogin()).isTrue();
@@ -94,9 +95,11 @@ class NicknameTest {
     }
 
     @Test void g14c_generatedNicknameNeverCollides() {
-        var first = members.googleLogin(googleUser("google-1", "same@example.com"));
+        var first = members.googleLogin(googleUser("google-1", "same@example.com"),
+                new com.palsaekjo.yogobi.privacy.ConsentService.LoginConsent(false, false));
         // 같은 앞부분을 쓰는 다른 계정이 와도 닉네임이 겹치지 않는다.
-        var second = members.googleLogin(googleUser("google-2", "same@other.example.com"));
+        var second = members.googleLogin(googleUser("google-2", "same@other.example.com"),
+                new com.palsaekjo.yogobi.privacy.ConsentService.LoginConsent(false, false));
         assertThat(second.nickname()).isNotEqualTo(first.nickname());
         assertThat(jdbc.queryForObject("SELECT count(DISTINCT nickname) FROM app_user", Integer.class)).isEqualTo(2);
     }

@@ -51,7 +51,7 @@ public final class PrivacyPolicy {
                         "탈퇴와 무관하게 확정 만료일까지 분리 보관 후 파기. 회원 ID·이메일·인증 정보는 복사하지 않음"),
                 new Item("인증 세션", List.of("auth_session(SHA-256 지문)", "user_agent"),
                         "로그인 유지·세션 관리", "계약 이행", "만료 24시간·유휴 2시간 후 파기(D-48)"),
-                new Item("동의 증빙", List.of("user_consent"),
+                new Item("동의 증빙", List.of("user_consent(필수·절감 추천 알림·이벤트/혜택 수신)"),
                         "수집·이용 동의 기록 보관", "법령상 의무", "탈퇴 시 파기"),
                 new Item("정보 오류 제보", List.of("대상 상품·오류 항목·설명·선택 출처 링크"),
                         "제보 확인·카탈로그 정정", "제보자의 자발적 제출",

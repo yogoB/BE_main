@@ -1,6 +1,7 @@
 package com.palsaekjo.yogobi.user;
 
 import com.palsaekjo.yogobi.common.ApiException;
+import com.palsaekjo.yogobi.privacy.ConsentService;
 import java.util.Locale;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -11,10 +12,11 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class AuthService {
     private final JdbcTemplate jdbc;
+    private final ConsentService consent;
     private final java.security.SecureRandom random = new java.security.SecureRandom();
 
-    public AuthService(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public AuthService(JdbcTemplate jdbc, ConsentService consent) {
+        this.jdbc = jdbc; this.consent = consent;
     }
 
     /** {@code localLogin} 은 D-34 이후 항상 false 다 — 우리가 보관하는 비밀번호가 없다. */
@@ -81,12 +83,6 @@ public class AuthService {
         if (jdbc.update("DELETE FROM app_user WHERE id=?", id) != 1) throw unauthorized();
     }
 
-    // 가입 시 필수 처리(계약 이행) 동의를 현재 처리방침 버전으로 기록한다. 같은 트랜잭션에서 실행.
-    private void recordEssentialConsent(long id) {
-        jdbc.update("INSERT INTO user_consent(user_id,item,policy_version) VALUES (?,'ESSENTIAL',?)",
-                id, com.palsaekjo.yogobi.privacy.PrivacyPolicy.VERSION);
-    }
-
     public Member member(long id) {
         return jdbc.query("SELECT id,email,name,nickname,password_hash IS NOT NULL,google_sub IS NOT NULL,current_plan_id,credential_version,email_verified FROM app_user WHERE id=?",
                 (rs, i) -> new Member(rs.getLong(1), rs.getString(2), rs.getString(3), rs.getString(4),
@@ -95,15 +91,18 @@ public class AuthService {
     }
 
     @Transactional
-    public Member googleLogin(OidcUser google) {
+    public Member googleLogin(OidcUser google, ConsentService.LoginConsent choices) {
         String email = googleEmail(google);
         var ids = jdbc.query("SELECT id FROM app_user WHERE google_sub=?", (rs, i) -> rs.getLong(1), google.getSubject());
-        if (!ids.isEmpty()) return member(ids.getFirst());
+        if (!ids.isEmpty()) {
+            consent.recordLogin(ids.getFirst(), choices);
+            return member(ids.getFirst());
+        }
         try {
             long id = jdbc.queryForObject(
                     "INSERT INTO app_user(email,google_sub,email_verified,nickname) VALUES (?,?,TRUE,?) RETURNING id",
                     Long.class, email, google.getSubject(), freshNickname(null, email));
-            recordEssentialConsent(id);
+            consent.recordLogin(id, choices);
             return member(id);
         } catch (DuplicateKeyException e) { throw conflict(); } // Never auto-link by email.
     }

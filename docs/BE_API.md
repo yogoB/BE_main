@@ -155,7 +155,7 @@ AI 연결과 내부 인증은 BE가 담당하며 프론트에는 AI 주소·내�
 | `benefitType` | `FREE` · `FIXED_DISCOUNT` · `RATE_DISCOUNT` · `BUNDLE_INCLUDED` | 제휴 혜택 형태 |
 | detection `rule` | `BENEFIT_OVERLAP` · `TIER_DUPLICATE` · `BUNDLE_OVERLAP` | 중복/낭비 탐지 규칙 |
 | switch-timing `status` | `SWITCH_NOW` · `WAIT_UNTIL_EXPIRY` · `NO_BENEFIT` | 변경 시점 판정 |
-| consent `item` | `ESSENTIAL`(철회 불가) · `MARKETING` | 수집·이용 동의 항목 |
+| consent `item` | `ESSENTIAL`(철회 불가) · `SAVINGS_ALERT` · `MARKETING` | 수집·이용 동의 항목 |
 
 **구독 서비스 ID 고정값**: 1 넷플릭스 · 2 디즈니+ · 3 티빙 · 4 웨이브 · 5 왓챠 · 6 유튜브 프리미엄
 
@@ -455,6 +455,7 @@ JWT 절대 수명 24시간·유휴 제한 2시간(refresh 없음, D-48). 상태�
 |---|---|---|---|
 | GET | `/oauth2/authorization/google` → `/login/oauth2/code/google` | — | **유일한 가입·로그인 경로.** 완료 후 `AUTH_RETURN_URL#auth=success\|failed\|account-conflict` 로 리다이렉트 |
 | GET | `/api/v1/auth/csrf` | — | `{headerName,token}` — 공개. 헤더 이름은 `X-CSRF-TOKEN` |
+| POST | `/api/v1/auth/consent` | `{age14,terms,privacy,savingsAlerts,marketing}`, CSRF | `{accepted:true}`. 앞의 3개가 `true`여야 하며 같은 세션에서만 OAuth 시작 가능 |
 | POST | `/api/v1/auth/logout` | 인증+CSRF | `{loggedOut:true}` — 현재 로그인만 폐기 |
 | POST | `/api/v1/auth/logout-all` | 인증+CSRF | `{loggedOut:true}` — 이 회원의 모든 로그인 폐기 |
 | GET | `/api/v1/me` | 인증 | 현재 회원 |
@@ -677,7 +678,8 @@ JWT 절대 수명 24시간·유휴 제한 2시간(refresh 없음, D-48). 상태�
 ] }
 ```
 
-`ESSENTIAL`(필수)은 가입 시 기록되며 **철회 불가**(계약 이행 근거). `MARKETING`(선택)만 6-3 으로 변경한다.
+`ESSENTIAL`(필수)은 OAuth 직전에 확인하여 가입·로그인 성공 시 기록되며 **철회 불가**(계약 이행 근거)다.
+`SAVINGS_ALERT`·`MARKETING` 은 사용자가 체크한 경우에만 기록하고, 각각 6-3b·6-3 으로 변경한다.
 
 `current` 는 이 기록이 **지금 처리방침 버전**에 대한 것인지다. 하나라도 `false` 면 화면이 다시 물어야 한다.
 `MARKETING` 이 `agreed:true, current:false` 면 **구버전 동의이며 유효하지 않다** — 발송 전에 다시 받아야 한다.

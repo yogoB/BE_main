@@ -64,7 +64,7 @@
 | 가맹점 별칭 | `MerchantAlias` | |
 | 약정 / 프로모션 | `Contract` / `Promotion` | Phase 2 |
 | 개인정보 처리방침·인벤토리 | `PrivacyPolicy` | 항목·목적·보유기간 단일 출처, 공개 조회. 보유기간 상수는 파기 기준 재사용 |
-| 수집·이용 동의 | `user_consent` / `ConsentService` | 필수(`ESSENTIAL`)·선택(`MARKETING`). `Consent` `Agreement` 단독 식별자 금지 |
+| 수집·이용 동의 | `user_consent` / `ConsentService` | 필수(`ESSENTIAL`)·선택(`SAVINGS_ALERT`·`MARKETING`). `Consent` `Agreement` 단독 식별자 금지 |
 | 보유기간 파기 | `RetentionService` | 보유기간 초과 개인데이터·만료 인증 흔적 자동 파기(@Scheduled) |
 | 회원 탈퇴(삭제권) | `AuthService.deleteAccount` | `app_user` 삭제가 FK cascade 로 개인데이터 전파 파기 |
 | 법정 보존 결제 사본 | `retained_payment_record` / `PaymentRetentionService` | 확인된 보존 의무만 분리 보관. 회원 FK·이메일·인증 정보는 복사하지 않음 |

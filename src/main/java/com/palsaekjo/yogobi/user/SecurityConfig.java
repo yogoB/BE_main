@@ -126,6 +126,7 @@ public class SecurityConfig {
                                 // 서버가 관측하는 단계는 받지 않는다 — FunnelEventController 참고.
                                 "/api/v1/events",
                                 "/api/v1/catalog/reports", "/api/v1/reports",
+                                "/api/v1/auth/consent",
                                 // 백오피스 로그인만 공개다(D-32). 나머지 /admin/** 은 아래에서 ADMIN 전용.
                                 // 가입·로그인은 Google 하나뿐이다(D-34) — 아래 /oauth2 경로가 그 입구다.
                                 "/api/v1/admin/login").permitAll()
@@ -164,7 +165,10 @@ public class SecurityConfig {
                             // 이벤트는 별도 버킷이다. 화면이 많이 보내도 추천 예산을 갉아먹지 않는다.
                             if ("POST".equals(req.getMethod()) && path.equals("/api/v1/events"))
                                 limits.check("evt:" + clientKey(req), calcLimit);
-                            if (path.equals("/oauth2/authorization/google")) google.requireEnabled();
+                            if (path.equals("/oauth2/authorization/google")) {
+                                google.requireEnabled();
+                                google.requireConsent(req);
+                            }
                             chain.doFilter(req, res);
                         } catch (ApiException ex) { error(json, res, ex); }
                     }

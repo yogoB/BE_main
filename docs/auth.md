@@ -15,7 +15,8 @@ JWT·비밀번호·Google 토큰은 응답 JSON이나 URL에 넣지 않는다.
 | 요청 | 입력 | 성공 |
 |---|---|---|
 | `GET /api/v1/auth/csrf` | 없음 | `{headerName:"X-CSRF-TOKEN",token:"..."}` |
-| `GET /oauth2/authorization/google` | 브라우저 이동 | **유일한 가입·로그인 입구.** Google 인증 화면으로 이동 |
+| `POST /api/v1/auth/consent` | `{age14,terms,privacy,savingsAlerts,marketing}`, CSRF | 필수 3개 확인 후 선택값을 OAuth HTTP 세션에 저장 |
+| `GET /oauth2/authorization/google` | 위 동의를 저장한 같은 브라우저 세션 | **유일한 가입·로그인 입구.** Google 인증 화면으로 이동 |
 | `GET /login/oauth2/code/google` | Google이 발급한 code/state | 고정 `AUTH_RETURN_URL#auth=success` 또는 `failed` / `account-conflict` |
 | `GET /api/v1/me` | 인증 쿠키 | 현재 회원 |
 | `GET /api/v1/me/sessions` | 인증 쿠키 | 로그인 세션 목록(`current` 표시, 15분 만료·5분 유휴 제외) |
@@ -71,7 +72,7 @@ Google Cloud 설정부터 시작하는 팀원은 [Google OAuth 연동 가이드]
 
 1. 비회원 추천·계산기는 기존대로 호출한다. **결과 리포트 화면만** `GET /api/v1/me` 로 로그인을 확인하고
    비로그인이면 리포트 대신 로그인 안내를 그린다(D-36). 이 확인은 화면의 일이지 API 권한이 아니다.
-2. 로그인은 BE 의 `/oauth2/authorization/google` 로 브라우저를 이동시킨다. 콜백 후 고정 프론트 주소로 돌아온다.
+2. 로그인 버튼은 먼저 `POST /api/v1/auth/consent`로 동의를 저장한 뒤, 같은 브라우저 세션으로 BE의 `/oauth2/authorization/google`로 이동한다. 콜백 후 고정 프론트 주소로 돌아온다.
 3. 회원 변경 요청 전에 `GET /api/v1/auth/csrf` 를 `credentials:'include'` 로 호출해 토큰을 받고
    `X-CSRF-TOKEN` 헤더에 넣는다. 모든 회원 요청은 `credentials:'include'`.
 4. 인증 정보는 HttpOnly 쿠키로 처리한다. JWT를 JavaScript 변수·localStorage·sessionStorage에 저장하지 않는다.
