@@ -227,7 +227,13 @@ class FunnelCounterTest {
         assertThat(kpi).containsKey("resultReachRate");
         assertThat(kpi.get("resultReachRate")).isNull();
         assertThat((String) kpi.get("resultReachRateNote")).contains("입력 시작");
-        assertThat(kpi.get("calcErrorRate")).isNull();
+        // 계산 오류율은 런타임 값이 아니라 **배포 게이트** 결과다 — 정답셋과 하나라도 어긋나면
+        // check 가 실패해 배포가 막히므로 운영 빌드에서는 정의상 0 이다. 그 대신 **무엇이 몇 개를
+        // 지키고 있나**를 같이 낸다. 개수는 docs/testing.md 한 곳에서 세어 빌드가 심는다.
+        assertThat(kpi.get("calcErrorRate")).isEqualTo(0.0);
+        assertThat(kpi.get("calcErrorRateBasis")).isEqualTo("GOLDEN_GATE");
+        assertThat((Integer) kpi.get("calcErrorRateCases")).isNotNull().isGreaterThan(60);
+        assertThat((String) kpi.get("calcErrorRateNote")).contains("배포가 막히므로");
     }
 
     /**

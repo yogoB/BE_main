@@ -30,7 +30,16 @@ public class SavingsStatsController {
     /** 이보다 적으면 노출하지 않는다. 2026-09-20 에 5 → 2(사용자 결정) — 화면은 표본 수를 적지 않는다. */
     static final int MIN_SAMPLES = 2;
     /** 랜딩이 순환 표시하는 개수. 더 줘도 화면이 쓰지 않는다. */
-    private static final int MAX_SAMPLES = 30;
+    private static final int MAX_SAMPLES = 12;
+    /**
+     * 공개로 내보낼 때 금액을 뭉개는 단위(2026-09-21). 랜딩은 개별 금액을 돌려 보여 주는 화면이라
+     * 배열 자체를 없앨 수는 없다. 대신 <b>정확한 값을 내보내지 않는다</b> — 17,958원 같은 숫자는
+     * 그 사람의 결과를 그대로 공개하는 것이고, 아는 사람이 보면 누구인지 짚을 수 있다.
+     *
+     * <p>1,000원 단위면 같은 칸에 여러 사람이 겹쳐 개인을 못 짚으면서, 화면이 보여 주려던
+     * "이 정도 아꼈다"는 감각은 남는다. <b>화면은 "약"이라고 적어야 한다</b> — 반올림한 값이다.
+     */
+    private static final long PUBLIC_ROUNDING = 1_000;
     private final JdbcTemplate jdbc;
     /** 방문마다 집계하지 않는다. 짧게 잡아 새 표본이 곧 반영되게 한다. 0 이면 매번 집계(테스트). */
     private final Duration cache;
@@ -52,11 +61,13 @@ public class SavingsStatsController {
      * 인증 없이 받아 보면 "지금 몇 명이고 각각 얼마"가 그대로 나왔다. 방어는 화면이 아니라 여기 있어야 한다.
      * 화면이 숫자 블록을 숨길 판단은 {@code samples} 가 비었는지로 충분하다.
      *
-     * <p><b>다만 이것으로 D-59 가 막으려던 것이 막히지는 않는다.</b> {@code samples} 자체가 개인별
-     * 절감액 배열이고 길이를 세면 표본 수가 그대로 나온다. 줄어든 것은 노출 표면이지 노출 자체가 아니다.
-     * 랜딩이 그 금액들을 돌려 보여 주는 게 기능이라 지금 구조에서는 여기까지다. 더 줄이려면 금액을
-     * 구간으로 뭉개거나 요청마다 하나씩만 주는 설계가 필요하고, 그건 화면 기획과 같이 정해야 한다
-     * (발표 뒤 과제, 프론트 세션과 합의 2026-09-21).
+     * <p><b>금액은 1,000원 단위로 뭉개서 내보낸다</b>(2026-09-21). 랜딩이 개별 금액을 돌려 보여 주는
+     * 화면이라 배열을 없앨 수는 없지만, 17,958원 같은 정확한 값은 그 사람의 결과를 그대로 공개하는
+     * 것이고 아는 사람이 보면 누구인지 짚을 수 있다. 뭉개면 같은 칸에 여러 사람이 겹친다.
+     * <b>평균·중앙값도 뭉갠 값에서 낸다</b> — 원본으로 평균을 내면 거기서 원본이 역산될 여지가 남는다.
+     *
+     * <p>개수도 30 → 12 로 줄였다. 랜딩이 그보다 많이 쓰지 않는데 더 주면 노출만 넓어진다.
+     * <b>화면은 "약"이라고 적어야 한다</b> — 반올림한 값이다.
      */
     public record Savings(List<Long> samples, Long monthlyAverage, Long monthlyMedian,
                           String basis, Instant updatedAt) { }
@@ -78,6 +89,9 @@ public class SavingsStatsController {
                 SELECT monthly_savings FROM member_savings
                 WHERE monthly_savings > 0 ORDER BY seen_at DESC LIMIT ?
                 """, Long.class, MAX_SAMPLES);
+        // 정확한 값을 공개하지 않는다 — 1,000원 단위로 뭉갠다. 평균·중앙값도 같은 값에서 낸다:
+        // 원본으로 평균을 내고 표본만 뭉개면 평균에서 원본이 역산될 여지가 남는다.
+        samples = samples.stream().map(v -> Math.round((double) v / PUBLIC_ROUNDING) * PUBLIC_ROUNDING).toList();
         int count = samples.size();
         if (count < MIN_SAMPLES) {
             return new Savings(List.of(), null, null, "CURRENT_PLAN", Instant.now());

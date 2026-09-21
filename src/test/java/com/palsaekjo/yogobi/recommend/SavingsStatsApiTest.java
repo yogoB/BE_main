@@ -87,6 +87,33 @@ class SavingsStatsApiTest {
                 .doesNotContain("sampleCount");
     }
 
+    /**
+     * G-69. 공개 표본은 <b>정확한 금액을 내보내지 않는다</b>(2026-09-21).
+     *
+     * <p>랜딩이 개별 금액을 돌려 보여 주는 화면이라 배열 자체를 없앨 수는 없다. 대신 1,000원 단위로
+     * 뭉갠다 — {@code 17,958원} 같은 값은 그 사람의 결과를 그대로 공개하는 것이고, 아는 사람이 보면
+     * 누구인지 짚을 수 있다. 뭉개면 같은 칸에 여러 사람이 겹친다.
+     *
+     * <p><b>평균·중앙값도 뭉갠 값에서 낸다.</b> 원본으로 평균을 내고 표본만 뭉개면 평균에서 원본이
+     * 역산될 여지가 남는다 — 방어를 한 겹만 두면 다른 겹으로 새어 나간다(sampleCount 때와 같은 교훈).
+     */
+    @Test
+    void g69_publicSamplesAreRoundedSoNoExactAmountLeaves() throws Exception {
+        save("sample1@example.com", 17_958L);
+        save("sample2@example.com", 10_800L);
+        save("sample3@example.com", 21_000L);
+
+        String body = mvc.perform(get("/api/v1/stats/savings")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.samples", org.hamcrest.Matchers.containsInAnyOrder(18000, 11000, 21000)))
+                // 평균도 뭉갠 값 기준이다: (18000 + 11000 + 21000) / 3
+                .andExpect(jsonPath("$.data.monthlyAverage").value(16667))
+                .andExpect(jsonPath("$.data.monthlyMedian").value(18000))
+                .andReturn().getResponse().getContentAsString();
+        // 원본 금액은 어디에도 없다.
+        org.assertj.core.api.Assertions.assertThat(body)
+                .doesNotContain("17958").doesNotContain("10800");
+    }
+
     /** G-43 — 임계값을 넘으면 1인당 평균·중앙값이 함께 나간다(D-57, 랜딩용). 미만이면 둘 다 null 이다. */
     @Test
     void perPersonAverageAppearsOnlyAboveTheThreshold() throws Exception {

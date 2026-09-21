@@ -35,10 +35,34 @@ dependencies {
 }
 
 tasks.named('processResources') {
+    dependsOn 'goldenAuditStamp'
     from('db') {
         into 'db'
         include 'migration/*.sql', 'seed/*.csv', 'seed/dev/*.csv'
         exclude 'seed/*_TEMPLATE.csv'
+    }
+    from(layout.buildDirectory.dir('generated-resources'))
+}
+
+/*
+ * 백오피스가 "계산 오류율"(최종보고서 §9.2 ②)을 말할 수 있게 골든 케이스 수를 빌드 산출물에 심는다.
+ *
+ * 이 지표는 **런타임 값이 아니다.** 정답셋과 어긋난 계산이 하나라도 있으면 `check` 가 실패해
+ * 배포 자체가 막히므로, 운영에 떠 있는 빌드에서는 정의상 0 이다. 그러니 대시보드가 낼 수 있는
+ * 것은 "얼마나 틀렸나"가 아니라 **"무엇이 몇 개를 지키고 있나"**다. 그 개수를 여기서 센다.
+ *
+ * 세는 곳은 docs/testing.md 한 곳이다 — 골든 케이스의 원본이고, 개수를 코드에 또 적으면 어긋난다.
+ */
+tasks.register('goldenAuditStamp') {
+    def source = file('docs/testing.md')
+    def target = layout.buildDirectory.file('generated-resources/golden-audit.properties')
+    inputs.file(source)
+    outputs.file(target)
+    doLast {
+        def cases = source.readLines().count { it.startsWith('## G-') }
+        def out = target.get().asFile
+        out.parentFile.mkdirs()
+        out.text = "cases=${cases}\nstampedAt=${new Date().format('yyyy-MM-dd')}\n"
     }
 }
 

@@ -409,6 +409,28 @@ public class BackofficeMetrics {
     }
 
     /**
+     * 빌드에 심어 둔 골든 케이스 수({@code golden-audit.properties}). 세는 곳은 {@code docs/testing.md}
+     * 한 곳이고 빌드가 옮겨 적는다 — 개수를 코드에 또 적으면 어긋난다.
+     *
+     * <p>못 읽으면 <b>{@code null}</b> 이다. 0 을 주면 "지키는 게 하나도 없다"로 읽히는데,
+     * 그건 파일을 못 읽었다는 사실과 전혀 다른 말이다.
+     */
+    private Integer goldenCases() {
+        try (var stream = getClass().getResourceAsStream("/golden-audit.properties")) {
+            if (stream == null) {
+                return null;
+            }
+            var properties = new java.util.Properties();
+            properties.load(stream);
+            String cases = properties.getProperty("cases");
+            return cases == null ? null : Integer.valueOf(cases);
+        } catch (java.io.IOException | NumberFormatException e) {
+            log.warn("골든 감사 스탬프를 읽지 못했습니다: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    /**
      * 단계별로 <b>마지막으로 쌓인 날</b>. 한 번도 없으면 {@code null} 이다.
      *
      * <p>집계 실패는 삼켜진다 — 지표 때문에 기능이 멈추면 안 되기 때문이다. 그 대가로 화면에서
@@ -444,7 +466,7 @@ public class BackofficeMetrics {
      * 비교가 성립하지 않은 조회는 애초에 행이 없다(모름 ≠ 0).
      */
     @SuppressWarnings("unchecked")
-    private static Map<String, Object> kpi(Map<String, Object> savings, Map<String, Object> funnel) {
+    private Map<String, Object> kpi(Map<String, Object> savings, Map<String, Object> funnel) {
         var out = new LinkedHashMap<String, Object>();
         out.put("source", "최종보고서 §9.2");
 
@@ -455,8 +477,14 @@ public class BackofficeMetrics {
         if (reach == null)
             out.put("resultReachRateNote", "입력 시작이 아직 한 건도 없다 — 분모가 없다. 화면이 POST /api/v1/events 로 INPUT_STARTED 를 보내면 낸다");
 
-        out.put("calcErrorRate", null);
-        out.put("calcErrorRateNote", "배포 전 골든 감사(scripts/golden_audit.py) 결과이지 런타임 지표가 아니다");
+        // 계산 오류율은 **런타임 값이 아니다.** 정답셋과 어긋난 계산이 하나라도 있으면 `check` 가
+        // 실패해 배포 자체가 막히므로, 운영에 떠 있는 빌드에서는 정의상 0 이다. 그러니 낼 수 있는 것은
+        // "얼마나 틀렸나"가 아니라 **"무엇이 몇 개를 지키고 있나"** 다 — 그 개수를 같이 싣는다.
+        out.put("calcErrorRate", 0.0);
+        out.put("calcErrorRateBasis", "GOLDEN_GATE");
+        out.put("calcErrorRateCases", goldenCases());
+        out.put("calcErrorRateNote", "배포 전 골든 감사 기준이다 — 정답셋과 하나라도 어긋나면 배포가 막히므로 "
+                + "운영 빌드에서는 언제나 0 이다. 런타임에 측정한 값이 아니다");
 
         Object members = savings.get("members"), opportunity = savings.get("opportunity");
         if (members instanceof Number below && opportunity instanceof Number above && below.longValue() > 0) {
