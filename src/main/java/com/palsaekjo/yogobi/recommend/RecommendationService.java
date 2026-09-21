@@ -372,13 +372,17 @@ public class RecommendationService {
     private void addConditionalDiscountNotice(List<MissingInput> missing, long dataMb, String networkType) {
         catalog.cheaperIfConditionMet(dataMb, networkType).ifPresent(cheaper -> missing.add(new MissingInput(
                 "carrierBenefitCondition",
-                cheaper.carrier() + " '" + cheaper.name() + "' 는 조건을 채우면 월 "
+                // **"후보에 있던"이 첫 낱말이다**(2026-09-21, 사용자 질문). 이 말이 없으면 화면에
+                // 안 보이는 통신사가 안내에만 튀어나와 "이건 왜 나오나" 가 된다. 실제로 그 질문을 받았다.
+                // 거짓이 아니다 — 이 질의는 후보 질의와 **같은 WHERE 절**에 benefit_price 조건만 더한다.
+                "후보에 있던 " + cheaper.carrier() + " '" + cheaper.name() + "' 는 조건을 채우면 월 "
                         + String.format("%,d", cheaper.benefitPrice()) + "원이에요 — 출처 표기는 '"
                         + cheaper.label() + "' 입니다",
                 // 굵게 나가는 첫 줄에 금액을 하나만 둔다(프론트 세션, 320px 에서 세 줄이었다).
                 // 순위에 안 쓴 이유와 조건 못 채웠을 때의 금액은 아래 줄로 내린다 — 덜 급한 말이다.
-                "조건 충족 여부를 저희가 알 수 없어 순위에는 넣지 않았어요. 조건은 통신사에서 확인해 주세요 — "
-                        + "못 채우면 기본료 " + String.format("%,d", cheaper.basePrice()) + "원으로 계산됩니다")));
+                "기본료 " + String.format("%,d", cheaper.basePrice()) + "원으로 계산해 순위에서는 밀렸어요. "
+                        + "조건 충족 여부를 저희가 알 수 없어 혜택가는 순위에 넣지 않습니다 — "
+                        + "조건은 통신사에서 확인해 주세요")));
     }
 
     /**

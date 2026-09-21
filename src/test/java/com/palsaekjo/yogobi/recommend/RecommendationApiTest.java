@@ -763,7 +763,10 @@ class RecommendationApiTest {
                     .andReturn().getResponse().getContentAsString();
 
             assertThat(body).contains("월 3,900원").contains("최대 할인가(VAT포함)")
-                    .contains("기본료 60,000원");   // 조건을 못 채우면 이 금액이라는 것도 같이 말한다
+                    .contains("기본료 60,000원")     // 순위를 정한 금액이 무엇이었는지 같이 말한다
+                    // **후보였다는 사실을 먼저 말한다.** 이 말이 빠지면 화면에 없는 통신사가
+                    // 안내에만 나와 "이건 왜 나오나" 가 된다 — 사용자가 실제로 그렇게 물었다.
+                    .contains("후보에 있던");
             // d — 조건 자체는 **지어내지 않는다.** 출처에 없는 말이 응답에 있으면 그 순간 D-43 위반이다.
             assertThat(body).doesNotContain("실적").doesNotContain("카드");
         } finally {
