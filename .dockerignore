@@ -8,6 +8,9 @@ graphify-out/
 .idea/
 *.iml
 docs/
+# 골든 케이스 수를 산출물에 심는 데 이 파일 하나만 필요하다(백오피스 "계산 오류율").
+# docs/ 전체는 계속 제외한다 — 이미지에 들어갈 이유가 없다.
+!docs/testing.md
 scripts/
 .githooks/
 .DS_Store
