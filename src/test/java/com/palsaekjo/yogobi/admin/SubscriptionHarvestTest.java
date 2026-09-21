@@ -110,9 +110,17 @@ class SubscriptionHarvestTest {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM catalog_change_request", Integer.class)).isZero();
     }
 
-    /** 대상은 Spotify 하나로 좁힌다 — 시드 카탈로그가 정답인 테스트라 서비스가 늘면 기대값이 흔들린다. */
+    /**
+     * 대상은 Spotify 하나로 좁힌다 — 시드 카탈로그가 정답인 테스트라 서비스가 늘면 기대값이 흔들린다.
+     *
+     * <p>특가 조회는 <b>닿지 않는 주소</b>로 둔다. 이 테스트가 보는 것은 구독 제안 수이고, 특가 쪽이
+     * 실패해도 수집 전체가 죽지 않아야 한다 — 그게 fail-soft 의 뜻이다(§9 는 G-70 이 따로 본다).
+     */
     private int harvest(SubscriptionPriceOracle oracle) {
-        var harvester = new CatalogDailyHarvest(jdbc, requests, admin, oracle, actions, 0, 20, List.of("Spotify"));
+        var promotions = new com.palsaekjo.yogobi.catalog.PlanPromotionOracle(
+                "http://127.0.0.1:1", "", 0, 1);
+        var harvester = new CatalogDailyHarvest(jdbc, requests, admin, oracle, promotions, actions,
+                0, 20, List.of("Spotify"));
         return (int) harvester.harvest().get("proposedSubscriptionTiers");
     }
 

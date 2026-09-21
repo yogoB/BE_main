@@ -6,6 +6,7 @@ import com.palsaekjo.yogobi.catalog.SubscriptionPriceOracle;
 import com.palsaekjo.yogobi.user.AdminAccount;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -52,6 +53,7 @@ public class CatalogDailyHarvest {
     private final CatalogChangeRequests requests;
     private final AdminAccount admin;
     private final SubscriptionPriceOracle subscriptions;
+    private final com.palsaekjo.yogobi.catalog.PlanPromotionOracle promotions;
     private final AdminActions actions;
     private final int planLimit;
     private final int subscriptionLimit;
@@ -59,7 +61,8 @@ public class CatalogDailyHarvest {
     private final List<String> subscriptionServices;
 
     public CatalogDailyHarvest(JdbcTemplate jdbc, CatalogChangeRequests requests, AdminAccount admin,
-                               SubscriptionPriceOracle subscriptions, AdminActions actions,
+                               SubscriptionPriceOracle subscriptions,
+                               com.palsaekjo.yogobi.catalog.PlanPromotionOracle promotions, AdminActions actions,
                                @Value("${yogobi.harvest.plan-limit:20}") int planLimit,
                                @Value("${yogobi.harvest.subscription-limit:20}") int subscriptionLimit,
                                @Value("${yogobi.harvest.subscription-services:Spotify,Apple Music,iCloud+}")
@@ -68,6 +71,7 @@ public class CatalogDailyHarvest {
         this.requests = requests;
         this.admin = admin;
         this.subscriptions = subscriptions;
+        this.promotions = promotions;
         this.actions = actions;
         this.planLimit = planLimit;
         this.subscriptionLimit = subscriptionLimit;
@@ -93,6 +97,7 @@ public class CatalogDailyHarvest {
         var out = new LinkedHashMap<String, Object>();
         out.put("proposedMobilePlans", plans);
         out.put("proposedSubscriptionTiers", harvestSubscriptions(proposer));
+        out.put("proposedPlanPromotions", harvestPromotions(proposer));
         out.put("pending", jdbc.queryForObject(
                 "SELECT count(*) FROM catalog_change_request WHERE status = 'PENDING'", Long.class));
         return out;
@@ -265,6 +270,91 @@ public class CatalogDailyHarvest {
             }
         }
         return made;
+    }
+
+    /**
+     * 기간 한정 특가를 공식 페이지로 다시 확인해 달라진 것만 제안한다(§9, 2026-09-21).
+     *
+     * <p>13행을 한 번 손으로 채운 상태였다 — 특가는 <b>끝나는 것이 정상</b>이라 그대로 두면 곧 어긋난다.
+     * 대상은 이미 특가로 표시된 요금제뿐이다. <b>새 특가를 찾지 않는다</b>: 저쪽이 목록을 훑지 않고
+     * (봇 차단), 발견은 원래 사람의 검수 절차다.
+     *
+     * <p><b>{@code failures} 에 오른 번호는 손대지 않는다.</b> 못 읽은 것과 특가가 끝난 것은 다르다 —
+     * 행이 사라진 것으로 보고 지우면 멀쩡한 특가가 조용히 없어진다. 그래서 여기서는 <b>지우는 제안을
+     * 아예 만들지 않는다</b>: 특가 종료는 사람이 합본에서 행을 빼는 것으로만 일어난다.
+     */
+    private int harvestPromotions(long proposer) {
+        List<Map<String, Object>> ours = jdbc.queryForList("""
+                SELECT p.id, p.name, p.promo_months, p.regular_price, p.source_url, c.name AS carrier
+                  FROM mobile_plan p JOIN carrier c ON c.id = p.carrier_id
+                 WHERE p.active AND p.promo_months IS NOT NULL
+                 ORDER BY p.id""");
+        if (ours.isEmpty()) {
+            return 0;
+        }
+        var byProduct = new LinkedHashMap<Long, Map<String, Object>>();
+        for (Map<String, Object> row : ours) {
+            com.palsaekjo.yogobi.catalog.PlanPromotionOracle.productId(String.valueOf(row.get("source_url")))
+                    .ifPresent(id -> byProduct.put(id, row));
+        }
+        if (byProduct.isEmpty()) {
+            log.warn("특가 조회 건너뜀 — 출처 URL 에서 상품 번호를 읽지 못했다({}건)", ours.size());
+            return 0;
+        }
+        int made = 0;
+        for (List<Long> batch : partition(List.copyOf(byProduct.keySet()),
+                com.palsaekjo.yogobi.catalog.PlanPromotionOracle.MAX_PRODUCTS)) {
+            com.palsaekjo.yogobi.catalog.PlanPromotionOracle.Check check;
+            try {
+                check = promotions.check(batch);
+            } catch (com.palsaekjo.yogobi.catalog.PlanPromotionOracle.Unavailable e) {
+                // 삼키되 침묵하지 않는다 — 운영 타임라인에 남겨야 다음 날 누군가 본다(§8 과 같은 이유).
+                log.warn("특가 조회 실패 [{}]: {}", e.code(), e.getMessage());
+                actions.record(proposer, "PROMOTION_CHECK_FAILED", String.valueOf(batch.size()),
+                        e.code() + ": " + e.getMessage());
+                continue;
+            }
+            for (var failure : check.failures()) {
+                // 못 읽은 것은 기록만 한다. 기존 행은 그대로 둔다.
+                actions.record(proposer, "PROMOTION_ROW_FAILED", String.valueOf(failure.productId()), failure.code());
+            }
+            for (var promotion : check.promotions()) {
+                Map<String, Object> row = byProduct.get(promotion.productId());
+                if (row == null) continue;   // 안 물어본 번호는 무시한다 — 우리가 짝을 지어내지 않는다
+                if (!String.valueOf(row.get("name")).equals(promotion.planName())
+                        || !String.valueOf(row.get("carrier")).equals(promotion.carrier())) {
+                    // 이름이 어긋나면 제안하지 않는다. 다른 상품의 값을 우리 행에 넣을 수는 없다.
+                    actions.record(proposer, "PROMOTION_NAME_DRIFT", String.valueOf(promotion.productId()),
+                            "카탈로그 " + row.get("carrier") + " " + row.get("name")
+                                    + " ≠ 조회 " + promotion.carrier() + " " + promotion.planName());
+                    continue;
+                }
+                Integer storedMonths = (Integer) row.get("promo_months");
+                Long storedRegular = (Long) row.get("regular_price");
+                if (promotion.promoMonths() == (storedMonths == null ? -1 : storedMonths)
+                        && storedRegular != null && storedRegular == promotion.regularPrice()) {
+                    continue;   // 그대로다
+                }
+                String key = row.get("carrier") + "|" + row.get("name");
+                if (pending("mobile_plan_promo", key)) continue;
+                if (propose(proposer, CatalogAuditLog.Action.UPDATE, "mobile_plan_promo", key,
+                        Map.of("promo_months", String.valueOf(promotion.promoMonths()),
+                                "regular_price", String.valueOf(promotion.regularPrice())),
+                        "일일 수집(특가 페이지): " + storedMonths + "개월/" + storedRegular + "원 → "
+                                + promotion.promoMonths() + "개월/" + promotion.regularPrice()
+                                + "원. 원문: " + promotion.evidence())) made++;
+            }
+        }
+        return made;
+    }
+
+    /** 계약 상한(30개)에 맞춰 나눈다. 한 번에 다 보내면 저쪽이 거절한다. */
+    private static List<List<Long>> partition(List<Long> all, int size) {
+        var out = new ArrayList<List<Long>>();
+        for (int from = 0; from < all.size(); from += size) {
+            out.add(all.subList(from, Math.min(from + size, all.size())));
+        }
+        return out;
     }
 
     /** 같은 대상의 대기 중 제안이 있으면 또 만들지 않는다 — 매일 같은 줄이 쌓이면 검수함이 못 쓰게 된다. */
