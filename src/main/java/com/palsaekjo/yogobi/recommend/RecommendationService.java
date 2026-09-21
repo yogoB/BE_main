@@ -373,10 +373,12 @@ public class RecommendationService {
         catalog.cheaperIfConditionMet(dataMb, networkType).ifPresent(cheaper -> missing.add(new MissingInput(
                 "carrierBenefitCondition",
                 cheaper.carrier() + " '" + cheaper.name() + "' 는 조건을 채우면 월 "
-                        + String.format("%,d", cheaper.benefitPrice()) + "원이에요(출처 표기: "
-                        + cheaper.label() + ") — 조건 충족 여부를 저희가 알 수 없어 순위에는 넣지 않았어요",
-                "할인 조건은 통신사에서 확인해 주세요. 조건을 못 채우면 기본료 "
-                        + String.format("%,d", cheaper.basePrice()) + "원으로 계산됩니다")));
+                        + String.format("%,d", cheaper.benefitPrice()) + "원이에요 — 출처 표기는 '"
+                        + cheaper.label() + "' 입니다",
+                // 굵게 나가는 첫 줄에 금액을 하나만 둔다(프론트 세션, 320px 에서 세 줄이었다).
+                // 순위에 안 쓴 이유와 조건 못 채웠을 때의 금액은 아래 줄로 내린다 — 덜 급한 말이다.
+                "조건 충족 여부를 저희가 알 수 없어 순위에는 넣지 않았어요. 조건은 통신사에서 확인해 주세요 — "
+                        + "못 채우면 기본료 " + String.format("%,d", cheaper.basePrice()) + "원으로 계산됩니다")));
     }
 
     /**
