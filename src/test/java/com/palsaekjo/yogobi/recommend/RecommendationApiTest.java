@@ -692,6 +692,16 @@ class RecommendationApiTest {
             assertThat(top.path("annualSavings").asLong()).isEqualTo(12 * monthly - 5 * 29_000);
             // 6개월은 특가 안이라 그대로 ×6 이다 — 기간마다 따로 판정한다.
             assertThat(top.path("semiannualSavings").asLong()).isEqualTo(6 * monthly);
+
+            // d — 지금 요금제 대비 기간 값도 같은 특가 종료를 반영한다. 월 차액 × 12 가 아니다.
+            String withCurrent = mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
+                    {"required":{"monthlyDataGb":20,"wantedServiceIds":[1]},
+                     "optional":{"contractType":"NONE","currentPlanId":1}}"""))
+                    .andReturn().getResponse().getContentAsString();
+            var current = new com.fasterxml.jackson.databind.ObjectMapper().readTree(withCurrent).path("data").path("current");
+            long vsCurrent = current.path("monthlySavings").asLong();
+            assertThat(current.path("annualSavings").asLong()).isEqualTo(12 * vsCurrent - 5 * 29_000);
+            assertThat(current.path("semiannualSavings").asLong()).isEqualTo(6 * vsCurrent);
         } finally {
             jdbc.execute("DELETE FROM mobile_plan WHERE id = 8");
         }

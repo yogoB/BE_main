@@ -181,9 +181,18 @@ public class RecommendationService {
         CostResult top = results.get(0);
         long monthly = cost.monthlyTotal() - top.monthlyTotal();
         return new RecommendationResponse.CurrentCost(cost, monthly,
-                top.annualSavings() == null ? null : monthly * 12,
-                top.semiannualSavings() == null ? null : monthly * 6,
+                vsCurrent(monthly, 12, top.annualSavings(), top),
+                vsCurrent(monthly, 6, top.semiannualSavings(), top),
                 excluded);
+    }
+
+    /**
+     * 지금 요금제 대비 {@code months} 개월 절감액. 월 차액 × N 에 <b>1순위의 특가 종료분</b>을 더한다(G-66 d) —
+     * 1순위 기간 값이 월 절감 × N 에서 벗어난 만큼이 곧 특가가 끝나 달라진 금액이다. 그걸 빼먹으면
+     * 특가 뒤 비싸지는 1순위가 1년으로는 지금보다 비싼데도 "1년이면 N원 아껴요"가 나간다(2026-09-23).
+     */
+    private static Long vsCurrent(long monthly, int months, Long topPeriod, CostResult top) {
+        return topPeriod == null ? null : monthly * months + (topPeriod - top.monthlySavings() * months);
     }
 
     /** {@code currentPlanId} 가 있으면 카탈로그에서 찾는다. 없는 id 는 막지 않고 빈 값으로 둔다(G-30 d). */
