@@ -19,6 +19,7 @@ public class CatalogCandidateRecorder {
     public enum Kind { MOBILE_PLAN, SUBSCRIPTION_TIER }
 
     private final JdbcTemplate jdbc;
+    private final java.util.concurrent.atomic.AtomicBoolean capWarned = new java.util.concurrent.atomic.AtomicBoolean();
 
     public CatalogCandidateRecorder(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
@@ -30,7 +31,7 @@ public class CatalogCandidateRecorder {
             return;
         }
         try {
-            jdbc.update("""
+            int changed = jdbc.update("""
                     INSERT INTO catalog_candidate (kind, query_text, status)
                     SELECT ?, ?, 'REQUESTED'
                     WHERE (SELECT count(*) FROM catalog_candidate) < ?
@@ -38,6 +39,10 @@ public class CatalogCandidateRecorder {
                         SET requested_cnt = catalog_candidate.requested_cnt + 1,
                             last_requested_at = now()
                     """, kind.name(), queryText, MAX_ROWS);
+            // 상한에 막히면 0행이다. 조용히 멈추면 수집 파이프라인이 끊긴 줄 아무도 모른다 — 한 번은 알린다(G-73 c).
+            if (changed == 0 && !capWarned.getAndSet(true)) {
+                log.warn("카탈로그 결손 기록이 상한({}행)에 닿아 멈췄다 — 새 결손은 기록되지 않는다", MAX_ROWS);
+            }
         } catch (RuntimeException e) {
             log.warn("카탈로그 결손 기록 실패 — 건너뜀 (fail-soft): {} {} / {}", kind, queryText, e.toString());
         }

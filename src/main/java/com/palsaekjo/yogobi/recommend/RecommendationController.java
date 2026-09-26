@@ -59,7 +59,7 @@ public class RecommendationController {
      */
     @PostMapping("/narrate")
     public ApiResponse<Narrator.Narration> narrate(@RequestBody RecommendationRequest request) {
-        RecommendationResponse result = service.recommend(request);
+        RecommendationResponse result = service.recommend(request, false);   // 결손은 추천에서 이미 셌다(G-73 d)
         if (result.results().isEmpty()) return ApiResponse.ok(Narrator.Narration.none());
         return ApiResponse.ok(narrator.narrationFor(
                 result.results().get(0), result.missingInputs(), result.candidateCount(), result.current()));

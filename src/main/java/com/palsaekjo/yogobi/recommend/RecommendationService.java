@@ -32,6 +32,7 @@ import org.springframework.stereotype.Service;
 public class RecommendationService {
     private static final int TOP_N = 5;
     private static final int MB_PER_GB = 1024;
+    private static final int MAX_GAPS_PER_REQUEST = 5;
 
     private final CatalogReader catalog;
     /**
@@ -78,7 +79,26 @@ public class RecommendationService {
         return List.copyOf(byService.values());
     }
 
+    /** 요청한 서비스에서 사용자가 고른 해외 결제 등급 (서비스 ID → "서비스명 등급명"). */
+    private Map<Long, String> pickedForeignServices(RecommendationRequest.Required required) {
+        List<Long> picked = required.wantedTierIds();
+        if (picked == null || picked.isEmpty()) {
+            return Map.of();
+        }
+        var found = new LinkedHashMap<>(catalog.findForeignPricedTierServices(picked));
+        found.keySet().retainAll(new LinkedHashSet<>(required.wantedServiceIds()));
+        return found;
+    }
+
     public RecommendationResponse recommend(RecommendationRequest request) {
+        return recommend(request, true);
+    }
+
+    /**
+     * {@code recordGaps=false} 는 같은 요청을 다시 계산하는 경로(설명 {@code /narrate})용이다.
+     * 결손은 추천 한 번에 한 번만 센다 — 설명을 펼친 사람만 두 배로 세면 수집 우선순위가 비틀린다(G-73 d).
+     */
+    public RecommendationResponse recommend(RecommendationRequest request, boolean recordGaps) {
         var required = request.required();
         if (required == null || required.monthlyDataGb() == null || required.monthlyDataGb() <= 0) {
             throw ApiException.requiredMissing("monthlyDataGb", "월 데이터 사용량(GB)이 필요합니다.");
@@ -90,12 +110,22 @@ public class RecommendationService {
         requireSane(required.wantedTierIds(), "wantedTierIds");
 
         // 카탈로그에 없는 서비스는 막지 않는다(G-12·D-17). 아는 것으로 계산하고 모르는 것은 안내·기록한다.
-        List<SubscriptionTier> tiers = chooseTiers(required);
+        // 사용자가 **해외 결제 등급**을 골랐으면 그 서비스는 계산에서 뺀다. 대표 원화 등급으로 바꿔 계산하면
+        // 고르지 않은 금액을 쓰는 것이고, 같은 등급을 계산기에 넣었을 때(G-17 f)와 답이 달라진다(G-73 a).
+        Map<Long, String> foreignPicked = pickedForeignServices(required);
+        List<SubscriptionTier> tiers = chooseTiers(required).stream()
+                .filter(t -> !foreignPicked.containsKey(t.serviceId())).toList();
         List<Long> excluded = unknown(required.wantedServiceIds(), tiers);
         // 그중 해외 결제 구독은 **결손이 아니다** — 수집할 게 아니라 사용자에게 실제 결제액을 물어야 하는 것이다.
-        Map<Long, String> foreignPriced = catalog.findForeignPricedServices(excluded);
+        Map<Long, String> foreignPriced = new LinkedHashMap<>(catalog.findForeignPricedServices(excluded));
+        foreignPriced.putAll(foreignPicked);
         List<Long> unknownServiceIds = excluded.stream().filter(id -> !foreignPriced.containsKey(id)).toList();
-        unknownServiceIds.forEach(id -> gaps.record(Kind.SUBSCRIPTION_TIER, "serviceId:" + id));
+        if (recordGaps) {
+            // 요청 하나가 만드는 결손 행에 상한을 둔다. 공개 경로라 몇 번의 요청으로 표 전체 상한을 채워
+            // 결손 기록을 멈추게 할 수 있었다(G-73 c). 사람이 고르는 서비스 수로는 닿지 않는 값이다.
+            unknownServiceIds.stream().limit(MAX_GAPS_PER_REQUEST)
+                    .forEach(id -> gaps.record(Kind.SUBSCRIPTION_TIER, "serviceId:" + id));
+        }
         Set<SubscriptionTier> wanted = new LinkedHashSet<>(tiers);
         Set<Long> wantedTierIds = new LinkedHashSet<>(tiers.stream().map(SubscriptionTier::id).toList());
         List<BundleProduct> bundles = catalog.findApplicableBundles(wantedTierIds);
@@ -105,14 +135,14 @@ public class RecommendationService {
         ContractType contractType = parseContract(optional);
         Boolean hasFamilyBundle = optional == null ? null : optional.hasFamilyBundle();
         Long familyDiscount = familyBundleDiscount(optional);
-        recordUnknownCarrier(optional);
+        if (recordGaps) recordUnknownCarrier(optional);
         java.util.Optional<CandidatePlan> currentPlan = findCurrentPlan(optional);
         String currentCarrier = currentCarrier(optional, currentPlan);
 
         long dataMb = (long) required.monthlyDataGb() * MB_PER_GB;
         List<CandidatePlan> candidates = catalog.findCandidatePlans(dataMb, networkType);
         if (candidates.isEmpty()) {
-            gaps.record(Kind.MOBILE_PLAN, "dataMb>=" + dataMb + ",network=" + (networkType == null ? "ANY" : networkType));
+            if (recordGaps) gaps.record(Kind.MOBILE_PLAN, "dataMb>=" + dataMb + ",network=" + (networkType == null ? "ANY" : networkType));
             var noPlan = missingInputs(optional, currentCarrier, familyDiscount, unknownServiceIds, foreignPriced);
             addAgeRestrictionNotice(noPlan, dataMb, networkType);
             noPlan.add(new MissingInput("monthlyDataGb",
@@ -130,7 +160,9 @@ public class RecommendationService {
         var ranked = candidates.stream()
                 .map(c -> Map.entry(c, calculator.calculate(c.plan(), wanted,
                         sameCarrier(c.carrier(), currentCarrier) ? ctx : ctxWithoutBundle)))
-                .sorted(Comparator.comparingLong(e -> e.getValue().effectiveMonthlyCost()))
+                // 동률은 요금제 id 로 가른다 — 행 순서에 맡기면 /narrate 가 다른 1순위를 설명할 수 있다(G-73 f).
+                .sorted(Comparator.<Map.Entry<CandidatePlan, CostBreakdown>>comparingLong(e -> e.getValue().effectiveMonthlyCost())
+                        .thenComparingLong(e -> e.getKey().plan().id()))
                 .toList();
         List<CostResult> results = ranked.stream()
                 .limit(TOP_N)

@@ -499,6 +499,38 @@ class RecommendationApiTest {
                 .andExpect(jsonPath("$.data.current.monthlySavings").value(-21500));
     }
 
+    /** G-73 d. 설명을 펼쳐도 결손은 한 번만 센다 — /narrate 는 추천을 다시 계산하지만 기록하지 않는다. */
+    @Test
+    void g73d_narrateDoesNotCountGapsTwice() throws Exception {
+        String body = """
+                {"required":{"monthlyDataGb":20,"wantedServiceIds":[1,99]},"optional":{"contractType":"NONE"}}""";
+        mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/v1/recommendations/narrate").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk());
+
+        assertThat(jdbc.queryForObject(
+                "SELECT requested_cnt FROM catalog_candidate WHERE query_text = 'serviceId:99'", Integer.class)).isEqualTo(1);
+    }
+
+    /** G-73 f. 월 총비용이 같으면 요금제 id 가 작은 쪽이 먼저다 — DB 행 순서에 맡기지 않는다. */
+    @Test
+    void g73f_tiesAreBrokenByPlanId() throws Exception {
+        // 큰 id 를 먼저 넣는다. 행 순서대로 정렬되면 21 이 1순위가 된다.
+        jdbc.execute("""
+                INSERT INTO mobile_plan(id,carrier_id,name,network_type,base_price,data_mb,voice_min,sms_cnt,source_url,collected_at)
+                VALUES (21,2,'동률B','FIVE_G',30000,100000,999999,9999,'http://seed','2026-09-27')""");
+        jdbc.execute("""
+                INSERT INTO mobile_plan(id,carrier_id,name,network_type,base_price,data_mb,voice_min,sms_cnt,source_url,collected_at)
+                VALUES (20,2,'동률A','FIVE_G',30000,100000,999999,9999,'http://seed','2026-09-27')""");
+
+        mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
+                {"required":{"monthlyDataGb":20,"wantedServiceIds":[99]},"optional":{"contractType":"NONE"}}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.results[0].planId").value(20))
+                .andExpect(jsonPath("$.data.results[1].planId").value(21));
+    }
+
     /** D-50 — /narrate 는 추천과 같은 공개 경로다. 비회원·CSRF 토큰 없이 200, 설명 모양(message·reasons·notices)으로 온다. */
     @Test
     void narrateIsPublicAndCsrfExemptLikeRecommendations() throws Exception {

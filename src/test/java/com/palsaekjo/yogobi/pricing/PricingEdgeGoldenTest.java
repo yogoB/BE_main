@@ -10,6 +10,7 @@ import com.palsaekjo.yogobi.pricing.domain.Money;
 import com.palsaekjo.yogobi.pricing.domain.MobilePlan;
 import com.palsaekjo.yogobi.pricing.domain.PlanBenefit;
 import com.palsaekjo.yogobi.pricing.domain.PricingContext;
+import com.palsaekjo.yogobi.common.Provenance;
 import com.palsaekjo.yogobi.pricing.domain.SubscriptionTier;
 import java.math.BigDecimal;
 import java.util.List;
@@ -93,6 +94,19 @@ class PricingEdgeGoldenTest {
         // 번들 12,000 > 혜택 적용 개별합 10,900 이므로 번들을 쓰지 않는다.
         assertThat(result.lines()).noneMatch(l -> l.label().equals(bundle.name()));
         assertThat(result.effectiveMonthlyCost()).isEqualTo(50_000 + 10_900);
+    }
+
+    /** G-73 e. 혜택으로 깎인 구독 줄은 계산값이라 DERIVED, 혜택 없는 줄은 공시가라 OFFICIAL 이다(원칙 4). */
+    @Test
+    void g73e_혜택이_깎은_구독_줄은_DERIVED() {
+        var freeTving = new PlanBenefit(TVING, 8L, BenefitType.FREE, null, false, null);
+
+        var result = calculator.calculate(plan(List.of(freeTving)), Set.of(T8, T12), ctx(List.of()));
+
+        assertThat(result.lines()).filteredOn(l -> l.label().equals(T8.name()))
+                .singleElement().satisfies(l -> assertThat(l.value().provenance()).isEqualTo(Provenance.DERIVED));
+        assertThat(result.lines()).filteredOn(l -> l.label().equals(T12.name()))
+                .singleElement().satisfies(l -> assertThat(l.value().provenance()).isEqualTo(Provenance.OFFICIAL));
     }
 
     /* ── 혜택 유형 네 가지 (PlanBenefit.apply) ──────────────────────────────── */

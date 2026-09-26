@@ -148,6 +148,61 @@ class ForeignCurrencyCatalogTest {
                 .isInstanceOf(ApiException.class);
     }
 
+    /**
+     * G-73 a. 원화 등급이 있는 서비스에서 해외 결제 등급을 고르면 그 서비스는 빼고 안내한다.
+     * 대표 원화 등급으로 몰래 바꿔 계산하면 계산기(G-17 f)와 같은 입력에 다른 답이 나온다.
+     */
+    @Test void g73a_pickedForeignTierIsExcludedNotSwappedForTheKrwOne() {
+        long serviceId = jdbc.queryForObject(
+                "SELECT service_id FROM subscription_tier WHERE active AND currency = 'KRW' ORDER BY id LIMIT 1", Long.class);
+        long foreignTier = jdbc.queryForObject("""
+                INSERT INTO subscription_tier (service_id, name, price, currency, tax_included)
+                VALUES (?, 'Pro 해외', 100, 'USD', TRUE) RETURNING id
+                """, Long.class, serviceId);
+        try {
+            var response = recommendations.recommend(new RecommendationRequest(
+                    new RecommendationRequest.Required(10, List.of(serviceId), List.of(foreignTier)), null));
+
+            assertThat(response.missingInputs()).anyMatch(m -> m.impact().contains("해외 결제"));
+            String serviceName = jdbc.queryForObject("SELECT name FROM subscription_service WHERE id = ?", String.class, serviceId);
+            // 그 서비스의 원화 대표 등급 줄이 계산 내역에 없어야 한다
+            assertThat(response.results().get(0).breakdown()).noneMatch(line -> line.label().contains(serviceName));
+        } finally {
+            jdbc.update("DELETE FROM subscription_tier WHERE id = ?", foreignTier);
+        }
+    }
+
+    /** G-73 b·b'. 퇴역 등급은 계산에 쓰지 않는다 — 계산기는 없는 ID 처럼 400, 추천은 대표 등급으로. */
+    @Test void g73b_retiredTierIsNeverPriced() {
+        long planId = jdbc.queryForObject("SELECT id FROM mobile_plan WHERE active ORDER BY id LIMIT 1", Long.class);
+        long serviceId = jdbc.queryForObject(
+                "SELECT service_id FROM subscription_tier WHERE active AND currency = 'KRW' ORDER BY id LIMIT 1", Long.class);
+        long retired = jdbc.queryForObject("""
+                INSERT INTO subscription_tier (service_id, name, price, currency, tax_included, active)
+                VALUES (?, '연간 총액', 174000, 'KRW', TRUE, FALSE) RETURNING id
+                """, Long.class, serviceId);
+        try {
+            assertThatThrownBy(() -> recommendations.calculate(new CalculatorRequest(planId, List.of(retired), null)))
+                    .isInstanceOf(ApiException.class);
+
+            var response = recommendations.recommend(new RecommendationRequest(
+                    new RecommendationRequest.Required(10, List.of(serviceId), List.of(retired)), null));
+            assertThat(response.results().get(0).breakdown())
+                    .noneMatch(line -> line.amount() == 174_000);
+        } finally {
+            jdbc.update("DELETE FROM subscription_tier WHERE id = ?", retired);
+        }
+    }
+
+    /** G-73 c. 모르는 서비스 id 를 몰아 보내도 요청 하나가 만드는 결손 행은 5개까지다. */
+    @Test void g73c_oneRequestCannotFloodTheGapTable() {
+        jdbc.update("DELETE FROM catalog_candidate");
+        var unknown = java.util.stream.LongStream.rangeClosed(900_001, 900_050).boxed().toList();
+        recommendations.recommend(new RecommendationRequest(new RecommendationRequest.Required(10, unknown, null), null));
+
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM catalog_candidate", Integer.class)).isEqualTo(5);
+    }
+
     /** 배치는 받은 값과 기준일을 그대로 남긴다. */
     @Test void dailyRefreshStoresRateAndDate() {
         FX_STATUS.set(200);

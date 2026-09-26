@@ -2,6 +2,7 @@ package com.palsaekjo.yogobi.recommend;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -73,7 +74,7 @@ class RecommendationControllerTest {
     /** 같은 본문으로 /narrate 를 부르면 1순위 설명이 온다. current 도 그대로 내레이터에 넘어간다. */
     @Test
     void narrateExplainsTheFirstResultWithCurrent() {
-        when(service.recommend(any()))
+        when(service.recommend(any(), eq(false)))
                 .thenReturn(new RecommendationResponse(Accuracy.PARTIAL, missing, List.of(best), 127, current, null));
         when(narrator.narrationFor(best, missing, 127, current))
                 .thenReturn(new Narrator.Narration("지금보다 월 15,390원 덜 내요.", List.of("넷플릭스가 포함돼요."),
@@ -89,7 +90,7 @@ class RecommendationControllerTest {
     /** 내레이터 장애는 빈 설명이다 — 200 이고 결과 경로는 애초에 무관하다. */
     @Test
     void narratorFailureYieldsEmptyNarration() {
-        when(service.recommend(any()))
+        when(service.recommend(any(), eq(false)))
                 .thenReturn(new RecommendationResponse(Accuracy.FULL, List.of(), List.of(best), 5, null, null));
         when(narrator.narrationFor(any(), any(), any(), any())).thenReturn(Narrator.Narration.none());
 
@@ -102,7 +103,7 @@ class RecommendationControllerTest {
     /** 후보가 없으면 설명할 것도 없다. 내레이터를 부르지 않는다. */
     @Test
     void noCandidateSkipsNarratorEntirely() {
-        when(service.recommend(any())).thenReturn(new RecommendationResponse(Accuracy.PARTIAL, List.of(), List.of()));
+        when(service.recommend(any(), eq(false))).thenReturn(new RecommendationResponse(Accuracy.PARTIAL, List.of(), List.of()));
 
         var narration = controller.narrate(request).data();
 

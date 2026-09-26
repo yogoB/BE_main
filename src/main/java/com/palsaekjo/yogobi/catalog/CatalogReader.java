@@ -414,7 +414,7 @@ public class CatalogReader {
         return jdbc.query("""
                 SELECT t.id, t.service_id, s.name AS service_name, t.name AS tier_name, t.price
                   FROM subscription_tier t JOIN subscription_service s ON s.id = t.service_id
-                 WHERE t.id IN (:ids) AND t.currency = 'KRW'
+                 WHERE t.id IN (:ids) AND t.currency = 'KRW' AND t.active AND s.active
                 """, new MapSqlParameterSource("ids", tierIds),
                 (rs, i) -> new SubscriptionTier(rs.getLong("id"), rs.getLong("service_id"),
                         tierDisplayName(rs.getString("service_name"), rs.getString("tier_name")),
@@ -433,6 +433,18 @@ public class CatalogReader {
                 WHERE t.id IN (:ids) AND t.currency <> 'KRW' ORDER BY t.id
                 """, new MapSqlParameterSource("ids", tierIds),
                 rs -> { found.put(rs.getLong("id"), rs.getString("service_name") + " " + rs.getString("tier_name")); });
+        return found;
+    }
+
+    /** 요청한 등급 중 해외 결제인 것의 서비스 (서비스 ID → "서비스명 등급명"). 추천이 고른 등급을 뺄 때 쓴다(G-73 a). */
+    public Map<Long, String> findForeignPricedTierServices(List<Long> tierIds) {
+        var found = new LinkedHashMap<Long, String>();
+        jdbc.query("""
+                SELECT t.service_id, s.name AS service_name, t.name AS tier_name
+                FROM subscription_tier t JOIN subscription_service s ON s.id = t.service_id
+                WHERE t.id IN (:ids) AND t.currency <> 'KRW' AND t.active AND s.active ORDER BY t.id
+                """, new MapSqlParameterSource("ids", tierIds),
+                rs -> { found.put(rs.getLong("service_id"), rs.getString("service_name") + " " + rs.getString("tier_name")); });
         return found;
     }
 

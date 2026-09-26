@@ -104,8 +104,9 @@ public final class CostCalculator {
             PlanBenefit benefit = findApplicableBenefit(plan, tier, exclusiveWinnerTierIds);
             long cost = benefit == null ? tier.listPrice() : benefit.apply(tier.listPrice());
             String note = benefit == null ? null : "제휴 혜택 적용";
+            // 혜택이 깎은 금액은 공시가가 아니라 공시가에서 계산한 값이다(원칙 4, G-73 e).
             lines.add(new CostLine(tier.name(),
-                    new ValuedAmount(Money.of(cost), Provenance.OFFICIAL), note));
+                    new ValuedAmount(Money.of(cost), benefit == null ? Provenance.OFFICIAL : Provenance.DERIVED), note));
             total += cost;
         }
 
