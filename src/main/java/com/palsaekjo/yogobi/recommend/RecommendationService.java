@@ -294,6 +294,9 @@ public class RecommendationService {
     private static void requireSane(List<Long> ids, String field) {
         if (ids != null && ids.size() > MAX_IDS)
             throw ApiException.requiredMissing(field, "한 번에 " + MAX_IDS + "개까지 보낼 수 있어요.");
+        // 빈 칸(null)이 섞이면 언박싱에서 500 이 났다(계산기·저장) — 신뢰 경계에서 400 으로 막는다(G-74 b·c).
+        if (ids != null && ids.stream().anyMatch(java.util.Objects::isNull))
+            throw ApiException.requiredMissing(field, "선택 항목을 다시 골라 주세요.");
     }
 
     /** 특정 조합(요금제 + 티어들)의 총비용. 후보 탐색·정렬 없이 1회 계산한다. */

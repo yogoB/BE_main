@@ -136,6 +136,9 @@ public class SecurityConfig {
                         // 카탈로그 원본(합본 CSV) CRUD — 공개 읽기 경로와 분리하고 **운영자만** 허용한다(D-24).
                         // CSRF 보호는 기본값 그대로 적용된다. 운영자 지정은 CATALOG_ADMIN_USER_IDS(비면 아무도 못 쓴다).
                         .requestMatchers("/api/v1/admin", "/api/v1/admin/**").hasRole("ADMIN")
+                        // 오류 디스패치(/error)는 원래 요청이 이미 체인을 통과한 뒤의 재진입이다. 막으면 415·405·500 이
+                        // 전부 401 "로그인하세요"로 둔갑한다(G-74 a). 밖에서 /error 를 직접 부르는 것은 REQUEST 라 그대로 막힌다.
+                        .dispatcherTypeMatchers(jakarta.servlet.DispatcherType.ERROR).permitAll()
                         .anyRequest().denyAll())
                 .exceptionHandling(e -> e
                         .authenticationEntryPoint((req, res, ex) -> error(json, res, AuthService.unauthorized()))

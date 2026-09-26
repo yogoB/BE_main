@@ -1673,3 +1673,20 @@ G-71 이 남긴 한계를 닫는다. KB리브모바일 페이지는 `기본료 �
 | d | `/recommendations` 뒤 같은 본문으로 `/recommendations/narrate` | 결손 `requested_cnt` 는 **1** — 설명은 기록하지 않는다(펼친 사람만 2배로 세던 왜곡) |
 | e | 제휴 혜택으로 깎인 구독 줄 | 출처 `DERIVED`(공식에서 계산). 혜택 없는 줄은 `OFFICIAL` 그대로 — 원칙 4 |
 | f | 월 총비용이 같은 후보 둘 | **요금제 id 가 작은 쪽이 먼저.** DB 행 순서에 맡기면 `/narrate` 가 다시 계산할 때 화면 1순위와 다른 요금제를 설명할 수 있다 |
+
+
+## G-74. 오류는 오류대로 돌려준다 — 모든 예외가 "로그인하세요"(401)로 둔갑하던 것 (2026-09-27)
+
+**검증**: `ErrorResponseTest` (실제 HTTP — MockMvc 는 오류 디스패치를 타지 않아 이 결함을 못 본다)
+
+처리하지 못한 예외는 서블릿이 `/error` 로 다시 보낸다. 그 **오류 디스패치를 보안 체인의 `denyAll` 이 막아**
+415·405·타입 오류·500 이 전부 `YGB-AUTH-001` 401 "로그인 정보를 확인해 주세요" 로 나가고 있었다.
+프론트는 401 을 로그아웃 신호로 읽고, 지표에는 5xx 가 안 잡혀 장애도 보이지 않는다.
+**새 오류 코드는 만들지 않는다**(`architecture.md` 코드 표는 사람이 관리한다) — 기존 `YGB-REQ-001` 과 표준 상태를 쓴다.
+
+| | 요청 | 정답 |
+|---|---|---|
+| a | `POST /calculator` 를 `Content-Type: text/plain` 으로 | **415** (401 이 아니다) |
+| b | `POST /calculator` `tierIds:[<유효>, null]` | **400** `YGB-REQ-001` `field=tierIds` — 전엔 언박싱 NPE 500 → 401 |
+| c | `POST /recommendations` `wantedServiceIds:[null]` | **400**. 전엔 200 이면서 결손 표에 `serviceId:null` 행을 남겼다 |
+| d | `GET /catalog/plans/abc/benefits` (숫자 자리에 문자) | **400** `YGB-REQ-001` `field=id`, 문구는 **다음 행동**을 말한다 |
