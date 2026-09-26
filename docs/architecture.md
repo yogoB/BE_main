@@ -150,7 +150,7 @@ POST /api/v1/admin/catalog/{dataset}  (운영자 변경 제안, D-29·D-45)
 
 | | |
 |---|---|
-| 요청 | `{ "serviceName": "Spotify" \| "Apple Music" \| "iCloud+" }` |
+| 요청 | `{ "serviceName": "<아래 15개 중 하나>" }` — 그 외는 422 |
 | 200 | `{ serviceName, sourceUrl, checkedAt, sourceHash, offers[{ tierName, price, currency, billingPeriod, evidence }] }` |
 | 502 | `offers` 없이 코드 둘 — `CATALOG-SOURCE-UNAVAILABLE`(못 읽음) · `CATALOG-SOURCE-CHANGED`(읽었는데 한 상품의 월 정가가 유일하지 않음). **코드는 `detail.code` 에 있다** — 최상위 `code` 도 `error.code` 도 아니다(FastAPI 가 감싼다). 2026-09-20 에 BE 가 최상위를 보다 모든 실패를 한 코드로 뭉갰다 |
 
@@ -161,8 +161,11 @@ POST /api/v1/admin/catalog/{dataset}  (운영자 변경 제안, D-29·D-45)
 - **쿨다운은 BE 가 지킨다.** 내레이터는 부를 때마다 원본 페이지를 읽고 캐시·쿨다운이 없다(무상태 규칙).
   `yogobi.harvest.subscription-cooldown-minutes`(기본 360). 배치는 하루 한 번이지만 운영자가 손으로
   수집을 연타할 수 있고, 그 경로가 곧 원본 페이지 연타다.
-- 대상 서비스는 `yogobi.harvest.subscription-services`(기본 `Spotify,Apple Music,iCloud+`).
-  **카탈로그 36개 중 3개만 점검된다** — 서비스마다 페이지 문구에 맞춘 추출이 따로 필요해 개수만큼 유지비가 는다.
+- 대상 서비스는 `yogobi.harvest.subscription-services`(기본은 아래 15개 전부). 이름은 `subscription_service.name` 과 같다:
+  `Spotify` · `Apple Music` · `iCloud+` · `멜론` · `벅스` · `크레마클럽` · `교보 sam` · `윌라` · `Microsoft 365` · `Notion` · `Google One` · `스토리텔` · `애플TV+` · `리디셀렉트` · `카카오 이모티콘 플러스`.
+  **카탈로그 39개 중 15개(등급 52개)가 점검된다**(2026-09-27, 3 → 15). 나머지는 가격을 스크립트로 그리거나
+  1MB 를 넘거나(디즈니+) `official_url` 이 날짜 박힌 보도자료·블로그(쿠팡플레이·YouTube Music)라 넣지 않았다.
+- `offers` 는 1~20개다(멜론 11등급). 목록에 없는 등급은 오지 않는다 — 안 온 등급은 점검되지 않은 것이지 없어진 것이 아니다.
 
 **BE_main이 AI-를 호출한다. 반대 방향은 없다.** 내레이터가 죽어도 결과·계산은 그대로 나간다 —
 설명은 결과와 따로 오고(D-50) 실패는 빈 설명으로 흡수하되 **WARN 으로 이유를 남긴다**.
