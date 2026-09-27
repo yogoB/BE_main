@@ -6,7 +6,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -68,10 +67,5 @@ public class RetentionService {
             deleted.put(t.name(), jdbc.update("DELETE FROM " + t.table() + " WHERE " + t.where(), t.args()));
         }
         return deleted;
-    }
-
-    @Scheduled(cron = "${yogobi.retention.cron:0 0 4 * * *}", zone = PrivacyPolicy.RETENTION_ZONE)
-    public void scheduledPurge() {
-        purge();
     }
 }

@@ -156,7 +156,8 @@ public class BackofficeController {
                            CASE WHEN a.outcome = 'APPLIED' THEN NULL ELSE a.outcome || ' ' || coalesce(a.detail, '') END AS detail
                     FROM catalog_audit a LEFT JOIN app_user u ON u.id = a.actor_id
                     UNION ALL
-                    SELECT b.created_at, u.email, b.action, b.target, b.detail
+                    -- 예약 작업은 actor_id=0(시스템)이다 — 빈칸 대신 '시스템'으로 보인다(G-79)
+                    SELECT b.created_at, coalesce(u.email, CASE WHEN b.actor_id = 0 THEN '시스템' END), b.action, b.target, b.detail
                     FROM admin_action b LEFT JOIN app_user u ON u.id = b.actor_id
                 ) t ORDER BY at DESC LIMIT ?
                 """, capped));

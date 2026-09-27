@@ -16,7 +16,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 /**
@@ -78,18 +77,6 @@ public class CatalogDailyHarvest {
         this.planLimit = planLimit;
         this.subscriptionLimit = subscriptionLimit;
         this.subscriptionServices = subscriptionServices;
-    }
-
-    /** 한국시간 매일 09:00. 실패해도 다음 날 다시 돈다 — 카탈로그는 그대로 유지된다(fail-soft). */
-    @Scheduled(cron = "${yogobi.harvest.cron:0 0 9 * * *}", zone = "Asia/Seoul")
-    public void scheduled() {
-        try {
-            Map<String, Object> result = harvest();
-            log.info("일일 카탈로그 수집 완료: {}", result);
-        } catch (RuntimeException e) {
-            log.warn("일일 카탈로그 수집 실패 — 카탈로그는 그대로 유지, 다음 실행에 재시도 ({})",
-                    e.getClass().getSimpleName());
-        }
     }
 
     /** 수집 1회. 만들어진 제안 수를 돌려준다. 이미 같은 대상의 PENDING 제안이 있으면 건너뛴다. */

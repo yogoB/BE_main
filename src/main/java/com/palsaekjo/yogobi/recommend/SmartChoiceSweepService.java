@@ -7,7 +7,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
@@ -38,16 +37,6 @@ public class SmartChoiceSweepService {
         this.client = client;
         this.jdbc = jdbc;
         this.maxConditions = maxConditions;
-    }
-
-    /** 하루 3회(D-12). 머신이 잠들어 있으면 발화하지 않으므로 화면의 수동 실행이 실질적인 경로다. */
-    @Scheduled(cron = "${yogobi.smartchoice.cron:0 40 3,12,20 * * *}", zone = "Asia/Seoul")
-    public void scheduled() {
-        try {
-            log.info("스마트초이스 스윕 완료: {}", sweep());
-        } catch (RuntimeException e) {
-            log.warn("스마트초이스 스윕 실패 — 이전 스냅샷을 유지합니다 ({})", e.getClass().getSimpleName());
-        }
     }
 
     /**

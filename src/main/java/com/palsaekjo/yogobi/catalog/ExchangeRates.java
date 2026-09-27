@@ -12,7 +12,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
@@ -71,15 +70,6 @@ public class ExchangeRates {
             price = price.multiply(KOREAN_VAT);
         }
         return price.multiply(rate.rate()).setScale(0, RoundingMode.FLOOR).longValue();
-    }
-
-    /**
-     * 하루 1회 갱신. ECB 참고환율은 CET 16:00 무렵 고시되므로 한국 시간 아침에 받는다.
-     * 실패는 경고만 남기고 넘어간다 — 화면은 이전 값으로 계속 동작한다.
-     */
-    @Scheduled(cron = "${yogobi.fx.cron:0 15 9 * * *}", zone = "Asia/Seoul")
-    public void refresh() {
-        refresh("USD", "KRW");
     }
 
     /**
