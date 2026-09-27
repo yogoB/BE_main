@@ -61,6 +61,16 @@ class ErrorResponseTest {
         assertThat(response.getBody()).contains("wantedServiceIds");
     }
 
+    /** G-82 b. 큰 목록은 압축해서 보낸다. */
+    @Test void catalogIsCompressedWhenTheClientAsks() {
+        var headers = new HttpHeaders();
+        headers.set(HttpHeaders.ACCEPT_ENCODING, "gzip");
+        var response = rest.exchange("/api/v1/catalog/plans", org.springframework.http.HttpMethod.GET,
+                new HttpEntity<>(headers), byte[].class);
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        assertThat(response.getHeaders().getFirst(HttpHeaders.CONTENT_ENCODING)).isEqualTo("gzip");
+    }
+
     /** d. 숫자 자리에 문자가 오면 400 이고, 어느 칸인지와 다음 행동을 말한다. */
     @Test void typeMismatchIs400WithFieldAndNextStep() {
         var response = rest.getForEntity("/api/v1/catalog/plans/abc/benefits", String.class);

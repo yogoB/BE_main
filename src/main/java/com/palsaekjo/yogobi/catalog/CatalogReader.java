@@ -67,7 +67,9 @@ public class CatalogReader {
         var tiersByService = new LinkedHashMap<Long, List<TierView>>();
         jdbc.query("""
                 SELECT service_id, id, name, price, currency, tax_included, concurrent_streams, quality, note
-                FROM subscription_tier WHERE active AND service_id IN (SELECT id FROM subscription_service WHERE active) ORDER BY service_id, price
+                FROM subscription_tier WHERE active AND service_id IN (SELECT id FROM subscription_service WHERE active)
+                -- 원화 먼저(G-82 a). 숫자만 보면 $4 가 4,900원보다 앞서고, 프론트는 첫 등급을 기본값으로 쓴다.
+                ORDER BY service_id, (currency <> 'KRW'), price, id
                 """, new MapSqlParameterSource(), rs -> {
                     String currency = rs.getString("currency");
                     long price = rs.getLong("price");

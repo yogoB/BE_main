@@ -61,7 +61,12 @@ public class AuthService {
     public Member changeNickname(long id, String nickname) {
         String trimmed = text(nickname, "nickname", 30);
         if (nicknameTaken(trimmed, id)) throw duplicateNickname();
-        jdbc.update("UPDATE app_user SET nickname = ? WHERE id = ?", trimmed, id);
+        try {
+            jdbc.update("UPDATE app_user SET nickname = ? WHERE id = ?", trimmed, id);
+        } catch (DuplicateKeyException e) {
+            // 확인과 UPDATE 사이에 다른 사람이 같은 닉네임을 가져갔다 — 500 이 아니라 같은 409 다(G-82 c).
+            throw duplicateNickname();
+        }
         return member(id);
     }
 
@@ -70,6 +75,9 @@ public class AuthService {
         String trimmed = value == null ? "" : value.trim();
         if (trimmed.isEmpty() || trimmed.codePointCount(0, trimmed.length()) > max)
             throw ApiException.requiredMissing(field, "1자 이상 " + max + "자 이하로 입력해 주세요.");
+        // 제어문자(\u0000 등)는 DB 가 거절해 500 이 났다 — 신뢰 경계에서 400(G-82 c).
+        if (trimmed.chars().anyMatch(Character::isISOControl))
+            throw ApiException.requiredMissing(field, "보이지 않는 특수문자는 쓸 수 없어요. 다시 입력해 주세요.");
         return trimmed;
     }
 

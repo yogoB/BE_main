@@ -203,6 +203,22 @@ class ForeignCurrencyCatalogTest {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM catalog_candidate", Integer.class)).isEqualTo(5);
     }
 
+    /** G-82 a. 원화 등급이 해외 결제 등급보다 먼저 온다 — 프론트는 첫 등급을 기본값으로 쓴다. */
+    @Test void g82a_krwTiersComeFirst() {
+        long serviceId = jdbc.queryForObject(
+                "SELECT service_id FROM subscription_tier WHERE active AND currency = 'KRW' ORDER BY id LIMIT 1", Long.class);
+        long cheapForeign = jdbc.queryForObject("""
+                INSERT INTO subscription_tier (service_id, name, price, currency, tax_included)
+                VALUES (?, '해외카드', 4, 'USD', TRUE) RETURNING id""", Long.class, serviceId);
+        try {
+            var tiers = reader.listServices().stream().filter(s -> s.id() == serviceId).findFirst().orElseThrow().tiers();
+            assertThat(tiers.get(0).currency()).isEqualTo("KRW");
+            assertThat(tiers.get(tiers.size() - 1).id()).isEqualTo(cheapForeign);
+        } finally {
+            jdbc.update("DELETE FROM subscription_tier WHERE id = ?", cheapForeign);
+        }
+    }
+
     /** 배치는 받은 값과 기준일을 그대로 남긴다. */
     @Test void dailyRefreshStoresRateAndDate() {
         FX_STATUS.set(200);

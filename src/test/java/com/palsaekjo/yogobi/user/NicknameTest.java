@@ -115,6 +115,14 @@ class NicknameTest {
         browser.post("/api/v1/me/nickname", Map.of("nickname", " 새닉네임 ")).andExpect(status().isOk());
     }
 
+    /** G-82 c. 제어문자는 DB 에 닿기 전에 400 이다. */
+    @Test void g82c_rejectsControlCharacters() throws Exception {
+        var browser = new Browser(TestMembers.create(jdbc, "a@example.com"));
+        browser.post("/api/v1/me/nickname", Map.of("nickname", "닉\u0000네임"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.field").value("nickname"));
+    }
+
     @Test void g14e_rejectsNicknameTakenByAnother() throws Exception {
         long other = TestMembers.create(jdbc, "other@example.com");
         jdbc.update("UPDATE app_user SET nickname = '선점닉' WHERE id = ?", other);
