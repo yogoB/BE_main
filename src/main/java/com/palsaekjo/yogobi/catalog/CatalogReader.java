@@ -234,6 +234,23 @@ public class CatalogReader {
         return found == null ? 0 : found;
     }
 
+    /** 자격 제한으로 뺀 요금제 중 가장 싼 <b>청년</b> 요금제. 후보 질의와 같은 WHERE 절에 청년 조건만 더한다(G-77 a). */
+    public record LeftOutPlan(String carrier, String name, long basePrice) {}
+
+    public Optional<LeftOutPlan> cheapestYouthPlanLeftOut(long dataMb, String networkType) {
+        return jdbc.query("""
+                SELECT c.name AS carrier, p.name, p.base_price FROM mobile_plan p JOIN carrier c ON c.id = p.carrier_id
+                WHERE p.active AND p.data_mb >= :dataMb
+                  AND (%s)
+                  AND NOT (%s)
+                  AND p.age_limit LIKE '%%청년%%'
+                ORDER BY p.base_price, p.id LIMIT 1
+                """.formatted(NETWORK_MATCHES, OPEN_TO_ALL), new MapSqlParameterSource()
+                .addValue("dataMb", dataMb).addValue("networkType", networkType),
+                (rs, i) -> new LeftOutPlan(rs.getString("carrier"), rs.getString("name"), rs.getLong("base_price")))
+                .stream().findFirst();
+    }
+
     /**
      * 망을 좁히는 바람에 놓친 <b>더 싼</b> 요금제(2026-09-21). 없으면 빈 Optional 이다.
      *

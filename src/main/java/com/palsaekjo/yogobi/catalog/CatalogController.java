@@ -45,6 +45,6 @@ public class CatalogController {
     @GetMapping("/plans/{id}/benefits")
     public ApiResponse<List<BenefitView>> benefits(@PathVariable long id) {
         return ApiResponse.ok(reader.listBenefits(id)
-                .orElseThrow(() -> ApiException.planNotFound("요금제를 찾을 수 없습니다: " + id)));
+                .orElseThrow(() -> ApiException.planNotFound("선택한 요금제를 찾지 못했어요. 요금제를 다시 골라 주세요.")));
     }
 }

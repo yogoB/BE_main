@@ -65,7 +65,7 @@ public class SwitchTimingService {
 
     private long effectiveCost(long planId, List<Long> tierIds) {
         var candidate = catalog.findPlanById(planId)
-                .orElseThrow(() -> ApiException.planNotFound("요금제를 찾을 수 없습니다: " + planId));
+                .orElseThrow(() -> ApiException.planNotFound("선택한 요금제를 찾지 못했어요. 요금제를 다시 골라 주세요."));
         List<SubscriptionTier> tiers = catalog.findTiersByIds(tierIds);
         var wanted = new LinkedHashSet<>(tiers);
         var bundles = catalog.findApplicableBundles(new LinkedHashSet<>(tierIds));

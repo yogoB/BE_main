@@ -39,12 +39,29 @@ class AgeLimitCandidateTest {
     @Autowired CatalogSeedLoader loader;
     @Autowired CatalogReader reader;
     @Autowired JdbcTemplate jdbc;
+    @Autowired com.palsaekjo.yogobi.recommend.RecommendationService recommendations;
 
     @BeforeEach
     void clean() {
         jdbc.execute("DELETE FROM plan_benefit");
         jdbc.execute("DELETE FROM mobile_plan");
         jdbc.execute("DELETE FROM carrier");
+    }
+
+    /** G-77 a. 뺀 요금제 중 가장 싼 청년 요금제를 이름·금액으로 알린다. 태블릿은 예로 들지 않는다. */
+    @Test
+    void g77a_namesTheCheapestYouthPlanItLeftOut() throws Exception {
+        loader.loadMobilePlans(csv(HEADER
+                + "SKT,누구나,5G,50000,20480,100,100,,,ALL,https://t/1,2026-09-07\n"
+                + "SKT,청년 비싼,5G,47000,20480,100,100,,,청년 만 19~34세,https://t/2,2026-09-07\n"
+                + "KT,청년 싼,5G,39000,20480,100,100,,,청년,https://t/3,2026-09-07\n"
+                + "LGU+,태블릿,5G,11000,20480,100,100,,,태블릿/웨어러블,https://t/4,2026-09-07\n"));
+
+        var response = recommendations.recommend(new com.palsaekjo.yogobi.recommend.RecommendationRequest(
+                new com.palsaekjo.yogobi.recommend.RecommendationRequest.Required(20, java.util.List.of(1L), null), null));
+
+        var notice = response.missingInputs().stream().filter(m -> m.field().equals("ageLimit")).findFirst().orElseThrow();
+        assertThat(notice.howToFind()).contains("청년 싼").contains("39,000원").doesNotContain("태블릿");
     }
 
     @Test

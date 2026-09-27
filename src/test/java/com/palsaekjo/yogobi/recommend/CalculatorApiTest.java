@@ -76,7 +76,11 @@ class CalculatorApiTest {
         mvc.perform(post("/api/v1/calculator").contentType(MediaType.APPLICATION_JSON).content("""
                 {"planId":99999,"tierIds":[2],"optional":{}}"""))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.error.code").value("YGB-CAT-001"));
+                .andExpect(jsonPath("$.error.code").value("YGB-CAT-001"))
+                // G-77 b — 내부 ID 대신 다음 행동을 말한다
+                .andExpect(jsonPath("$.error.message").value(org.hamcrest.Matchers.allOf(
+                        org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("99999")),
+                        org.hamcrest.Matchers.containsString("다시 골라"))));
     }
 
     @Test

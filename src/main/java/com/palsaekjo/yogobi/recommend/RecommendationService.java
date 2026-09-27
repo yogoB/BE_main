@@ -313,7 +313,7 @@ public class RecommendationService {
         }
         requireSane(request.tierIds(), "tierIds");
         var candidate = catalog.findPlanById(request.planId())
-                .orElseThrow(() -> ApiException.planNotFound("요금제를 찾을 수 없습니다: " + request.planId()));
+                .orElseThrow(() -> ApiException.planNotFound("선택한 요금제를 찾지 못했어요. 요금제를 다시 골라 주세요."));
 
         // 원화 확정 가격 등급만 계산에 들어간다. 빠진 ID 가 해외 결제 등급이면 잘못된 요청이 아니라
         // "실제 결제액을 물어야 하는 것"이므로 막지 않고 안내로 돌려준다(원칙 5-①).
@@ -322,7 +322,7 @@ public class RecommendationService {
                 .filter(id -> tiers.stream().noneMatch(t -> t.id() == id)).toList();
         Map<Long, String> foreignPriced = catalog.findForeignPricedTiers(absent);
         if (absent.size() != foreignPriced.size()) {
-            throw ApiException.requiredMissing("tierIds", "존재하지 않는 구독 등급 ID가 포함됐습니다.");
+            throw ApiException.requiredMissing("tierIds", "지금은 없는 구독이 섞여 있어요. 구독을 다시 골라 주세요.");
         }
         Set<SubscriptionTier> wanted = new LinkedHashSet<>(tiers);
         Set<Long> wantedTierIds = new LinkedHashSet<>(tiers.stream().map(SubscriptionTier::id).toList());
@@ -372,9 +372,14 @@ public class RecommendationService {
         if (restricted == 0) {
             return;
         }
+        // 무엇을 찾아야 하는지 말한다 — 가장 싼 청년 요금제 하나를 이름·금액으로(G-77 a). 태블릿 같은
+        // 휴대폰 밖 요금제는 예로 들지 않는다. 청년 요금제가 없으면 원래 문구다.
+        String howToFind = catalog.cheapestYouthPlanLeftOut(dataMb, networkType)
+                .map(p -> "청년이라면 " + p.carrier() + " '" + p.name() + "' 기본료 월 "
+                        + String.format("%,d", p.basePrice()) + "원도 있어요 — 자격 조건은 통신사에서 확인해 주세요")
+                .orElse("해당 자격이 있다면 통신사에서 더 싼 요금제를 찾을 수 있어요");
         missing.add(new MissingInput("ageLimit",
-                "청년·키즈·시니어처럼 가입 자격이 필요한 요금제 " + restricted + "건은 뺐어요",
-                "해당 자격이 있다면 통신사에서 더 싼 요금제를 찾을 수 있어요"));
+                "청년·키즈·시니어처럼 가입 자격이 필요한 요금제 " + restricted + "건은 뺐어요", howToFind));
     }
 
     /**
@@ -591,7 +596,7 @@ public class RecommendationService {
         try {
             return ContractType.valueOf(o.contractType());
         } catch (IllegalArgumentException e) {
-            throw ApiException.requiredMissing("contractType", "약정 유형 값이 올바르지 않습니다.");
+            throw ApiException.requiredMissing("contractType", "약정 선택값을 읽지 못했어요. 약정을 다시 골라 주세요.");
         }
     }
 
@@ -636,7 +641,7 @@ public class RecommendationService {
             case "5G", "FIVE_G" -> "FIVE_G";
             case "LTE", "4G" -> "LTE";
             case "3G", "THREE_G" -> "THREE_G";
-            default -> throw ApiException.requiredMissing("networkType", "망 종류 값이 올바르지 않습니다.");
+            default -> throw ApiException.requiredMissing("networkType", "통신망 선택값을 읽지 못했어요. 통신망을 다시 골라 주세요.");
         };
     }
 
