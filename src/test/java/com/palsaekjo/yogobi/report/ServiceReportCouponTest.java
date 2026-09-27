@@ -93,6 +93,14 @@ class ServiceReportCouponTest {
                 .andExpect(jsonPath("$.data[0].usedAt").doesNotExist());
     }
 
+    /** G-84. IP 를 바꿔도 회원당 15분 5건이다 — 쿠폰을 주소마다 쌓지 못한다. */
+    @Test void memberLimitHoldsAcrossAddresses() throws Exception {
+        Cookie[] auth = TestMembers.login(jdbc, tokens, "farmer@example.com");
+        for (int i = 1; i <= 5; i++)
+            mvc.perform(report(auth).header("X-Client-IP", "203.0.113." + i)).andExpect(status().isOk());
+        mvc.perform(report(auth).header("X-Client-IP", "203.0.113.99")).andExpect(status().isTooManyRequests());
+    }
+
     @Test void anotherMemberSeesNothing() throws Exception {
         mvc.perform(report(TestMembers.login(jdbc, tokens, "reporter@example.com"))).andExpect(status().isOk());
         Cookie[] stranger = TestMembers.login(jdbc, tokens, "stranger@example.com");

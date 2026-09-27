@@ -71,6 +71,8 @@ public class ServiceReportController {
         UUID id = UUID.randomUUID();
         // 비회원도 쓰는 경로다 — principal 은 로그인 상태에서만 채워진다(null 이면 익명 제보).
         Long userId = principal == null ? null : Long.valueOf(principal.getName());
+        // 제보 1건 = 쿠폰 1장이라 회원은 주소를 바꿔도 같은 한도다(G-84).
+        if (userId != null) limits.check("service-report:u:" + userId, 5);
         jdbc.update("""
                 INSERT INTO service_report(id, category, description, page_url, source_url, user_id)
                 VALUES (?, ?, ?, ?, ?, ?)
