@@ -44,7 +44,9 @@ public class CatalogCandidateRecorder {
                 log.warn("카탈로그 결손 기록이 상한({}행)에 닿아 멈췄다 — 새 결손은 기록되지 않는다", MAX_ROWS);
             }
         } catch (RuntimeException e) {
-            log.warn("카탈로그 결손 기록 실패 — 건너뜀 (fail-soft): {} {} / {}", kind, queryText, e.toString());
+            // 사용자 자유 텍스트라 줄바꿈으로 가짜 로그 줄을 만들 수 있다 — 제어문자를 치환한다(G-85 g).
+            log.warn("카탈로그 결손 기록 실패 — 건너뜀 (fail-soft): {} {} / {}", kind,
+                    queryText.replaceAll("\\p{Cntrl}", "?"), e.getClass().getSimpleName());
         }
     }
 }

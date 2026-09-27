@@ -34,6 +34,17 @@ primary_region = "nrt"
     timeout = "5s"
     path = "/api/v1/catalog/services"
 
+# G-85 e. 기본 종료 유예 5초는 처리 중 요청·09:00 수집을 끊었다. Spring graceful 종료(최대 30초)와 맞춘다.
+kill_timeout = "30s"
+
+# G-85 e. 머신 1대 rolling 은 기동 12~13초 동안 502 다. 새 머신이 헬스체크를 통과한 뒤 옮긴다.
+[deploy]
+  strategy = "bluegreen"
+
+# G-85 c. 기본(on-failure 10회)은 DB 가 늦게 돌아오면 멈춘 채 남았다(2026-09-27 장애). 계속 다시 띄운다.
+[[restart]]
+  policy = "always"
+
 [[vm]]
   size = "shared-cpu-1x"
   memory = "512mb"

@@ -18,7 +18,8 @@ RUN ./gradlew --no-daemon clean bootJar
 FROM eclipse-temurin:21-jre
 WORKDIR /app
 # 컨테이너 메모리에 맞춰 힙을 잡는다 (fly [[vm]] memory 기준)
-ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0"
+# G-85 b. OOM 뒤 좀비로 남지 않고 재시작되게, 512MB VM 에서 비힙(메타스페이스·스레드) 여유를 남긴다.
+ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=60.0 -XX:+ExitOnOutOfMemoryError"
 COPY --from=build /app/build/libs/yogobi-0.0.1-SNAPSHOT.jar app.jar
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "app.jar"]

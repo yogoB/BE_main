@@ -61,6 +61,16 @@ class ErrorResponseTest {
         assertThat(response.getBody()).contains("wantedServiceIds");
     }
 
+    /** G-85 a. 2MB 를 넘는 JSON 본문은 파서 단계에서 400 이다 — 역직렬화가 힙을 채우기 전에. */
+    @Test void hugeJsonBodyIs400() {
+        String ids = "1,".repeat(1_500_000) + "1";              // 약 3MB
+        var response = post("/api/v1/recommendations",
+                "{\"required\":{\"monthlyDataGb\":10,\"wantedServiceIds\":[" + ids + "]}}", MediaType.APPLICATION_JSON);
+        assertThat(response.getStatusCode().value()).isEqualTo(400);
+        // 파서가 끊었다는 증거: 목록 길이 검사(역직렬화 뒤)의 문구가 아니라 본문을 읽지 못했다는 문구다.
+        assertThat(response.getBody()).contains("YGB-REQ-001").doesNotContain("200개까지");
+    }
+
     /** G-82 b. 큰 목록은 압축해서 보낸다. */
     @Test void catalogIsCompressedWhenTheClientAsks() {
         var headers = new HttpHeaders();
