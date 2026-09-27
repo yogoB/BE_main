@@ -136,6 +136,25 @@ class NarratorClientTest {
     }
 
     /**
+     * G-75 a — 내레이터가 실패해도 <b>안내는 남는다.</b> 문장은 BE 가 쓴 것이라 이어 붙이기만 한다
+     * (내레이터 `notices_for` 와 같은 규칙). 전엔 특가 종료·결합 적용 범위 경고까지 함께 사라졌다.
+     */
+    @Test
+    void failureKeepsTheNoticesTheBackendAlreadyWrote() {
+        body = """
+                {"message":"월 55,000원이에요.","reasons":[],"surprise":"?"}""";   // 계약 밖 필드 → 폐기
+
+        var narration = client.narrationFor(COST, List.of(
+                new MissingInput("promotionPeriod", "7개월 뒤 월 30,000원으로 바뀌어요", "1·6·12개월 탭에 반영했어요"),
+                new MissingInput("ageLimit", "자격이 필요한\n요금제 3건은 뺐어요", null)), 127, null);
+
+        assertThat(narration.message()).isNull();
+        assertThat(narration.notices()).containsExactly(
+                "7개월 뒤 월 30,000원으로 바뀌어요 — 1·6·12개월 탭에 반영했어요",
+                "자격이 필요한 요금제 3건은 뺐어요");
+    }
+
+    /**
      * G-31 d — 폐기한 이유에 <b>필드 이름이 적힌다.</b> 이 예외는 삼켜지므로 메시지가 유일한 흔적이고,
      * 그 한 단어가 없어서 오늘 D-46 이 운영에서 죽은 채 배포됐다.
      */

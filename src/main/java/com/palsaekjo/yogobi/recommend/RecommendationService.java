@@ -33,6 +33,8 @@ public class RecommendationService {
     private static final int TOP_N = 5;
     private static final int MB_PER_GB = 1024;
     private static final int MAX_GAPS_PER_REQUEST = 5;
+    /** 카탈로그의 무제한 표기(docs/data.md: 무제한은 999999). */
+    private static final long UNLIMITED_DATA_MB = 999_999;
 
     private final CatalogReader catalog;
     /**
@@ -188,14 +190,16 @@ public class RecommendationService {
                         catalog.currentPlanExclusion(p.plan().id(), dataMb, networkType).orElse(null)))
                 .orElse(null);
 
-        List<MissingInput> missing = missingInputs(optional, currentCarrier, familyDiscount,
-                unknownServiceIds, foreignPriced);
-        addAgeRestrictionNotice(missing, dataMb, networkType);
-        addNetworkNarrowingNotice(missing, dataMb, networkType);
-        addConditionalDiscountNotice(missing, dataMb, networkType);
+        // 사실(금액을 바꾸는 것·뺀 것)을 먼저, 입력 요청을 뒤에 둔다 — 요청 뒤에 묻힌 경고는 읽히지 않았다(G-75 d).
+        List<MissingInput> missing = new ArrayList<>();
         addPromotionPeriodNotice(missing, results);
         addFamilyBundleCarrierNotice(missing, familyDiscount, currentCarrier, results);
+        addLessDataThanNowNotice(missing, current, currentPlan, required.monthlyDataGb());
+        addNetworkNarrowingNotice(missing, dataMb, networkType);
+        addConditionalDiscountNotice(missing, dataMb, networkType);
+        addAgeRestrictionNotice(missing, dataMb, networkType);
         addUnknownCurrentPlanNotice(missing, optional, currentPlan);
+        missing.addAll(missingInputs(optional, currentCarrier, familyDiscount, unknownServiceIds, foreignPriced));
         Accuracy accuracy = missing.isEmpty() ? Accuracy.FULL : Accuracy.PARTIAL;
         return new RecommendationResponse(accuracy, missing, results, candidates.size(), current, minimalChange);
     }
@@ -505,6 +509,24 @@ public class RecommendationService {
         }
     }
 
+    /**
+     * 지금 요금제가 요청량보다 훨씬 크고(2배 이상 또는 무제한) 옮기면 싸질 때, 그 절감액이 <b>데이터를 줄였을 때</b>
+     * 값이라는 것을 알린다(G-75 e). 디테일 입력의 데이터 기본값(10GB)을 건드리지 않은 무제한 사용자가
+     * 큰 절감액을 받고 믿지 못했다 — 큰 절감일수록 불신했다(2차 베타, 2만원↑ 5/5).
+     */
+    private void addLessDataThanNowNotice(List<MissingInput> missing, RecommendationResponse.CurrentCost current,
+            java.util.Optional<CandidatePlan> currentPlan, int requestedGb) {
+        if (current == null || current.monthlySavings() <= 0 || currentPlan.isEmpty()) {
+            return;
+        }
+        catalog.planDataMb(currentPlan.get().plan().id())
+                .filter(mb -> mb >= 2L * requestedGb * MB_PER_GB)
+                .ifPresent(mb -> missing.add(new MissingInput("monthlyDataGb",
+                        "지금 요금제는 데이터 " + (mb >= UNLIMITED_DATA_MB ? "무제한" : mb / MB_PER_GB + "GB") + "인데 "
+                                + requestedGb + "GB 기준으로 찾았어요 — 절감액은 데이터를 그만큼 줄였을 때 금액이에요",
+                        "실제로 쓰는 양을 넣으면 정확해져요. 통신사 앱 > 데이터 사용량")));
+    }
+
     /** 보낸 요금제를 못 찾았을 때. 400 으로 막지 않는다 — '현재' 금액 하나 때문에 추천 전체를 버릴 이유가 없다. */
     private static void addUnknownCurrentPlanNotice(List<MissingInput> missing, RecommendationRequest.Optional o,
             java.util.Optional<CandidatePlan> currentPlan) {
@@ -524,16 +546,17 @@ public class RecommendationService {
             // 해외 결제 구독은 원화 확정 금액이 없다. 환율 환산값은 표시용이라 계산에 넣지 않는다(D-17).
             missing.add(new MissingInput("wantedServiceIds",
                     String.join("·", foreignPriced.values()) + "는 해외 결제라 원화 금액이 확정되지 않아 계산에서 뺐어요",
-                    "마이페이지 > 내 구독에 실제 결제액을 넣으면 그 금액으로 반영돼요"));
+                    // "마이페이지에 넣으면 반영돼요"라고 했지만 추천은 그 값을 읽지 않는다 — 지킬 수 있는 사실만 말한다(G-75 b).
+                    "지금과 추천 양쪽에서 똑같이 뺐으니 둘의 차이에는 영향이 없어요"));
         }
         if (!unknownServiceIds.isEmpty()) {
             missing.add(new MissingInput("wantedServiceIds",
-                    "아직 카탈로그에 없는 서비스(ID " + join(unknownServiceIds) + ")는 계산에서 뺐어요",
-                    "확인 중이에요. 금액을 알고 있다면 계산기에서 직접 입력해 바로 반영할 수 있어요"));
+                    "고르신 서비스 " + unknownServiceIds.size() + "개는 아직 금액을 몰라 계산에서 뺐어요",
+                    "지금과 추천 양쪽에서 똑같이 뺐어요. 확인되면 카탈로그에 반영할게요"));
         }
         if (o == null || o.contractType() == null) {
             missing.add(new MissingInput("contractType",
-                    "선택약정 25% 적용 시 통신비가 약 25% 절감될 수 있어요",
+                    "선택약정(요금할인 25%)을 받고 있다면 알려 주세요 — 금액이 달라져요",
                     "통신사 고객센터 또는 마이페이지 > 약정 정보"));
         }
         if (o == null || o.hasFamilyBundle() == null) {
@@ -556,11 +579,8 @@ public class RecommendationService {
                     "현재 통신사를 알면 번호이동 여부를 판단할 수 있어요",
                     "현재 사용 중인 통신사 선택"));
         }
-        if (o == null || o.networkType() == null) {
-            missing.add(new MissingInput("networkType",
-                    "망 종류를 지정하면 후보를 더 정확히 좁혀요",
-                    "5G / LTE / 3G 중 선택"));
-        }
+        // 망 미입력은 요청하지 않는다 — 미입력이 곧 "상관없음"이고, 좁히면 더 싼 요금제를 놓친다는
+        // 안내(addNetworkNarrowingNotice)와 정면으로 모순됐다(G-75 c).
         return missing;
     }
 
@@ -626,7 +646,4 @@ public class RecommendationService {
         return requestedServiceIds.stream().distinct().filter(id -> !known.contains(id)).toList();
     }
 
-    private static String join(List<Long> ids) {
-        return ids.stream().map(String::valueOf).collect(Collectors.joining(", "));
-    }
 }

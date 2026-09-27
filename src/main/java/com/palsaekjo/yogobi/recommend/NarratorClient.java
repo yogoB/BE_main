@@ -113,8 +113,29 @@ public class NarratorClient implements Narrator, DetectionNarrator, SwitchTiming
         } catch (Unavailable e) {
             log.warn("추천 설명을 쓰지 못했다 — 금액은 그대로 나간다: {}", e.getMessage());
             count(e);
-            return Narrator.Narration.none();
+            // 문장은 비워도 안내는 남긴다 — 안내는 원래 BE 가 쓴 문장이라 잇기만 하면 된다(G-75 a).
+            return new Narrator.Narration(null, List.of(), fallbackNotices(missingInputs));
         }
+    }
+
+    /**
+     * 내레이터 {@code notices_for} 와 같은 규칙으로 안내를 잇는다: 한 줄로 누르고 "impact — howToFind",
+     * 300자를 넘는 줄은 자르지 않고 뺀다(잘린 안내는 오해를 만든다), 최대 10개.
+     */
+    static List<String> fallbackNotices(List<MissingInput> missingInputs) {
+        return missingInputs.stream()
+                .map(m -> {
+                    String impact = squash(m.impact());
+                    String how = squash(m.howToFind());
+                    return impact.isEmpty() ? "" : how.isEmpty() ? impact : impact + " — " + how;
+                })
+                .filter(line -> !line.isEmpty() && line.length() <= 300)
+                .limit(10)
+                .toList();
+    }
+
+    private static String squash(String text) {
+        return text == null ? "" : String.join(" ", text.trim().split("\\s+"));
     }
 
     /** reasons: 없으면 빈 목록. 있으면 배열·최대 3개·각 1~80자·개행 없음(내레이터 계약과 동일). */

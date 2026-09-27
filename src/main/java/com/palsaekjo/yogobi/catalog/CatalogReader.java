@@ -359,6 +359,12 @@ public class CatalogReader {
                 .stream().filter(fit -> fit.reason() != null).findFirst();
     }
 
+    /** 요금제 데이터 제공량(MB). 없는 요금제면 빈 값이다. */
+    public java.util.Optional<Long> planDataMb(long planId) {
+        return jdbc.query("SELECT data_mb FROM mobile_plan WHERE id = :id",
+                new MapSqlParameterSource("id", planId), (rs, i) -> rs.getLong("data_mb")).stream().findFirst();
+    }
+
     public java.util.Optional<CandidatePlan> findPlanById(long planId) {
         var plans = jdbc.query("""
                 SELECT p.id, p.name, p.base_price, p.contract_discount_12m, p.contract_discount_24m,

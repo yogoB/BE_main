@@ -499,6 +499,53 @@ class RecommendationApiTest {
                 .andExpect(jsonPath("$.data.current.monthlySavings").value(-21500));
     }
 
+    /** G-75 b. 안내는 지킬 수 없는 약속을 하지 않고, 내부 ID 를 적지 않는다. */
+    @Test
+    void g75b_noticesDoNotPromiseWhatTheyCannotDo() throws Exception {
+        mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
+                {"required":{"monthlyDataGb":20,"wantedServiceIds":[1,99]},"optional":{"contractType":"NONE"}}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.missingInputs[?(@.field=='wantedServiceIds')].impact").value(
+                        org.hamcrest.Matchers.everyItem(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("ID")))))
+                .andExpect(jsonPath("$.data.missingInputs[?(@.field=='wantedServiceIds')].howToFind").value(
+                        org.hamcrest.Matchers.hasItem(org.hamcrest.Matchers.containsString("양쪽"))));
+    }
+
+    /** G-75 c. 망 종류를 안 골랐다고 요청하지 않는다 — 나머지를 다 채우면 FULL 이다. */
+    @Test
+    void g75c_missingNetworkTypeIsNotARequest() throws Exception {
+        mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
+                {"required":{"monthlyDataGb":20,"wantedServiceIds":[1]},
+                 "optional":{"currentCarrier":"SKT","contractType":"NONE","hasFamilyBundle":false}}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.accuracy").value("FULL"))
+                .andExpect(jsonPath("$.data.missingInputs").isEmpty());
+    }
+
+    /** G-75 d. 사실 안내가 입력 요청보다 먼저 온다. */
+    @Test
+    void g75d_factsComeBeforeRequests() throws Exception {
+        // KT 결합 11,000원 + 1순위 후보에 SKT 가 섞인다 → "KT 요금제에만 반영" 사실 안내. 약정은 비워 요청을 만든다.
+        mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
+                {"required":{"monthlyDataGb":20,"wantedServiceIds":[1]},
+                 "optional":{"currentCarrier":"KT","hasFamilyBundle":true,"familyBundleDiscountKrw":11000}}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.missingInputs[0].field").value("familyBundleDiscountKrw"))
+                .andExpect(jsonPath("$.data.missingInputs[-1].field").value("contractType"));
+    }
+
+    /** G-75 e. 지금 요금제가 요청량보다 훨씬 크면(여기선 ~97GB vs 20GB) 절감액의 전제를 알린다. */
+    @Test
+    void g75e_saysWhenSavingsAssumeLessData() throws Exception {
+        // 지금 = 넷플플랜(데이터 100,000MB) + 웨이브 → 1순위 웨이브플랜(웨이브 무료)이 더 싸다
+        mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
+                {"required":{"monthlyDataGb":20,"wantedServiceIds":[4]},"optional":{"contractType":"NONE","currentPlanId":1}}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.current.monthlySavings").value(org.hamcrest.Matchers.greaterThan(0)))
+                .andExpect(jsonPath("$.data.missingInputs[?(@.field=='monthlyDataGb')].impact").value(
+                        org.hamcrest.Matchers.hasItem(org.hamcrest.Matchers.containsString("20GB 기준으로 찾았어요"))));
+    }
+
     /** G-73 d. 설명을 펼쳐도 결손은 한 번만 센다 — /narrate 는 추천을 다시 계산하지만 기록하지 않는다. */
     @Test
     void g73d_narrateDoesNotCountGapsTwice() throws Exception {
