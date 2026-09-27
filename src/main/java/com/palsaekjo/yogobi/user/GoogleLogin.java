@@ -72,6 +72,11 @@ public class GoogleLogin {
         } catch (ApiException e) {
             invalidate(request);
             response.sendRedirect(returnUrl + "#auth=" + (e.status() == 409 ? "account-conflict" : "failed"));
+        } catch (RuntimeException e) {
+            // DB 오류 등은 콜백 URL 에서 Whitelabel 500 으로 끝나고 세션도 남았다 — 앱으로 돌려보낸다(G-83 a).
+            org.slf4j.LoggerFactory.getLogger(GoogleLogin.class).error("Google 로그인 콜백 실패", e);
+            invalidate(request);
+            response.sendRedirect(returnUrl + "#auth=failed");
         } finally { SecurityContextHolder.clearContext(); }
     }
 

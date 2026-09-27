@@ -107,9 +107,15 @@ public class AuthService {
             return member(ids.getFirst());
         }
         try {
-            long id = jdbc.queryForObject(
-                    "INSERT INTO app_user(email,google_sub,email_verified,nickname) VALUES (?,?,TRUE,?) RETURNING id",
-                    Long.class, email, google.getSubject(), freshNickname(null, email));
+            // 같은 sub 로 두 기기가 동시에 첫 로그인하면 늦은 쪽이 sub 유니크 위반으로 "계정 충돌"을 받았다 —
+            // sub 충돌은 건너뛰고 다시 읽는다(G-83 b). 이메일 충돌은 여전히 409 다(자동 병합 금지).
+            var inserted = jdbc.query(
+                    "INSERT INTO app_user(email,google_sub,email_verified,nickname) VALUES (?,?,TRUE,?) "
+                            + "ON CONFLICT (google_sub) DO NOTHING RETURNING id",
+                    (rs, i) -> rs.getLong(1), email, google.getSubject(), freshNickname(null, email));
+            long id = inserted.isEmpty()
+                    ? jdbc.queryForObject("SELECT id FROM app_user WHERE google_sub=?", Long.class, google.getSubject())
+                    : inserted.getFirst();
             consent.recordLogin(id, choices);
             return member(id);
         } catch (DuplicateKeyException e) { throw conflict(); } // Never auto-link by email.
