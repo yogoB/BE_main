@@ -539,6 +539,12 @@ public class CatalogReader {
     }
 
     /** 원하는 티어 집합에 완전히 포함되는 번들만 반환한다 (부분 번들은 적용 불가). */
+    /** 번들 표시 이름. 없으면 빈 값이다(G-78 e). */
+    public Optional<String> bundleName(long bundleId) {
+        return jdbc.query("SELECT name FROM bundle_product WHERE id = :id", new MapSqlParameterSource("id", bundleId),
+                (rs, i) -> rs.getString("name")).stream().findFirst();
+    }
+
     public List<BundleProduct> findApplicableBundles(Set<Long> wantedTierIds) {
         if (wantedTierIds.isEmpty()) {
             return List.of();

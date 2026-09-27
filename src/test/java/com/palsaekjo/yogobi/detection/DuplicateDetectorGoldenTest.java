@@ -33,6 +33,42 @@ class DuplicateDetectorGoldenTest {
 
     private final DuplicateDetector detector = new DuplicateDetector();
 
+    private static final ActiveSubscription DISNEY_STD = new ActiveSubscription(7, 20L, "디즈니+ 스탠다드", 9_900, 9_900);
+
+    /** G-78 a. 같은 등급을 나눠 쓰는 번들은 하나만 — 절약액이 큰 것부터, 겹치지 않는 것만. */
+    @Test
+    void g78a_겹치는_번들은_하나만_권한다() {
+        var b6 = new BundleProduct(6, "티빙x디즈니", 18_000, Set.of(8L, 20L));            // 5,400 절약
+        var b7 = new BundleProduct(7, "티빙x웨이브x디즈니", 21_500, Set.of(8L, 12L, 20L));  // 12,800 절약
+
+        List<DetectionFinding> findings = detector.detect(
+                List.of(TVING_STD, WAVE_STD, DISNEY_STD), List.of(), List.of(B4, b6, b7));
+
+        assertThat(findings).singleElement().satisfies(f -> {
+            assertThat(f.targetRef()).isEqualTo("bundle:7");
+            assertThat(f.wastedAmount()).isEqualTo(12_800);
+        });
+    }
+
+    /** G-78 b. 요금제에 들어 있는 서비스로 번들을 권하지 않는다 — "해지하세요"와 모순이다. */
+    @Test
+    void g78b_포함된_서비스로_번들을_권하지_않는다() {
+        List<DetectionFinding> findings = detector.detect(
+                List.of(TVING_STD, WAVE_STD), List.of(free(TVING)), List.of(B4));
+
+        assertThat(findings).extracting(DetectionFinding::rule).containsExactly(DetectionRule.BENEFIT_OVERLAP);
+    }
+
+    /** G-78 c. 포함된 서비스를 두 등급으로 내면 둘 다 낭비다 — 등급 중복을 따로 내지 않는다. */
+    @Test
+    void g78c_포함된_서비스의_등급중복은_따로_내지_않는다() {
+        List<DetectionFinding> findings = detector.detect(
+                List.of(NETFLIX_STD, NETFLIX_PREMIUM), List.of(free(NETFLIX)), List.of());
+
+        assertThat(findings).extracting(DetectionFinding::rule)
+                .containsExactly(DetectionRule.BENEFIT_OVERLAP, DetectionRule.BENEFIT_OVERLAP);
+    }
+
     @Test
     void g09a_benefitOverlap_웨이브무료인데_결제중() {
         List<DetectionFinding> findings = detector.detect(

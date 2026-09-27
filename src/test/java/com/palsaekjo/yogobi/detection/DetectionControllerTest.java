@@ -50,11 +50,31 @@ class DetectionControllerTest {
         assertThat(view.findings()).hasSize(2);
         assertThat(view.lines()).extracting(DetectionNarrator.Explained::target)
                 .containsExactly("넷플릭스", "묶음 상품");
-        // 문구는 없다. 규칙 이름과 금액 표기만 남는다 — 화면이 통째로 비는 것보다 낫다.
+        // G-78 d — 내레이터와 같은 한글 제목·방법 문장. 규칙 코드(TIER_DUPLICATE)가 화면에 새지 않는다.
+        assertThat(view.lines()).extracting(DetectionNarrator.Explained::title)
+                .containsOnly("같은 서비스를 두 등급으로 결제 중");
         assertThat(view.lines()).extracting(DetectionNarrator.Explained::amount)
                 .containsExactly("월 13,500원", "월 13,500원");
-        assertThat(view.lines()).extracting(DetectionNarrator.Explained::how).containsExactly("", "");
+        assertThat(view.lines()).extracting(DetectionNarrator.Explained::how)
+                .containsOnly("더 비싼 등급 하나만 남기면 나머지가 줄어요.");
         assertThat(view.summary()).isEmpty();
+    }
+
+    /** G-78 d·e. 추정 금액은 "최대"를 붙이고, 번들은 실제 이름으로 보여준다. */
+    @Test
+    void estimatedAmountsSayMaximumAndBundlesHaveNames() {
+        var estimated = new DetectionFinding(DetectionRule.BENEFIT_OVERLAP, "service:1", 13500,
+                com.palsaekjo.yogobi.common.Provenance.ESTIMATED);
+        given(estimated, finding("bundle:9"));
+        when(catalog.bundleName(9L)).thenReturn(java.util.Optional.of("티빙x웨이브 더블"));
+        when(narrator.getIfAvailable()).thenReturn(null);
+
+        var view = controller.detections(MEMBER).data();
+
+        assertThat(view.lines()).extracting(DetectionNarrator.Explained::amount)
+                .containsExactly("최대 월 13,500원", "월 13,500원");
+        assertThat(view.lines()).extracting(DetectionNarrator.Explained::target)
+                .containsExactly("넷플릭스", "티빙x웨이브 더블");
     }
 
     /** 내레이터가 있으면 이름을 찾아 넘기고 문구를 그대로 싣는다 — 카탈로그는 내레이터가 모른다. */

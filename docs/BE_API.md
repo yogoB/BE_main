@@ -603,7 +603,7 @@ JWT 절대 수명 24시간·유휴 제한 2시간(refresh 없음, D-48). 상태�
 | 이름 | 필수 | 기본 | 설명 |
 |---|---|---|---|
 | `targetPlanId` | ✅ | — | 비교 대상 요금제 ID |
-| `switchingCost` | ✕ | 0 | 전환비용(위약금 등, 사용자 추정치) |
+| `switchingCost` | ✕ | 없음 | 전환비용(위약금 등, 사용자 추정치). **안 보내면 모르는 것으로 본다** — 판정 계산은 0 으로 하되, 약정이 남았으면 헤드라인·노트가 "약정 해지 비용 확인 필요"로 바뀐다(G-78 f) |
 | `remainingContractMonths` | ✕ | 0 | 약정 잔여 개월(사용자 추정치) |
 | `currentPlanId` | ✕ | — | 이번 흐름에서 고른 현재 요금제(디테일 1단계). **있으면 저장값보다 우선**하고 프로필은 바꾸지 않는다(G-35). 둘 다 없으면 400 `currentPlan` |
 
@@ -618,7 +618,7 @@ JWT 절대 수명 24시간·유휴 제한 2시간(refresh 없음, D-48). 상태�
 
 - `status` = `SWITCH_NOW`(약정잔여 0 이거나 회수개월 < 약정잔여) · `WAIT_UNTIL_EXPIRY`(그 외) · `NO_BENEFIT`(월 절감 ≤ 0, `paybackMonths=null`).
 - 현재 요금제 미설정 → **400** `YGB-REQ-001`(먼저 5-2 호출). `targetPlanId` 미존재 → 404 `YGB-CAT-001`.
-- `switchingCost`·`remainingContractMonths` 음수, 회수 개월 Integer 초과 → 400. 활성 구독이 없어도 비교 가능.
+- `switchingCost`·`remainingContractMonths` 음수, 회수 개월 Integer 초과 → 400. **G-78 g**: `remainingContractMonths` 0~120, `switchingCost` ≤ 10,000,000, `expiryDate` 는 `YYYY-MM-DD` — 벗어나면 400 `YGB-REQ-001`(`field` 에 그 칸). 활성 구독이 없어도 비교 가능.
 - 현재 계산은 카탈로그 티어 가격 기준이며 저장한 실제 청구액·약정·가족결합을 완전히 반영하지 않는다.
   항목별 출처를 포함한 개인화 응답은 [후속 검토안](proposals/2026-09-15-service-direction.md)에 기록했다.
 

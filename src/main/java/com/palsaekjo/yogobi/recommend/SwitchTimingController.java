@@ -1,6 +1,7 @@
 package com.palsaekjo.yogobi.recommend;
 
 import com.palsaekjo.yogobi.common.FunnelCounter;
+import com.palsaekjo.yogobi.common.ApiException;
 import com.palsaekjo.yogobi.common.ApiResponse;
 import java.security.Principal;
 import org.springframework.beans.factory.ObjectProvider;
@@ -36,19 +37,37 @@ public class SwitchTimingController {
     @GetMapping("/switch-timing")
     public ApiResponse<TimingView> switchTiming(
             @RequestParam long targetPlanId,
-            @RequestParam(defaultValue = "0") long switchingCost,
+            // 모르면 null — 0 으로 읽으면 "전환비용이 없어 지금 바로 이득"이라고 단정하게 된다(G-78 f).
+            @RequestParam(required = false) Long switchingCost,
             @RequestParam(defaultValue = "0") int remainingContractMonths,
             @RequestParam(required = false) Long currentPlanId,
             // 사용자가 화면에 적은 약정 만료일. 서버는 이 날짜를 모르므로 받아서 문구에만 쓴다.
             @RequestParam(required = false) String expiryDate,
             Principal principal) {
+        // 범위 밖 입력은 문장에 그대로 찍히거나(20억 개월) 설명을 조용히 지웠다(형식 틀린 날짜) — G-78 g.
+        if (remainingContractMonths < 0 || remainingContractMonths > 120)
+            throw ApiException.requiredMissing("remainingContractMonths", "약정 남은 기간을 다시 확인해 주세요(0~120개월).");
+        if (switchingCost != null && (switchingCost < 0 || switchingCost > 10_000_000))
+            throw ApiException.requiredMissing("switchingCost", "위약금·전환비용을 원 단위로 다시 적어 주세요.");
+        if (expiryDate != null) {
+            try {
+                java.time.LocalDate.parse(expiryDate);
+            } catch (java.time.format.DateTimeParseException e) {
+                throw ApiException.requiredMissing("expiryDate", "약정 만료일을 다시 골라 주세요.");
+            }
+        }
         long userId = Long.parseLong(principal.getName());
         SwitchTimingService.Response timing = switchTiming.evaluate(
-                userId, targetPlanId, switchingCost, remainingContractMonths, currentPlanId);
+                userId, targetPlanId, switchingCost == null ? 0 : switchingCost, remainingContractMonths, currentPlanId);
         funnel.record(FunnelCounter.CALENDAR_SHOWN,
                 FunnelCounter.actor(userId));   // 퍼널 4단계(D-52)
         SwitchTimingNarrator port = narrator.getIfAvailable();
-        var wording = port == null ? SwitchTimingNarrator.fallback(timing.status())
+        // 약정이 남았는데 전환비용을 모르면 판정 문장을 쓰지 않는다 — 대신 무엇을 알려 주면 되는지 말한다(G-78 f).
+        var wording = switchingCost == null && remainingContractMonths > 0
+                ? new SwitchTimingNarrator.Wording("약정 해지 비용 확인 필요",
+                        "약정이 " + remainingContractMonths + "개월 남았어요. 위약금·할인반환금을 알려 주시면 "
+                                + "지금 바꿀지 만료 후에 바꿀지 계산해 드려요.")
+                : port == null ? SwitchTimingNarrator.fallback(timing.status())
                 : port.explain(timing, expiryDate);
         return ApiResponse.ok(new TimingView(timing, wording.headline(), wording.note()));
     }

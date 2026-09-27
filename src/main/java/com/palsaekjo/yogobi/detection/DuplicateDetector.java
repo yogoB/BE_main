@@ -20,10 +20,15 @@ public final class DuplicateDetector {
 
     public List<DetectionFinding> detect(List<ActiveSubscription> active,
             List<PlanBenefit> planBenefits, List<BundleProduct> bundles) {
-        List<DetectionFinding> findings = new ArrayList<>();
-        findings.addAll(benefitOverlaps(active, planBenefits));
-        findings.addAll(tierDuplicates(active));
-        findings.addAll(bundleOverlaps(active, bundles));
+        List<DetectionFinding> findings = new ArrayList<>(benefitOverlaps(active, planBenefits));
+        // 요금제에 이미 들어 있는 서비스는 "해지하세요"가 답이다. 같은 서비스로 등급 중복·번들을 또 권하면
+        // 같은 돈을 두 번 세고 서로 모순된 조언이 된다(G-78 b·c).
+        java.util.Set<String> covered = new java.util.HashSet<>();
+        findings.forEach(f -> covered.add(f.targetRef()));
+        List<ActiveSubscription> rest = active.stream()
+                .filter(sub -> !covered.contains("service:" + sub.serviceId())).toList();
+        findings.addAll(tierDuplicates(rest));
+        findings.addAll(bundleOverlaps(rest, bundles));
         return findings;
     }
 
@@ -106,7 +111,8 @@ public final class DuplicateDetector {
                 byTier.putIfAbsent(sub.tierId(), sub);
             }
         }
-        List<DetectionFinding> findings = new ArrayList<>();
+        List<DetectionFinding> candidates = new ArrayList<>();
+        Map<String, BundleProduct> byRef = new HashMap<>();
         for (BundleProduct bundle : bundles) {
             if (!byTier.keySet().containsAll(bundle.tierIds())) {
                 continue;
@@ -114,8 +120,22 @@ public final class DuplicateDetector {
             long individual = bundle.tierIds().stream()
                     .mapToLong(t -> byTier.get(t).monthlyAmount()).sum();
             if (bundle.price() < individual) {
-                findings.add(DetectionFinding.derived(DetectionRule.BUNDLE_OVERLAP,
+                candidates.add(DetectionFinding.derived(DetectionRule.BUNDLE_OVERLAP,
                         "bundle:" + bundle.id(), individual - bundle.price()));
+                byRef.put("bundle:" + bundle.id(), bundle);
+            }
+        }
+        // 한 등급은 번들 하나에만 들어갈 수 있다. 절약액 큰 것부터 겹치지 않는 것만 남긴다(G-78 a) —
+        // 셋을 다 내면 동시에 할 수 없는 절약을 세 건으로 센다.
+        candidates.sort(java.util.Comparator.comparingLong(DetectionFinding::wastedAmount).reversed()
+                .thenComparing(DetectionFinding::targetRef));
+        java.util.Set<Long> used = new java.util.HashSet<>();
+        List<DetectionFinding> findings = new ArrayList<>();
+        for (DetectionFinding candidate : candidates) {
+            var tiers = byRef.get(candidate.targetRef()).tierIds();
+            if (tiers.stream().noneMatch(used::contains)) {
+                used.addAll(tiers);
+                findings.add(candidate);
             }
         }
         return findings;

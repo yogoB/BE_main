@@ -164,6 +164,29 @@ class MeApiTest {
                 .andExpect(jsonPath("$.data.headline").value("지금이 최적 실행 시점"));
     }
 
+    /** G-78 f·g. 전환비용을 모르면 "비용 없다"고 단정하지 않고, 범위 밖 입력은 400 이다. */
+    @Test void switchTimingDoesNotAssumeZeroCostAndChecksBounds() throws Exception {
+        jdbc.execute("INSERT INTO carrier(id,name,carrier_type) VALUES (1,'SKT','MNO'),(2,'KT','MNO')");
+        jdbc.execute("""
+                INSERT INTO mobile_plan(id,carrier_id,name,network_type,base_price,data_mb,voice_min,sms_cnt,source_url,collected_at)
+                VALUES (1,1,'지금','FIVE_G',55000,100000,999999,9999,'http://seed','2026-09-14'),
+                       (2,2,'대상','FIVE_G',45000,100000,999999,9999,'http://seed','2026-09-14')""");
+        Browser a = new Browser(); signup("timing@example.com", a);
+
+        mvc.perform(get("/api/v1/me/switch-timing").cookie(a.cookies)
+                        .param("targetPlanId", "2").param("currentPlanId", "1").param("remainingContractMonths", "18"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.headline").value(org.hamcrest.Matchers.not("지금이 최적 실행 시점")))
+                .andExpect(jsonPath("$.data.note").value(org.hamcrest.Matchers.containsString("위약금")));
+
+        for (String[] bad : new String[][] {{"remainingContractMonths", "121"}, {"remainingContractMonths", "-1"},
+                {"switchingCost", "-5"}, {"switchingCost", "10000001"}, {"expiryDate", "abc"}})
+            mvc.perform(get("/api/v1/me/switch-timing").cookie(a.cookies).param("targetPlanId", "2")
+                            .param("currentPlanId", "1").param(bad[0], bad[1]))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.error.field").value(bad[0]));
+    }
+
     /** G-35 — 이번 흐름에서 고른 요금제(currentPlanId)가 저장값보다 앞선다. 프로필은 그대로다. */
     @Test void switchTimingTakesCurrentPlanIdFromTheQueryFirst() throws Exception {
         jdbc.execute("INSERT INTO carrier(id,name,carrier_type) VALUES (1,'SKT','MNO')");

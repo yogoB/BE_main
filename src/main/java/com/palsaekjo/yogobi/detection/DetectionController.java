@@ -53,6 +53,14 @@ public class DetectionController {
                             CatalogReader.ServiceView::name, (a, b) -> a));
             return names.getOrDefault(parts[1], "서비스 #" + parts[1]);
         }
-        return parts.length == 2 && "bundle".equals(parts[0]) ? "묶음 상품" : reference;
+        // 번들은 실제 이름으로 — 셋 다 "묶음 상품"이면 어느 것인지 알 수 없다(G-78 e).
+        if (parts.length == 2 && "bundle".equals(parts[0])) {
+            try {
+                return catalog.bundleName(Long.parseLong(parts[1])).orElse("묶음 상품");
+            } catch (NumberFormatException e) {
+                return "묶음 상품";
+            }
+        }
+        return reference;
     }
 }
