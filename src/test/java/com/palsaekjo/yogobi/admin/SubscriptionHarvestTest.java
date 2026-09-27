@@ -65,6 +65,17 @@ class SubscriptionHarvestTest {
         assertThat((String) proposal.get("reason")).contains("8690원 → 8691원").contains("원문:");
     }
 
+    /** G-80 c. 거절한 제안은 같은 값으로 다시 올라오지 않는다. 값이 바뀌면 새로 제안한다. */
+    @Test
+    void rejectedProposalIsNotRaisedAgainWithTheSameValue() {
+        assertThat(harvest(check(SPOTIFY_URL, offer("Premium Basic", 8691)))).isEqualTo(1);
+        jdbc.update("""
+                UPDATE catalog_change_request SET status = 'REJECTED', decided_by = 1, decided_at = now()""");
+
+        assertThat(harvest(check(SPOTIFY_URL, offer("Premium Basic", 8691)))).isZero();
+        assertThat(harvest(check(SPOTIFY_URL, offer("Premium Basic", 8692)))).isEqualTo(1);
+    }
+
     /**
      * URL 드리프트 가드. 같은 URL 이 두 레포에 따로 살아 있으므로, 저쪽이 읽은 페이지가 우리
      * {@code official_url} 과 다르면 <b>그 서비스는 통째로 건너뛴다.</b> 엉뚱한 페이지의 가격이

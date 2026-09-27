@@ -347,6 +347,24 @@ public class CatalogDailyHarvest {
     }
 
     /** 같은 대상의 대기 중 제안이 있으면 또 만들지 않는다 — 매일 같은 줄이 쌓이면 검수함이 못 쓰게 된다. */
+    private boolean recentlyRejected(String dataset, String key, Map<String, String> values) {
+        String payload;
+        try {
+            payload = JSON.writeValueAsString(values);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            return false;
+        }
+        // jsonb 비교라 필드 순서와 무관하다.
+        Long count = jdbc.queryForObject("""
+                SELECT count(*) FROM catalog_change_request
+                WHERE status = 'REJECTED' AND dataset = ? AND row_key IS NOT DISTINCT FROM ?
+                  AND decided_at > now() - interval '30 days'
+                  AND payload IS NOT NULL AND payload::jsonb = ?::jsonb""", Long.class, dataset, key, payload);
+        return count != null && count > 0;
+    }
+
+    private static final com.fasterxml.jackson.databind.ObjectMapper JSON = new com.fasterxml.jackson.databind.ObjectMapper();
+
     private boolean pending(String dataset, String key) {
         Long count = jdbc.queryForObject("""
                 SELECT count(*) FROM catalog_change_request
@@ -356,6 +374,9 @@ public class CatalogDailyHarvest {
 
     private boolean propose(long proposer, CatalogAuditLog.Action action, String dataset, String key,
                             Map<String, String> values, String reason) {
+        // 운영자가 거절한 것을 같은 값으로 매일 다시 올리지 않는다(G-80 c) — 운영은 승인이 막혀 있어(D-37)
+        // 거절만 가능한데, 거절한 차이가 매일 09:00 에 되살아났다. 값이 달라지면 새 제안이다.
+        if (recentlyRejected(dataset, key, values)) return false;
         try {
             requests.propose(proposer, action, dataset, key, values, reason);
             return true;

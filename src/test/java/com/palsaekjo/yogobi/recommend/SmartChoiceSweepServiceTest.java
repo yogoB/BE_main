@@ -58,6 +58,29 @@ class SmartChoiceSweepServiceTest {
         return jdbc;
     }
 
+    /** G-80 a. 상한보다 조건이 많으면 실행마다 창을 옮겨, 연속 세 번이면 전부 한 번은 본다. */
+    @Test
+    void 조건_창은_실행마다_옮겨_가며_전부를_돈다() {
+        var all = java.util.stream.IntStream.range(0, 137).boxed().toList();
+        var seen = new java.util.HashSet<Integer>();
+        for (long slot = 500; slot < 503; slot++) {
+            var picked = SmartChoiceSweepService.window(all, 60, slot);
+            assertThat(picked).hasSize(60).doesNotHaveDuplicates();
+            seen.addAll(picked);
+        }
+        assertThat(seen).hasSize(137);
+        assertThat(SmartChoiceSweepService.window(List.of(1, 2), 60, 7)).containsExactly(1, 2);
+    }
+
+    /** G-80 b. 조건은 판매 중 요금제에서만 뽑는다. */
+    @Test
+    void 조건은_판매중_요금제에서만_뽑는다() {
+        var client = new StubClient(true, null, List.of());
+        var jdbc = jdbcWith(1);
+        new SmartChoiceSweepService(client, jdbc, 60).sweep();
+        verify(jdbc).queryForList(contains("WHERE active"), any(Object[].class));
+    }
+
     @Test
     void 키가_없으면_외부를_부르지도_저장하지도_않고_enabled_false_로_알린다() {
         var client = new StubClient(false, null, List.of());

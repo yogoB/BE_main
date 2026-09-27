@@ -44,6 +44,25 @@ public class SmartChoiceSweepService {
      * 키가 없다 / 서버에 닿지 못했다 / 돌았고 몇 행을 남겼다.
      * 닿지 못한 것은 등록 IP·한국망 제한일 수 있어 "실패"와 다르게 읽어야 한다.
      */
+    /** 조건 전체를 읽는 안전 상한. 실제 조합은 137개(2026-09-21)다. */
+    private static final int ALL_CONDITIONS_CAP = 1_000;
+
+    /**
+     * 전체 조건에서 이번 실행이 볼 {@code limit} 개. 시작 위치는 {@code slot × limit} 이고 끝에서 앞으로 감는다 —
+     * 시간 단위 slot 이라 하루 세 번의 실행이 서로 다른 창을 본다.
+     */
+    static <T> List<T> window(List<T> all, int limit, long slot) {
+        if (all.size() <= limit) {
+            return all;
+        }
+        int start = (int) ((slot * limit) % all.size());
+        var picked = new java.util.ArrayList<T>(limit);
+        for (int i = 0; i < limit; i++) {
+            picked.add(all.get((start + i) % all.size()));
+        }
+        return picked;
+    }
+
     public Map<String, Object> sweep() {
         var out = new LinkedHashMap<String, Object>();
         if (!client.enabled()) {
@@ -56,12 +75,15 @@ public class SmartChoiceSweepService {
             out.put("snapshotRows", snapshotRows());
             return out;
         }
-        List<Map<String, Object>> conditions = jdbc.queryForList("""
+        // 판매 중 요금제의 조건만, 그리고 실행마다 창을 옮긴다(G-80). 앞에서부터 상한만큼 자르면
+        // 정렬상 FIVE_G 만 돌고 알뜰폰 대부분인 LTE 는 한 번도 대조되지 않았다. 외부 호출 수는 그대로다.
+        List<Map<String, Object>> conditions = window(jdbc.queryForList("""
                 SELECT DISTINCT network_type, data_mb
                   FROM mobile_plan
+                 WHERE active
                  ORDER BY network_type, data_mb
                  LIMIT ?
-                """, maxConditions);
+                """, ALL_CONDITIONS_CAP), maxConditions, System.currentTimeMillis() / 3_600_000);
         int stored = 0;
         boolean reachable = true;
         for (Map<String, Object> condition : conditions) {
