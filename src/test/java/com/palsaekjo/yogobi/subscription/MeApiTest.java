@@ -79,6 +79,15 @@ class MeApiTest {
         return id;
     }
 
+    /** G-76 d. 월 결제액에 상한이 있다 — 합이 long 을 넘어 탐지가 500 이 나던 경로. */
+    @Test void g76d_monthlyPriceHasACeiling() throws Exception {
+        Browser a = new Browser(); signup("ceiling@example.com", a);
+        var added = a.send(post("/api/v1/me/subscriptions").contentType("application/json")
+                .content("{\"tierId\":2,\"monthlyPrice\":5000000000000000000}"));
+        assertThat(added.getResponse().getStatus()).isEqualTo(400);
+        assertThat(added.getResponse().getContentAsString()).contains("monthlyPrice");
+    }
+
     @Test void addListDeleteSubscription() throws Exception {
         Browser a = new Browser(); signup("alice@example.com", a);
         var added = a.send(post("/api/v1/me/subscriptions").contentType("application/json")

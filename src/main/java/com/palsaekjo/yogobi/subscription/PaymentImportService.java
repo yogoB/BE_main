@@ -1,5 +1,6 @@
 package com.palsaekjo.yogobi.subscription;
 
+import com.palsaekjo.yogobi.common.ApiException;
 import com.palsaekjo.yogobi.common.MatchType;
 import com.palsaekjo.yogobi.subscription.domain.MerchantAlias;
 import com.palsaekjo.yogobi.subscription.port.PaymentHistoryProvider;
@@ -25,12 +26,23 @@ public class PaymentImportService {
         this.jdbc = jdbc;
     }
 
+    private static final int MAX_CONTENT_CHARS = 1_000_000;
+    private static final int MAX_ITEMS = 1_000;
+    private static final int MAX_MERCHANT_CHARS = 200;
+
     public record Result(int imported, int recognized, List<String> unrecognized) {
     }
 
     @Transactional
     public Result importPayments(long userId, PaymentHistoryProvider provider, String content) {
+        // 업로드에는 끝이 있다(G-76). 상한 없이 한 트랜잭션에서 전부 INSERT 하면 한 요청이 커넥션을 오래 붙잡는다.
+        if (content != null && content.length() > MAX_CONTENT_CHARS)
+            throw ApiException.requiredMissing("payload", "파일이 너무 커요(1MB까지). 기간을 나눠 올려 주세요.");
         var payments = provider.parse(content);
+        if (payments.size() > MAX_ITEMS)
+            throw ApiException.requiredMissing("approved_list", "한 번에 " + MAX_ITEMS + "건까지 올릴 수 있어요. 기간을 나눠 올려 주세요.");
+        if (payments.stream().anyMatch(p -> p.merchantRaw().length() > MAX_MERCHANT_CHARS))
+            throw ApiException.requiredMissing("approved_list", "가맹점 이름이 너무 긴 항목이 있어요. 내려받은 파일 그대로 올려 주세요.");
         List<MerchantAlias> aliases = jdbc.query("SELECT service_id, pattern, match_type FROM merchant_alias",
                 (rs, i) -> new MerchantAlias(rs.getLong(1), rs.getString(2), MatchType.valueOf(rs.getString(3))));
 

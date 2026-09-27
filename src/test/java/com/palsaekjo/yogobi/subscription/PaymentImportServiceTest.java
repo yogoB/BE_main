@@ -46,6 +46,26 @@ class PaymentImportServiceTest {
         service = new PaymentImportService(jdbc);
     }
 
+    /** G-76 a·b·c. 업로드에는 끝이 있다 — 크기·건수·가맹점명 길이. */
+    @Test void g76_uploadHasLimits() {
+        long userId = jdbc.queryForObject(
+                "INSERT INTO app_user(email,password_hash,email_verified) VALUES ('b@example.com','x',TRUE) RETURNING id", Long.class);
+        String item = "{\"approved_dtime\":\"20260901093000\",\"approved_amt\":%d,\"currency_code\":\"KRW\",\"merchant_name\":\"%s\",\"status\":\"01\",\"paid_type\":\"01\"}";
+
+        String huge = "{\"approved_list\":[" + String.format(item, 1, "a".repeat(1_100_000)) + "]}";
+        assertThatThrownBy(() -> service.importPayments(userId, provider, huge)).isInstanceOf(ApiException.class);
+
+        var many = new StringBuilder("{\"approved_list\":[");
+        for (int i = 0; i < 1_001; i++) many.append(i == 0 ? "" : ",").append(String.format(item, i + 1, "가맹점" + i));
+        String tooMany = many.append("]}").toString();
+        assertThatThrownBy(() -> service.importPayments(userId, provider, tooMany)).isInstanceOf(ApiException.class);
+
+        String longName = "{\"approved_list\":[" + String.format(item, 1, "가".repeat(201)) + "]}";
+        assertThatThrownBy(() -> service.importPayments(userId, provider, longName)).isInstanceOf(ApiException.class);
+
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM payment_record WHERE user_id=?", Integer.class, userId)).isZero();
+    }
+
     @Test void importsPaymentsNormalizesMerchantsAndFlagsUnknown() {
         long userId = jdbc.queryForObject(
                 "INSERT INTO app_user(email,password_hash,email_verified) VALUES ('a@example.com','x',TRUE) RETURNING id", Long.class);

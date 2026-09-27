@@ -68,7 +68,9 @@ public class NarratorClient implements Narrator, DetectionNarrator, SwitchTiming
         var factory = new JdkClientHttpRequestFactory(HttpClient.newBuilder()
                 .version(HttpClient.Version.HTTP_1_1) // Uvicorn은 h2c 업그레이드를 지원하지 않는다.
                 .connectTimeout(Duration.ofSeconds(5)).followRedirects(HttpClient.Redirect.NEVER).build());
-        factory.setReadTimeout(Duration.ofSeconds(25));
+        // 내레이터는 모델 없이 템플릿으로 답한다(D-45) — 수 ms 다. 25초를 기다리면 공개 /narrate 가 느린 날
+        // 요청 스레드를 오래 붙잡는다(G-76). 늦으면 설명 없이(안내는 남긴 채, G-75 a) 간다.
+        factory.setReadTimeout(Duration.ofSeconds(5));
         client = RestClient.builder().baseUrl(baseUrl).requestFactory(factory).build();
     }
 

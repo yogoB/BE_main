@@ -66,7 +66,20 @@ public class FunnelCounter {
 
     /** 행위자 키. 회원은 id, 비회원은 발신지. 사람을 식별하려는 게 아니라 같은 사람을 두 번 안 세려는 것이다. */
     public static String actor(Principal principal, HttpServletRequest request) {
-        return principal != null ? "u:" + principal.getName() : "ip:" + ClientAddress.of(request);
+        return principal != null ? "u:" + principal.getName() : "ip:" + sha256(ClientAddress.of(request));
+    }
+
+    /**
+     * 비회원 키는 주소의 SHA-256 이다 — 원문 IP 를 남기지 않는다(처리방침, G-76 e). 같은 주소는 같은 키라
+     * 사람 수·전환율 계산은 그대로다. {@code AuthTokens.hash} 와 같은 값이지만 common 은 user 를 참조하지 않는다.
+     */
+    private static String sha256(String value) {
+        try {
+            return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(String.valueOf(value).getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     public static String actor(long userId) {

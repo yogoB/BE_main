@@ -64,6 +64,18 @@ class FunnelCounterTest {
                 .stream().findFirst().orElse(0L);
     }
 
+    /** G-76 e. 비회원 행위자 키에 원문 IP 가 없다. 같은 주소는 같은 키다(사람 수 계산 유지). */
+    @Test void g76e_guestActorKeyIsHashedNotRawIp() {
+        var request = new org.springframework.mock.web.MockHttpServletRequest();
+        request.setRemoteAddr("203.0.113.7");
+
+        String key = FunnelCounter.actor(null, request);
+
+        assertThat(key).startsWith("ip:").doesNotContain("203.0.113.7").hasSize(3 + 64);
+        assertThat(key).isEqualTo("ip:" + AuthTokens.hash("203.0.113.7"));
+        assertThat(FunnelCounter.actor(null, request)).isEqualTo(key);
+    }
+
     @Test void g23a_guestResultCountsAsGateShown() throws Exception {
         mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content(REQUEST))
                 .andExpect(status().isOk());

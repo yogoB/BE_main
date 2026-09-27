@@ -41,6 +41,10 @@ public class UserSubscriptionService {
         if (monthlyPrice == null || monthlyPrice < 0) {
             throw ApiException.requiredMissing("monthlyPrice", "월 결제액은 0 이상 정수여야 합니다.");
         }
+        // 상한이 없으면 두 건 합이 long 을 넘어 탐지가 음수 → CHECK 위반 500 이 났다(G-76 d). 월 구독료로 닿을 수 없는 값이다.
+        if (monthlyPrice > 10_000_000) {
+            throw ApiException.requiredMissing("monthlyPrice", "월 결제액이 너무 커요. 한 달 금액을 원 단위로 적어 주세요.");
+        }
         if (jdbc.queryForObject("SELECT count(*) FROM subscription_tier WHERE id = ? AND active", Integer.class, tierId) == 0) {
             throw ApiException.requiredMissing("tierId", "존재하지 않는 구독 등급입니다.");
         }
