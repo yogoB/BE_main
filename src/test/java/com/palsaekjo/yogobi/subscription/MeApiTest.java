@@ -213,6 +213,21 @@ class MeApiTest {
                 .andExpect(jsonPath("$.data.timing.currentMonthlyCost").value(99000));
     }
 
+    /** G-81. 옛 형식 스냅숏 한 건이 있어도 목록은 200 이고 나머지는 보인다. */
+    @Test void oneUnreadableSnapshotDoesNotHideTheRest() throws Exception {
+        Browser a = new Browser(); long id = signup("snapshot@example.com", a);
+        jdbc.update("""
+                INSERT INTO saved_result (user_id, request, cost, saved_at) VALUES
+                (?, '{}'::jsonb, '{"planId":"옛 형식"}'::jsonb, now() - interval '1 day'),
+                (?, '{}'::jsonb, '{"planId":1,"planName":"넷플플랜","carrier":"SKT","monthlyTotal":55000,"baseline":55000,
+                                   "monthlySavings":0,"annualSavings":0,"breakdown":[]}'::jsonb, now())""", id, id);
+
+        mvc.perform(get("/api/v1/me/saved-results").cookie(a.cookies))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].cost.planName").value("넷플플랜"));
+    }
+
     /** G-37 — 저장한 결과: 스냅숏은 BE 가 계산한다. 목록은 최신순, 남의 것은 404, 비회원은 401. */
     @Test void savedResultsAreSnapshotsComputedByTheServer() throws Exception {
         jdbc.execute("INSERT INTO carrier(id,name,carrier_type) VALUES (1,'SKT','MNO')");

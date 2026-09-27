@@ -70,12 +70,16 @@ public class SavedResultController {
     /** 최신순. 스냅숏 그대로 — 다시 계산하지 않는다. */
     @GetMapping
     public ApiResponse<List<Saved>> list(Principal principal) {
+        // 읽지 못한 스냅숏은 빼고 보여준다 — 옛 형식 한 건이 목록 전체를 500 으로 만들었다(G-81).
         return ApiResponse.ok(jdbc.query("""
                 SELECT id, saved_at, cost, monthly_savings_vs_current FROM saved_result
                 WHERE user_id = ? ORDER BY saved_at DESC
-                """, (rs, i) -> new Saved(rs.getObject("id", UUID.class), rs.getTimestamp("saved_at").toInstant(),
-                        read(rs.getString("cost")), (Long) rs.getObject("monthly_savings_vs_current")),
-                Long.parseLong(principal.getName())));
+                """, (rs, i) -> {
+                    UUID id = rs.getObject("id", UUID.class);
+                    CostResult cost = read(id, rs.getString("cost"));
+                    return cost == null ? null : new Saved(id, rs.getTimestamp("saved_at").toInstant(),
+                            cost, (Long) rs.getObject("monthly_savings_vs_current"));
+                }, Long.parseLong(principal.getName())).stream().filter(java.util.Objects::nonNull).toList());
     }
 
     /** 남의 것은 없는 것과 같다 — 404 하나로 존재 여부를 알리지 않는다. */
@@ -86,11 +90,14 @@ public class SavedResultController {
         return ApiResponse.ok(new Deleted(true));
     }
 
-    private CostResult read(String snapshot) {
+    private CostResult read(UUID id, String snapshot) {
         try {
             return json.readValue(snapshot, CostResult.class);
         } catch (Exception e) {
-            throw new IllegalStateException("저장된 결과 스냅숏을 읽지 못했습니다", e);
+            log.warn("저장된 결과 스냅숏을 읽지 못해 목록에서 뺀다 (id={}): {}", id, e.getClass().getSimpleName());
+            return null;
         }
     }
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SavedResultController.class);
 }
