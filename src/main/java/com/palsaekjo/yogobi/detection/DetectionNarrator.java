@@ -22,7 +22,7 @@ public interface DetectionNarrator {
             com.palsaekjo.yogobi.common.DetectionRule.TIER_DUPLICATE, new String[] {
                     "같은 서비스를 두 등급으로 결제 중", "더 비싼 등급 하나만 남기면 나머지가 줄어요."},
             com.palsaekjo.yogobi.common.DetectionRule.BUNDLE_OVERLAP, new String[] {
-                    "묶음 상품이 더 싼 조합", "개별 결제 합계가 묶음 상품보다 비싸요."});
+                    "묶음 상품이 더 싼 조합", "개별 결제 합계가 묶음 상품보다 비싸요. 묶음으로 바꾸면 그만큼 줄어요."});
 
     /** 한 줄. {@code amount} 는 이미 표기까지 끝난 문자열이다("월 13,500원" · "최대 월 13,500원"). */
     record Explained(String title, String target, String amount, String how) {
