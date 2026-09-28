@@ -53,7 +53,7 @@ public class ServiceReportController {
             throw ApiException.requiredMissing("description", "설명을 1~2000자로 입력하세요. 개인정보는 적지 마세요.");
         String page = blankToNull(body.pageUrl());
         if (page != null && (page.length() > 2000 || !page.startsWith("/") || page.startsWith("//")))
-            throw ApiException.requiredMissing("pageUrl", "화면 경로는 /로 시작하는 우리 사이트 경로만 받습니다.");
+            throw ApiException.requiredMissing("pageUrl", "제보를 보내지 못했어요. 화면을 새로 고친 뒤 다시 보내 주세요.");
         String source = blankToNull(body.sourceUrl());
         if (source != null) {
             try {
@@ -62,7 +62,7 @@ public class ServiceReportController {
                         || uri.getRawUserInfo() != null || uri.getRawQuery() != null || uri.getRawFragment() != null)
                     throw new IllegalArgumentException();
             } catch (IllegalArgumentException e) {
-                throw ApiException.requiredMissing("sourceUrl", "인증정보·검색조건 없는 HTTPS 출처 링크를 입력하세요.");
+                throw ApiException.requiredMissing("sourceUrl", "출처 링크는 https:// 로 시작하는 주소만 받아요. 주소에 '?'나 '#'이 있으면 그 뒤를 지우고 붙여 넣어 주세요.");
             }
         }
         // 발신지는 ClientAddress 로 읽는다. getRemoteAddr() 은 프론트 nginx·Fly 프록시 뒤에서

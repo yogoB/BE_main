@@ -38,8 +38,8 @@ public class CatalogReportController {
     public ApiResponse<Receipt> submit(@RequestBody Request body, HttpServletRequest request) {
         String table = body.targetType() == null ? null : TARGETS.get(body.targetType());
         if (table == null) throw ApiException.requiredMissing("targetType", "제보할 상품 종류를 선택하세요.");
-        if (body.targetId() == null || body.targetId() <= 0) throw ApiException.requiredMissing("targetId", "제보할 상품이 필요합니다.");
-        if (body.field() == null || !FIELDS.contains(body.field())) throw ApiException.requiredMissing("field", "잘못된 항목을 선택하세요.");
+        if (body.targetId() == null || body.targetId() <= 0) throw ApiException.requiredMissing("targetId", "제보할 요금제·구독을 찾지 못했어요. 화면을 새로 고친 뒤 다시 제보해 주세요.");
+        if (body.field() == null || !FIELDS.contains(body.field())) throw ApiException.requiredMissing("field", "어떤 값이 틀렸는지 골라 주세요.");
         if (body.description() == null || body.description().isBlank() || body.description().length() > 2000)
             throw ApiException.requiredMissing("description", "설명을 1~2000자로 입력하세요. 개인정보는 적지 마세요.");
         String source = body.sourceUrl() == null || body.sourceUrl().isBlank() ? null : body.sourceUrl().strip();
@@ -50,7 +50,7 @@ public class CatalogReportController {
                         || uri.getRawUserInfo() != null || uri.getRawQuery() != null || uri.getRawFragment() != null)
                     throw new IllegalArgumentException();
             } catch (IllegalArgumentException e) {
-                throw ApiException.requiredMissing("sourceUrl", "인증정보·검색조건 없는 HTTPS 출처 링크를 입력하세요.");
+                throw ApiException.requiredMissing("sourceUrl", "출처 링크는 https:// 로 시작하는 주소만 받아요. 주소에 '?'나 '#'이 있으면 그 뒤를 지우고 붙여 넣어 주세요.");
             }
         }
         // 발신지는 ClientAddress 로 읽는다. getRemoteAddr() 은 프론트 nginx·Fly 프록시 뒤에서
@@ -58,7 +58,7 @@ public class CatalogReportController {
         limits.check("catalog-report:" + ClientAddress.of(request), 5);
         // table은 서버의 고정 allowlist 값이다. 사용자 문자열을 SQL 식별자로 사용하지 않는다.
         if (jdbc.queryForObject("SELECT count(*) FROM " + table + " WHERE id = ?", Integer.class, body.targetId()) == 0)
-            throw ApiException.planNotFound("제보할 상품을 찾을 수 없습니다.");
+            throw ApiException.planNotFound("제보할 요금제·구독을 찾지 못했어요. 화면을 새로 고친 뒤 다시 제보해 주세요.");
         UUID id = UUID.randomUUID();
         jdbc.update("""
                 INSERT INTO catalog_report(id,target_type,target_id,field,description,source_url)

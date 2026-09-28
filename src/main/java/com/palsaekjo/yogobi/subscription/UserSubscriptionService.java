@@ -38,10 +38,10 @@ public class UserSubscriptionService {
     @Transactional
     public View add(long userId, Long tierId, Long monthlyPrice) {
         if (tierId == null) {
-            throw ApiException.requiredMissing("tierId", "구독 등급 ID가 필요합니다.");
+            throw ApiException.requiredMissing("tierId", "구독 등급을 골라 주세요.");
         }
         if (monthlyPrice == null || monthlyPrice < 0) {
-            throw ApiException.requiredMissing("monthlyPrice", "월 결제액은 0 이상 정수여야 합니다.");
+            throw ApiException.requiredMissing("monthlyPrice", "한 달 결제액을 원 단위 숫자로 적어 주세요.");
         }
         // 상한이 없으면 두 건 합이 long 을 넘어 탐지가 음수 → CHECK 위반 500 이 났다(G-76 d). 월 구독료로 닿을 수 없는 값이다.
         if (monthlyPrice > 10_000_000) {
@@ -66,14 +66,14 @@ public class UserSubscriptionService {
     /** 본인 구독만 삭제한다. 없거나 남의 것이면 404. */
     public void remove(long userId, long id) {
         if (jdbc.update("DELETE FROM user_subscription WHERE id = ? AND user_id = ?", id, userId) != 1) {
-            throw new ApiException("YGB-SUB-404", 404, "구독을 찾을 수 없습니다.", null);
+            throw new ApiException("YGB-SUB-404", 404, "이미 지워진 구독이에요. 목록을 새로 고쳐 주세요.", null);
         }
     }
 
     @Transactional
     public void setCurrentPlan(long userId, Long planId) {
         if (planId == null) {
-            throw ApiException.requiredMissing("planId", "요금제 ID가 필요합니다.");
+            throw ApiException.requiredMissing("planId", "요금제를 골라 주세요.");
         }
         if (jdbc.queryForObject("SELECT count(*) FROM mobile_plan WHERE id = ? AND active", Integer.class, planId) == 0) {
             throw ApiException.planNotFound("선택한 요금제를 찾지 못했어요. 요금제를 다시 골라 주세요.");

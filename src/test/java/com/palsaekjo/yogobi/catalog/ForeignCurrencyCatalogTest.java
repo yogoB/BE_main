@@ -133,6 +133,16 @@ class ForeignCurrencyCatalogTest {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM catalog_candidate", Integer.class)).isZero();
     }
 
+    /** G-87 b. 해외 결제와 모르는 서비스를 같이 고르면 같은 칸의 안내가 한 줄이다 — 칸으로 묶는 화면에서 하나가 가려졌다. */
+    @Test void foreignAndUnknownServicesShareOneNotice() {
+        var response = recommendations.recommend(new RecommendationRequest(
+                new RecommendationRequest.Required(10, List.of(usdServiceId, 99_999_999L), null), null), false);
+
+        assertThat(response.missingInputs()).filteredOn(m -> m.field().equals("wantedServiceIds"))
+                .singleElement()
+                .satisfies(m -> assertThat(m.impact()).contains("해외 결제").contains("그 밖의 1개"));
+    }
+
     /** f·g: 계산기는 해외 등급만 빼고 200, 없는 ID 는 그대로 400. */
     @Test void calculatorSkipsForeignTierButStillRejectsUnknownId() {
         long planId = jdbc.queryForObject("SELECT id FROM mobile_plan WHERE active ORDER BY id LIMIT 1", Long.class);

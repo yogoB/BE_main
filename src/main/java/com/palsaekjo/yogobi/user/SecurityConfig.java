@@ -143,7 +143,7 @@ public class SecurityConfig {
                 .exceptionHandling(e -> e
                         .authenticationEntryPoint((req, res, ex) -> error(json, res, AuthService.unauthorized()))
                         .accessDeniedHandler((req, res, ex) -> error(json, res,
-                                new ApiException("YGB-AUTH-403", 403, "요청 권한과 보안 토큰을 확인해 주세요.", null))))
+                                new ApiException("YGB-AUTH-403", 403, "화면을 새로 고친 뒤 다시 시도해 주세요. 계속되면 다시 로그인해 주세요.", null))))
                 .addFilterBefore(new OncePerRequestFilter() {
                     @Override protected void doFilterInternal(HttpServletRequest req, HttpServletResponse res, FilterChain chain)
                             throws ServletException, IOException {

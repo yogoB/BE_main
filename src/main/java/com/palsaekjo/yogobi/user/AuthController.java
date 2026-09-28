@@ -22,9 +22,10 @@ public class AuthController {
     private final AuthService members;
     private final AuthTokens tokens;
     private final GoogleLogin google;
+    private final AdminAccount admin;
 
-    public AuthController(AuthService members, AuthTokens tokens, GoogleLogin google) {
-        this.members = members; this.tokens = tokens; this.google = google;
+    public AuthController(AuthService members, AuthTokens tokens, GoogleLogin google, AdminAccount admin) {
+        this.members = members; this.tokens = tokens; this.google = google; this.admin = admin;
     }
 
     @GetMapping("/auth/csrf")
@@ -61,7 +62,11 @@ public class AuthController {
     @DeleteMapping("/me")
     public ApiResponse<Map<String, Boolean>> deleteAccount(Principal principal, HttpServletRequest request,
                                                            HttpServletResponse response) {
-        members.deleteAccount(Long.parseLong(principal.getName()));
+        long id = Long.parseLong(principal.getName());
+        // 백오피스 계정은 설정(ADMIN_ID)이 원본이다. 지우면 재시작 전까지 백오피스가 잠긴다(G-87 d).
+        if (admin.configured() && id == admin.id())
+            throw ApiException.conflict("백오피스 관리자 계정은 탈퇴할 수 없어요.");
+        members.deleteAccount(id);
         tokens.clear(response);
         GoogleLogin.invalidate(request);
         return ApiResponse.ok(Map.of("deleted", true));
@@ -87,8 +92,8 @@ public class AuthController {
 
     private static void fields(JsonNode body, String... fields) {
         if (!body.isObject() || body.size() != fields.length)
-            throw ApiException.requiredMissing(null, "요청 필드를 확인해 주세요.");
+            throw ApiException.requiredMissing(null, "입력값을 읽지 못했어요. 화면을 새로 고친 뒤 다시 입력해 주세요.");
         for (String field : Set.of(fields)) if (!body.path(field).isTextual())
-            throw ApiException.requiredMissing(field, "문자열로 입력해 주세요.");
+            throw ApiException.requiredMissing(field, "입력값을 읽지 못했어요. 화면을 새로 고친 뒤 다시 입력해 주세요.");
     }
 }

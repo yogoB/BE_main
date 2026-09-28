@@ -34,7 +34,7 @@ public class MockMydataProvider implements PaymentHistoryProvider {
         try {
             JsonNode list = json.readTree(content).path("approved_list");
             if (!list.isArray()) {
-                throw ApiException.requiredMissing("approved_list", "표준 마이데이터(카드 승인내역) 형식이 아닙니다.");
+                throw ApiException.requiredMissing("approved_list", "카드 승인내역 파일을 읽지 못했어요. 카드사에서 내려받은 파일을 그대로 올려 주세요.");
             }
             var out = new ArrayList<ImportedPayment>();
             for (JsonNode n : list) {
@@ -48,7 +48,7 @@ public class MockMydataProvider implements PaymentHistoryProvider {
                 if (merchant.isBlank() || merchant.indexOf('\0') >= 0 || !amount.isIntegralNumber() || !amount.canConvertToLong()
                         || amount.longValue() < 0 || !"KRW".equals(n.path("currency_code").asText())
                         || !dtime.matches("[0-9]{14}")) {
-                    throw ApiException.requiredMissing("approved_list", "결제 항목 형식 오류(merchant_name·approved_amt·approved_dtime).");
+                    throw ApiException.requiredMissing("approved_list", "읽을 수 없는 결제 항목이 있어요. 원화가 아닌 결제가 섞였다면 그 줄을 빼고 올려 주세요.");
                 }
                 out.add(new ImportedPayment(merchant, amount.longValue(), LocalDateTime.parse(dtime,
                         DateTimeFormatter.ofPattern("uuuuMMddHHmmss").withResolverStyle(ResolverStyle.STRICT)).toLocalDate()));
@@ -57,7 +57,7 @@ public class MockMydataProvider implements PaymentHistoryProvider {
         } catch (ApiException e) {
             throw e;
         } catch (JsonProcessingException | RuntimeException e) {
-            throw ApiException.requiredMissing("payload", "마이데이터 JSON 파싱에 실패했습니다.");
+            throw ApiException.requiredMissing("payload", "카드 승인내역 파일을 읽지 못했어요. 카드사에서 내려받은 파일을 그대로 올려 주세요.");
         }
     }
 }

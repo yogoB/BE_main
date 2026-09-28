@@ -4,6 +4,7 @@ import com.palsaekjo.yogobi.common.ApiResponse;
 import com.palsaekjo.yogobi.common.FunnelCounter;
 import jakarta.servlet.http.HttpServletRequest;
 import java.security.Principal;
+import java.util.List;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -54,13 +55,15 @@ public class RecommendationController {
 
     /**
      * 같은 요청 본문으로 1순위 설명만 만든다. 추천을 다시 계산한다 — 결과를 저장하지 않는 무상태 경로라
-     * 그게 가장 단순하고, 계산은 싸다(내레이터 왕복이 더 비싸다). 후보가 없으면 빈 설명이다.
+     * 그게 가장 단순하고, 계산은 싸다(내레이터 왕복이 더 비싸다). 후보가 없으면 설명 문장 없이 BE 안내만 싣는다.
      * 퍼널은 세지 않는다 — 리포트를 본 것은 위에서 이미 셌다.
      */
     @PostMapping("/narrate")
     public ApiResponse<Narrator.Narration> narrate(@RequestBody RecommendationRequest request) {
         RecommendationResponse result = service.recommend(request, false);   // 결손은 추천에서 이미 셌다(G-73 d)
-        if (result.results().isEmpty()) return ApiResponse.ok(Narrator.Narration.none());
+        // 후보가 없어도 무엇을 바꾸면 되는지는 BE 가 이미 썼다. 화면은 이 안내만 그린다(G-87 a).
+        if (result.results().isEmpty())
+            return ApiResponse.ok(new Narrator.Narration(null, List.of(), NarratorClient.fallbackNotices(result.missingInputs())));
         return ApiResponse.ok(narrator.narrationFor(
                 result.results().get(0), result.missingInputs(), result.candidateCount(), result.current()));
     }

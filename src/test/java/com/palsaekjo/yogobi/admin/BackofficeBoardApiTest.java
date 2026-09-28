@@ -1,6 +1,7 @@
 package com.palsaekjo.yogobi.admin;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -90,6 +91,17 @@ class BackofficeBoardApiTest {
                 .andExpect(jsonPath("$.data.length()").value(1))
                 .andExpect(jsonPath("$.data[0].queryText").value("carrier:끝난것"));
         send(get("/api/v1/admin/gaps").param("status", "DROP"), admin).andExpect(status().isBadRequest());
+    }
+
+    /**
+     * G-87 d. 백오피스 관리자 계정은 회원 탈퇴 경로로 지워지지 않는다. 지워지면 캐시된 id 로 다음 로그인이 500 이 나
+     * 재시작 전까지 백오피스가 잠겼다.
+     */
+    @Test
+    void theBackofficeAccountCannotWithdrawItself() throws Exception {
+        Cookie[] admin = loginAsAdmin();
+        send(delete("/api/v1/me"), admin).andExpect(status().isConflict());
+        loginAsAdmin();   // 여전히 들어온다
     }
 
     /** G-38 c — 제보에 처리 메모가 붙고, 목록에 메모와 갱신 시각이 보인다. */

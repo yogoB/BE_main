@@ -72,6 +72,7 @@ class CatalogAdminApiTest {
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;
     @Autowired com.palsaekjo.yogobi.user.AuthTokens tokens;
+    @Autowired CatalogChangeRequests requests;
 
     /** 운영자는 `CATALOG_ADMIN_USER_IDS=1` 이므로 **가장 먼저 가입한 계정**이어야 한다. 테스트 순서와 무관하게 고정한다. */
     @org.junit.jupiter.api.BeforeEach
@@ -167,6 +168,39 @@ class CatalogAdminApiTest {
         // 같은 제안을 두 번 반영할 수 없다.
         send(post("/api/v1/admin/catalog/requests/" + requestId + "/approve"), operator)
                 .andExpect(status().isConflict());
+    }
+
+    /**
+     * G-87 c. 승인과 거절이 동시에 와도 <b>반영된 것과 기록된 상태가 어긋나지 않는다.</b> 잡기(claim)가 자동 커밋이라
+     * 잠금이 바로 풀려, 거절로 닫힌 제안이 원본을 바꾸거나 같은 제안이 두 번 반영될 수 있었다.
+     */
+    @Test
+    void concurrentApproveAndRejectNeverDisagree() throws Exception {
+        Cookie[] operator = login(OPERATOR);
+        long operatorId = jdbc.queryForObject("SELECT id FROM app_user WHERE email = ?", Long.class, OPERATOR);
+        for (int round = 0; round < 8; round++) {
+            long requestId = requestId(send(patch("/api/v1/admin/catalog/{dataset}/{key}", "mobile_plan", "SKT|베스트 Max(T 우주)")
+                    .contentType(MediaType.APPLICATION_JSON).content("{\"base_price\":\"" + (90000 + round) + "\"}"), operator)
+                    .andExpect(status().isAccepted()));
+            var start = new java.util.concurrent.CountDownLatch(1);
+            var pool = java.util.concurrent.Executors.newFixedThreadPool(3);
+            var tasks = java.util.List.<java.util.concurrent.Callable<Object>>of(
+                    () -> { start.await(); return requests.approve(operatorId, requestId); },
+                    () -> { start.await(); return requests.approve(operatorId, requestId); },
+                    () -> { start.await(); return requests.reject(operatorId, requestId, "경합"); });
+            var futures = tasks.stream().map(pool::submit).toList();
+            start.countDown();
+            for (var f : futures) {
+                try { f.get(); } catch (java.util.concurrent.ExecutionException ignored) { }   // 진 쪽은 409 다
+            }
+            pool.shutdown();
+
+            String status = jdbc.queryForObject("SELECT status FROM catalog_change_request WHERE id = ?", String.class, requestId);
+            int applied = jdbc.queryForObject(
+                    "SELECT count(*) FROM catalog_audit WHERE outcome = 'APPLIED' AND detail LIKE ?", Integer.class,
+                    "%요청#" + requestId + " %");
+            assertThat(applied).as("round %d status %s", round, status).isEqualTo("APPROVED".equals(status) ? 1 : 0);
+        }
     }
 
     @Test

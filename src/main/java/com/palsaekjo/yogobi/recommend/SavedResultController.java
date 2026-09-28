@@ -86,7 +86,7 @@ public class SavedResultController {
     @DeleteMapping("/{id}")
     public ApiResponse<Deleted> delete(@PathVariable UUID id, Principal principal) {
         if (jdbc.update("DELETE FROM saved_result WHERE id = ? AND user_id = ?", id, Long.parseLong(principal.getName())) != 1)
-            throw new ApiException("YGB-RES-404", 404, "저장한 결과를 찾을 수 없습니다.", null);
+            throw new ApiException("YGB-RES-404", 404, "이미 지워진 결과예요. 목록을 새로 고쳐 주세요.", null);
         return ApiResponse.ok(new Deleted(true));
     }
 

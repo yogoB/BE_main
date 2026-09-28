@@ -37,7 +37,7 @@ public class GoogleLogin {
 
     public void requireEnabled() {
         tokens.requireConfigured();
-        if (!enabled) throw new ApiException("YGB-AUTH-503", 503, "Google 로그인 설정을 확인해 주세요.", null);
+        if (!enabled) throw new ApiException("YGB-AUTH-503", 503, "지금은 로그인할 수 없어요. 잠시 후 다시 시도해 주세요.", null);
     }
 
     public void rememberConsent(HttpServletRequest request, JsonNode body) {

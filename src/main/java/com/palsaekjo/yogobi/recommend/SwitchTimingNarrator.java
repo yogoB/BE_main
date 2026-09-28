@@ -19,7 +19,7 @@ public interface SwitchTimingNarrator {
             case "SWITCH_NOW" -> "지금이 최적 실행 시점";
             case "WAIT_UNTIL_EXPIRY" -> "약정 만료 후가 이득";
             case "NO_BENEFIT" -> "절감 없음 · 참고용 일정";
-            default -> status;
+            default -> "지금은 판단하지 못했어요";   // 모르는 판정 코드를 화면에 그대로 내보내지 않는다
         }, "");
     }
 

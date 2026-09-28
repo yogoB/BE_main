@@ -376,6 +376,27 @@ class RecommendationApiTest {
         assertGap("MOBILE_PLAN", "dataMb>=204800,network=ANY", 2);   // 행은 안 늘고 횟수만 오른다
     }
 
+    /**
+     * G-87 a. 맞는 요금제가 없으면 <b>그 사실과 바꿀 조건을 먼저</b> 말하고, 결과를 바꾸지 못하는 요청
+     * (선택약정·가족결합·통신사)은 묻지 않는다. 설명 경로도 그 안내를 싣는다 — 전엔 빈 설명이라 화면에서 사라졌다.
+     */
+    @Test
+    void g87a_noPlanSaysWhatToChangeFirstAndNarrateKeepsIt() throws Exception {
+        String body = """
+                {"required":{"monthlyDataGb":200,"wantedServiceIds":[1]},"optional":{"networkType":"5G"}}""";
+        mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.missingInputs[0].field").value("monthlyDataGb"))
+                .andExpect(jsonPath("$.data.missingInputs[0].impact").value(org.hamcrest.Matchers.containsString("200GB")))
+                .andExpect(jsonPath("$.data.missingInputs[0].howToFind").value(org.hamcrest.Matchers.containsString("상관없어요")))
+                .andExpect(jsonPath("$.data.missingInputs[*].field").value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.anyOf(
+                        org.hamcrest.Matchers.hasItem("contractType"), org.hamcrest.Matchers.hasItem("hasFamilyBundle"),
+                        org.hamcrest.Matchers.hasItem("currentCarrier")))));
+        mvc.perform(post("/api/v1/recommendations/narrate").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.notices[0]").value(org.hamcrest.Matchers.containsString("200GB")));
+    }
+
     @Test
     void g12e_recordingStopsAtRowCapButRequestStillSucceeds() throws Exception {
         jdbc.update("""
@@ -717,7 +738,7 @@ class RecommendationApiTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.data.missingInputs[?(@.field=='networkType')].impact")
                             .value(org.hamcrest.Matchers.hasItem(org.hamcrest.Matchers.allOf(
-                                    org.hamcrest.Matchers.containsString("5G 로 좁혀서"),
+                                    org.hamcrest.Matchers.containsString("통신 규격을 5G로 좁혀서"),
                                     // 내부 enum 이 사용자 문구로 새어 나가면 안 된다 — 처음에 "FIVE_G 로 좁혀서" 가 나갔다.
                                     org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("FIVE_G")),
                                     // 남은 최저 45,000(웨이브플랜) - 뺀 최저 1,000 = 44,000

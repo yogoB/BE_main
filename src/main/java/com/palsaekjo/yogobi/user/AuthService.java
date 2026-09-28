@@ -134,7 +134,7 @@ public class AuthService {
     }
 
     public static ApiException unauthorized() {
-        return new ApiException("YGB-AUTH-001", 401, "로그인 정보 또는 본인 확인을 다시 확인해 주세요.", null);
+        return new ApiException("YGB-AUTH-001", 401, "로그인이 끝났어요. 다시 로그인해 주세요.", null);
     }
 
     public static ApiException conflict() {

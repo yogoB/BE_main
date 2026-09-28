@@ -76,6 +76,10 @@ public class CatalogChangeRequests {
         // 감사 기록에 "누가 제안하고 누가 승인했는지"를 남긴다. 실제 반영자는 승인자다.
         String trace = "요청#" + requestId + " 제안자=" + proposerId + " 승인자=" + approverId;
 
+        // 반영 <b>전에</b> 조건부로 닫는다 — 이 UPDATE 하나만 PENDING 을 이긴다. 잡기의 FOR UPDATE 는 자동 커밋이라
+        // 바로 풀려, 거절로 닫힌 제안이 반영되거나 같은 제안이 두 번 반영됐다(G-87 c).
+        if (close(requestId, approverId, "APPROVED", null) == 0)
+            throw ApiException.conflict("이미 처리된 제안입니다.");
         try {
             switch (action) {
                 case CREATE -> store.create(dataset, read(request), approverId, trace);
@@ -83,10 +87,10 @@ public class CatalogChangeRequests {
                 case DELETE -> store.delete(dataset, key, approverId, trace);
             }
         } catch (RuntimeException e) {
-            close(requestId, approverId, "FAILED", e.getMessage());
+            jdbc.update("UPDATE catalog_change_request SET status = 'FAILED', decision_note = ? WHERE id = ? AND status = 'APPROVED'",
+                    cut(e.getMessage()), requestId);
             throw e;
         }
-        close(requestId, approverId, "APPROVED", null);
         updateCandidate(request, "VERIFIED");
         log.info("카탈로그 변경 승인 #{} {} {} {} approver={}", requestId, action, dataset, key, approverId);
         return Map.of("requestId", requestId, "status", "APPROVED");
@@ -94,7 +98,8 @@ public class CatalogChangeRequests {
 
     public Map<String, Object> reject(long approverId, long requestId, String note) {
         Map<String, Object> request = claim(requestId);
-        close(requestId, approverId, "REJECTED", note);
+        if (close(requestId, approverId, "REJECTED", note) == 0)
+            throw ApiException.conflict("이미 처리된 제안입니다.");
         updateCandidate(request, "REJECTED");
         log.info("카탈로그 변경 거절 #{} approver={}", requestId, approverId);
         return Map.of("requestId", requestId, "status", "REJECTED");
@@ -109,7 +114,7 @@ public class CatalogChangeRequests {
 
     /**
      * PENDING 인 제안을 잡는다. 이미 처리됐으면 409 — 같은 제안이 두 번 반영되면 안 된다.
-     * {@code FOR UPDATE} 로 동시 승인 두 건이 같은 제안을 함께 통과하지 못하게 막는다.
+     * 동시 처리의 문지기는 여기가 아니라 {@link #close} 의 조건부 UPDATE 다(G-87 c).
      */
     private Map<String, Object> claim(long requestId) {
         var rows = jdbc.queryForList("SELECT * FROM catalog_change_request WHERE id = ? FOR UPDATE", requestId);
@@ -120,8 +125,9 @@ public class CatalogChangeRequests {
         return request;
     }
 
-    private void close(long requestId, long approverId, String status, String note) {
-        jdbc.update("""
+    /** PENDING 일 때만 닫는다. 닫은 행 수(0 이면 다른 요청이 먼저 처리했다). */
+    private int close(long requestId, long approverId, String status, String note) {
+        return jdbc.update("""
                 UPDATE catalog_change_request
                 SET status = ?, decided_by = ?, decided_at = now(), decision_note = ?
                 WHERE id = ? AND status = 'PENDING'""",

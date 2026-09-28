@@ -146,11 +146,13 @@ public class RecommendationService {
         List<CandidatePlan> candidates = catalog.findCandidatePlans(dataMb, networkType);
         if (candidates.isEmpty()) {
             if (recordGaps) gaps.record(Kind.MOBILE_PLAN, "dataMb>=" + dataMb + ",network=" + (networkType == null ? "ANY" : networkType));
-            var noPlan = missingInputs(optional, currentCarrier, familyDiscount, unknownServiceIds, foreignPriced);
-            addAgeRestrictionNotice(noPlan, dataMb, networkType);
+            // 사실과 바꿀 조건을 먼저 말한다. 선택약정·가족결합·통신사를 알려 줘도 요금제가 생기지 않으니 묻지 않는다(G-87 a).
+            var noPlan = new ArrayList<MissingInput>();
             noPlan.add(new MissingInput("monthlyDataGb",
-                    "조건을 만족하는 요금제가 아직 카탈로그에 없어요. 확인 중이에요",
-                    "데이터 사용량을 낮추거나 망 종류를 바꿔서 다시 찾아보세요"));
+                    "데이터 " + required.monthlyDataGb() + "GB 이상" + (networkType == null ? "" : "·" + displayNetwork(networkType)) + " 요금제를 찾지 못했어요",
+                    networkType == null ? "데이터 사용량을 줄여서 다시 찾아보세요"
+                            : "데이터 사용량을 줄이거나 통신 규격을 '상관없어요'로 두고 다시 찾아보세요"));
+            addAgeRestrictionNotice(noPlan, dataMb, networkType);
             return new RecommendationResponse(Accuracy.PARTIAL, noPlan, List.of());
         }
 
@@ -307,7 +309,7 @@ public class RecommendationService {
     /** 특정 조합(요금제 + 티어들)의 총비용. 후보 탐색·정렬 없이 1회 계산한다. */
     public CalculatorResponse calculate(CalculatorRequest request) {
         if (request.planId() == null) {
-            throw ApiException.requiredMissing("planId", "요금제 ID가 필요합니다.");
+            throw ApiException.requiredMissing("planId", "요금제를 골라 주세요.");
         }
         if (request.tierIds() == null || request.tierIds().isEmpty()) {
             throw ApiException.requiredMissing("tierIds", "구독 등급을 하나 이상 지정하세요.");
@@ -402,7 +404,7 @@ public class RecommendationService {
     private void addNetworkNarrowingNotice(List<MissingInput> missing, long dataMb, String networkType) {
         catalog.cheaperIfNetworkWidened(dataMb, networkType).ifPresent(missed -> missing.add(new MissingInput(
                 "networkType",
-                "통신망을 " + displayNetwork(networkType) + " 로 좁혀서 요금제 " + missed.excludedCount()
+                "통신 규격을 " + displayNetwork(networkType) + "로 좁혀서 요금제 " + missed.excludedCount()
                         + "건을 뺐어요 — 그중엔 기본료가 월 "
                         + String.format("%,d", missed.cheapestKept() - missed.cheapestExcluded())
                         + "원 더 싼 것도 있어요",
@@ -432,9 +434,9 @@ public class RecommendationService {
                 // **"후보에 있던"이 첫 낱말이다**(2026-09-21, 사용자 질문). 이 말이 없으면 화면에
                 // 안 보이는 통신사가 안내에만 튀어나와 "이건 왜 나오나" 가 된다. 실제로 그 질문을 받았다.
                 // 거짓이 아니다 — 이 질의는 후보 질의와 **같은 WHERE 절**에 benefit_price 조건만 더한다.
-                "후보에 있던 " + cheaper.carrier() + " '" + cheaper.name() + "' 는 조건을 채우면 월 "
+                "후보에 있던 " + cheaper.carrier() + " '" + cheaper.name() + "'는 조건을 채우면 월 "
                         + String.format("%,d", cheaper.benefitPrice()) + "원이에요 — 출처 표기는 '"
-                        + cheaper.label() + "' 입니다",
+                        + cheaper.label() + "'입니다",
                 // 굵게 나가는 첫 줄에 금액을 하나만 둔다(프론트 세션, 320px 에서 세 줄이었다).
                 // 순위에 안 쓴 이유와 조건 못 채웠을 때의 금액은 아래 줄로 내린다 — 덜 급한 말이다.
                 "기본료 " + String.format("%,d", cheaper.basePrice()) + "원으로 계산해 순위에서는 밀렸어요. "
@@ -551,14 +553,19 @@ public class RecommendationService {
     private static List<MissingInput> missingInputs(RecommendationRequest.Optional o, String currentCarrier,
             Long familyDiscount, List<Long> unknownServiceIds, Map<Long, String> foreignPriced) {
         var missing = new ArrayList<MissingInput>();
-        if (!foreignPriced.isEmpty()) {
+        if (!foreignPriced.isEmpty() && !unknownServiceIds.isEmpty()) {
+            // 같은 칸(wantedServiceIds)의 안내가 두 줄이면 칸으로 묶는 화면에서 하나가 가려진다(G-87 b). 한 줄로 합친다.
+            missing.add(new MissingInput("wantedServiceIds",
+                    String.join("·", foreignPriced.values()) + "는 해외 결제라, 그 밖의 " + unknownServiceIds.size()
+                            + "개는 아직 금액을 몰라 계산에서 뺐어요",
+                    "지금과 추천 양쪽에서 똑같이 뺐으니 둘의 차이에는 영향이 없어요"));
+        } else if (!foreignPriced.isEmpty()) {
             // 해외 결제 구독은 원화 확정 금액이 없다. 환율 환산값은 표시용이라 계산에 넣지 않는다(D-17).
             missing.add(new MissingInput("wantedServiceIds",
                     String.join("·", foreignPriced.values()) + "는 해외 결제라 원화 금액이 확정되지 않아 계산에서 뺐어요",
                     // "마이페이지에 넣으면 반영돼요"라고 했지만 추천은 그 값을 읽지 않는다 — 지킬 수 있는 사실만 말한다(G-75 b).
                     "지금과 추천 양쪽에서 똑같이 뺐으니 둘의 차이에는 영향이 없어요"));
-        }
-        if (!unknownServiceIds.isEmpty()) {
+        } else if (!unknownServiceIds.isEmpty()) {
             missing.add(new MissingInput("wantedServiceIds",
                     "고르신 서비스 " + unknownServiceIds.size() + "개는 아직 금액을 몰라 계산에서 뺐어요",
                     "지금과 추천 양쪽에서 똑같이 뺐어요. 확인되면 카탈로그에 반영할게요"));
@@ -572,7 +579,7 @@ public class RecommendationService {
             // 결합 중이라고 하면 할인액을 물어 그 금액을 뺀다(G-28). 그러니 여기서 약속해도 된다 —
             // 단, 깎이는 것은 사용자가 적어 준 금액이지 우리가 계산한 값이 아니다.
             missing.add(new MissingInput("hasFamilyBundle",
-                    "가족 결합 중이라면 할인액을 알려주세요. 그 금액을 빼고 계산해요",
+                    "가족결합 중이라면 할인액을 알려 주세요. 그 금액을 빼고 계산해요",
                     "통신사 마이페이지 > 결합 상품"));
         }
         // 결합 중이라고 했는데 할인액을 모르면 그만큼 금액이 덜 깎인다. 우리가 만들 수 없는 값이라 묻는다(G-28 b).
@@ -645,7 +652,7 @@ public class RecommendationService {
             case "5G", "FIVE_G" -> "FIVE_G";
             case "LTE", "4G" -> "LTE";
             case "3G", "THREE_G" -> "THREE_G";
-            default -> throw ApiException.requiredMissing("networkType", "통신망 선택값을 읽지 못했어요. 통신망을 다시 골라 주세요.");
+            default -> throw ApiException.requiredMissing("networkType", "통신 규격 선택값을 읽지 못했어요. 통신 규격을 다시 골라 주세요.");
         };
     }
 

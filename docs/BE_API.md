@@ -299,7 +299,8 @@ AI 연결과 내부 인증은 BE가 담당하며 프론트에는 AI 주소·내�
             "reasons": ["조건에 맞는 조합 369개 중 가장 싼 선택이에요."],
             "notices": ["청년·키즈·시니어처럼 가입 자격이 필요한 요금제 8건은 뺐어요 — …"] }, "warnings": [] }
 ```
-내레이터 장애면 `message` 는 `null`, 배열은 빈 값이고 여전히 200 이다. 후보가 없으면 셋 다 빈 값.
+내레이터 장애면 `message` 는 `null`, `reasons` 는 빈 값이고 여전히 200 이다. `notices` 는 BE 가 쓴 안내라 장애여도 남는다(G-75 a).
+후보가 없으면 `message` `null`·`reasons` 빈 값이고 **`notices` 에 무엇을 바꾸면 되는지**가 실린다 — 첫 줄이 "데이터 N GB 이상 요금제를 찾지 못했어요"(G-87 a).
 
 ### 카탈로그 결손은 오류가 아니다 (D-17 · G-12)
 
@@ -460,7 +461,7 @@ JWT 절대 수명 24시간·유휴 제한 2시간(refresh 없음, D-48). 상태�
 | POST | `/api/v1/auth/logout` | 인증+CSRF | `{loggedOut:true}` — 현재 로그인만 폐기 |
 | POST | `/api/v1/auth/logout-all` | 인증+CSRF | `{loggedOut:true}` — 이 회원의 모든 로그인 폐기 |
 | GET | `/api/v1/me` | 인증 | 현재 회원 |
-| DELETE | `/api/v1/me` | 인증+CSRF | `{deleted:true}` — 탈퇴. 법정 보존 사본만 남는다 |
+| DELETE | `/api/v1/me` | 인증+CSRF | `{deleted:true}` — 탈퇴. 법정 보존 사본만 남는다. 백오피스 관리자 계정은 **409**(G-87 d) |
 | POST | `/api/v1/me/nickname` | `{nickname}`, 인증+CSRF | 현재 회원 (D-22) |
 | GET | `/api/v1/me/sessions` | 인증 | 로그인 세션 목록(`current` 플래그 포함) |
 | DELETE | `/api/v1/me/sessions/{sessionId}` | 인증+CSRF | `{revoked:true}`. 남의 세션은 404 |

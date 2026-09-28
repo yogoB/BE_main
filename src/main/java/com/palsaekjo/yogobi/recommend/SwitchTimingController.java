@@ -65,8 +65,8 @@ public class SwitchTimingController {
         // 약정이 남았는데 전환비용을 모르면 판정 문장을 쓰지 않는다 — 대신 무엇을 알려 주면 되는지 말한다(G-78 f).
         var wording = switchingCost == null && remainingContractMonths > 0
                 ? new SwitchTimingNarrator.Wording("약정 해지 비용 확인 필요",
-                        "약정이 " + remainingContractMonths + "개월 남았어요. 위약금·할인반환금을 알려 주시면 "
-                                + "지금 바꿀지 만료 후에 바꿀지 계산해 드려요.")
+                        "약정이 " + remainingContractMonths + "개월 남았어요. 해지하면 위약금이 생길 수 있어 "
+                                + "지금 바꿀지는 판단하지 않았어요. 위약금은 통신사 앱의 약정 정보에서 확인할 수 있어요.")
                 : port == null ? SwitchTimingNarrator.fallback(timing.status())
                 : port.explain(timing, expiryDate);
         return ApiResponse.ok(new TimingView(timing, wording.headline(), wording.note()));

@@ -67,7 +67,7 @@ public class PrivacyController {
     /** {@code agree} 는 boolean 이어야 한다. 빠지거나 문자열이면 400 — 기본값을 추측하지 않는다. */
     private static boolean requireAgree(JsonNode body) {
         if (!body.path("agree").isBoolean()) {
-            throw ApiException.requiredMissing("agree", "동의 여부를 boolean(agree)으로 보내 주세요.");
+            throw ApiException.requiredMissing("agree", "동의 여부를 다시 골라 주세요.");
         }
         return body.get("agree").booleanValue();
     }

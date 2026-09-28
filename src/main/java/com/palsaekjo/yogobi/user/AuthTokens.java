@@ -61,7 +61,7 @@ public class AuthTokens {
     }
 
     public void requireConfigured() {
-        if (encoder == null) throw new ApiException("YGB-AUTH-503", 503, "회원 인증 설정을 확인해 주세요.", null);
+        if (encoder == null) throw new ApiException("YGB-AUTH-503", 503, "지금은 로그인할 수 없어요. 잠시 후 다시 시도해 주세요.", null);
     }
 
     @org.springframework.transaction.annotation.Transactional
@@ -123,7 +123,7 @@ public class AuthTokens {
 
     public void revokeSession(long userId, java.util.UUID sessionId) {
         if (jdbc.update("DELETE FROM auth_session WHERE id=? AND user_id=?", sessionId,userId) != 1)
-            throw new ApiException("YGB-AUTH-404",404,"로그인 세션을 찾을 수 없습니다.",null);
+            throw new ApiException("YGB-AUTH-404",404,"이미 로그아웃된 기기예요. 목록을 새로 고쳐 주세요.",null);
     }
 
     public void clear(HttpServletResponse response) {

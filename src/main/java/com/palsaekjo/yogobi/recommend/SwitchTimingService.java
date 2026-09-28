@@ -45,7 +45,7 @@ public class SwitchTimingService {
         Long currentPlanId = currentPlanIdOverride != null ? currentPlanIdOverride
                 : jdbc.queryForObject("SELECT current_plan_id FROM app_user WHERE id = ?", Long.class, userId);
         if (currentPlanId == null) {
-            throw ApiException.requiredMissing("currentPlan", "현재 요금제를 알려주세요 (currentPlanId 또는 POST /me/current-plan).");
+            throw ApiException.requiredMissing("currentPlan", "지금 쓰는 요금제를 먼저 골라 주세요. 마이페이지에 저장해 두면 다음부터 자동으로 써요.");
         }
         // 현재·대상 모두 사용자의 활성 구독(같은 집합)을 얹어 같은 조건으로 비교한다.
         List<Long> tierIds = jdbc.queryForList(
