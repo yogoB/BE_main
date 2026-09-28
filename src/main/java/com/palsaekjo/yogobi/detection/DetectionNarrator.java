@@ -42,7 +42,8 @@ public interface DetectionNarrator {
             String amount = "월 " + String.format("%,d", finding.wastedAmount()) + "원";
             // 상한으로 잡은 금액은 단정하지 않는다 — 내레이터와 같은 규칙(G-78 d).
             if (finding.provenance() == com.palsaekjo.yogobi.common.Provenance.ESTIMATED) amount = "최대 " + amount;
-            String[] words = WORDS.get(finding.rule());
+            // 규칙이 늘었는데 문구가 아직 없으면 NPE 대신 일반 제목으로 보여 준다 — 규칙 코드는 화면에 내지 않는다.
+            String[] words = WORDS.getOrDefault(finding.rule(), new String[] {"겹치는 결제", ""});
             lines.add(new Explained(words[0], targetNames.get(i), amount, words[1]));
         }
         return new Explanation(List.copyOf(lines), "");

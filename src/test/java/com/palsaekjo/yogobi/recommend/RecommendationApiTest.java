@@ -77,6 +77,20 @@ class RecommendationApiTest {
                 .isZero();
     }
 
+    /** G-88 b. 무제한보다 큰 요청은 통계에서도 한 칸이다 — 공개 경로라 값마다 새 행이 끝없이 쌓였다. */
+    @Test
+    void hugeDataRequestsShareOneStatsRow_g88b() throws Exception {
+        jdbc.execute("DELETE FROM recommendation_daily");
+        jdbc.execute("""
+                INSERT INTO mobile_plan(id,carrier_id,name,network_type,base_price,data_mb,voice_min,sms_cnt,source_url,collected_at)
+                VALUES (4,1,'무제한플랜','FIVE_G',69000,999999,999999,9999,'http://seed','2026-09-08')""");
+        for (int gb : new int[] {2000, 3000, 2_000_000_000})
+            mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content(
+                    "{\"required\":{\"monthlyDataGb\":" + gb + ",\"wantedServiceIds\":[1]},\"optional\":{\"contractType\":\"NONE\"}}"))
+                    .andExpect(status().isOk());
+        assertThat(jdbc.queryForList("SELECT data_gb FROM recommendation_daily", Integer.class)).containsExactly(976);
+    }
+
     /** G-86 j. 기간이 끝난 혜택은 할인하지 않는다 — 넷플릭스 무료가 어제 끝났으면 넷플플랜은 정가다. */
     @Test
     void anExpiredBenefitNoLongerDiscounts_g86j() throws Exception {

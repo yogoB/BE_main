@@ -106,6 +106,8 @@ public class CatalogDailyHarvest {
                 JOIN LATERAL (
                     SELECT plan_price FROM smartchoice_plan_snapshot s
                     WHERE s.carrier = c.name AND s.plan_name = m.name
+                      -- 오래된 시세로 가격 변경을 제안하지 않는다. 스윕이 막혀도 제안은 계속 나왔다(G-88 c).
+                      AND s.collected_at > now() - interval '7 days'
                     ORDER BY s.contract_months ASC, s.collected_at DESC LIMIT 1) s ON TRUE
                 WHERE m.active AND abs(s.plan_price - m.base_price) > ?
                 ORDER BY abs(s.plan_price - m.base_price) DESC

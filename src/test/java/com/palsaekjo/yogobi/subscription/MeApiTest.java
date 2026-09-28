@@ -200,6 +200,23 @@ class MeApiTest {
                     .andExpect(jsonPath("$.error.field").value(bad[0]));
     }
 
+    /** G-88 d. 판매가 끝난 요금제로 옮기라고 하지 않는다. 지금 요금제는 끝났어도 비교 대상이다. */
+    @Test void switchTimingRefusesARetiredTargetButNotARetiredCurrentPlan() throws Exception {
+        jdbc.execute("INSERT INTO carrier(id,name,carrier_type) VALUES (1,'SKT','MNO')");
+        jdbc.execute("""
+                INSERT INTO mobile_plan(id,carrier_id,name,network_type,base_price,data_mb,voice_min,sms_cnt,source_url,collected_at,active)
+                VALUES (1,1,'끝난지금','FIVE_G',55000,100000,999999,9999,'http://seed','2026-09-14',false),
+                       (2,1,'끝난대상','FIVE_G',45000,100000,999999,9999,'http://seed','2026-09-14',false),
+                       (3,1,'파는대상','FIVE_G',45000,100000,999999,9999,'http://seed','2026-09-14',true)""");
+        Browser a = new Browser(); signup("retired@example.com", a);
+        mvc.perform(get("/api/v1/me/switch-timing").cookie(a.cookies).param("targetPlanId", "2").param("currentPlanId", "1"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.message").value(org.hamcrest.Matchers.containsString("가입할 수 없는")));
+        mvc.perform(get("/api/v1/me/switch-timing").cookie(a.cookies).param("targetPlanId", "3").param("currentPlanId", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.timing.monthlySavings").value(10000));
+    }
+
     /** G-35 — 이번 흐름에서 고른 요금제(currentPlanId)가 저장값보다 앞선다. 프로필은 그대로다. */
     @Test void switchTimingTakesCurrentPlanIdFromTheQueryFirst() throws Exception {
         jdbc.execute("INSERT INTO carrier(id,name,carrier_type) VALUES (1,'SKT','MNO')");

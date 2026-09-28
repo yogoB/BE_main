@@ -263,6 +263,9 @@ public class NarratorClient implements Narrator, DetectionNarrator, SwitchTiming
             return new SwitchTimingNarrator.Wording(text(result, "headline", 200),
                     optional(result, "note", 300));
         } catch (Unavailable e) {
+            // 다른 두 설명과 같이 이유와 지표를 남긴다 — 여기만 조용히 비어 있었다(G-88 e).
+            log.warn("변경 시점 설명을 쓰지 못했다 — 판정은 그대로 나간다: {}", e.getMessage());
+            count(e);
             return SwitchTimingNarrator.fallback(timing.status());
         }
     }

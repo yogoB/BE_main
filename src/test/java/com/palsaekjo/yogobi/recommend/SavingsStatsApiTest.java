@@ -114,6 +114,18 @@ class SavingsStatsApiTest {
                 .doesNotContain("17958").doesNotContain("10800");
     }
 
+    /** G-88 a. 뭉개면 0원이 되는 절감(1~499원)은 표본이 아니다 — 랜딩에 "약 0원 아꼈어요"가 섞이고 평균을 끌어내렸다. */
+    @Test
+    void g88a_savingsThatRoundToZeroAreNotSamples() throws Exception {
+        save("sample1@example.com", 300L);
+        save("sample2@example.com", 10_000L);
+        save("sample3@example.com", 12_000L);
+
+        mvc.perform(get("/api/v1/stats/savings")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.samples", org.hamcrest.Matchers.containsInAnyOrder(10000, 12000)))
+                .andExpect(jsonPath("$.data.monthlyAverage").value(11000));
+    }
+
     /** G-43 — 임계값을 넘으면 1인당 평균·중앙값이 함께 나간다(D-57, 랜딩용). 미만이면 둘 다 null 이다. */
     @Test
     void perPersonAverageAppearsOnlyAboveTheThreshold() throws Exception {

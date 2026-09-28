@@ -99,7 +99,9 @@ class SmartChoiceSweepServiceTest {
         var result = new SmartChoiceSweepService(client, jdbc, 60).sweep();
         assertThat(client.calls).isEqualTo(1);                       // 첫 실패에서 멈춘다
         verify(jdbc, never()).update(anyString(), any(Object[].class));
-        assertThat(result).containsEntry("enabled", true).containsEntry("reachable", false);
+        assertThat(result).containsEntry("enabled", true).containsEntry("reachable", false)
+                // G-88 c — 예약 작업 기록은 updated 로 성공·실패를 가른다. 못 닿은 스윕이 "성공"으로 남았다.
+                .containsEntry("updated", false);
     }
 
     @Test

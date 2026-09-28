@@ -106,6 +106,9 @@ public class SmartChoiceSweepService {
         out.put("conditions", conditions.size());
         out.put("stored", stored);
         out.put("reachable", reachable);
+        // 예약 작업 기록(ScheduledJobs)은 updated 로 실패를 가른다. 못 닿았는데 "성공"으로 남던 것(G-88 c).
+        // 키가 없는 경우는 설정이지 실패가 아니라 싣지 않는다.
+        out.put("updated", reachable);
         // 닿지 못한 스윕은 스냅샷을 갱신하지 못했다. 낡은 스냅샷으로 결손을 새로 적지 않는다 —
         // -1 은 "확인 못 함"이며 0("없음")과 구분한다.
         out.put("recordedGaps", reachable ? recordMissingPlans() : -1);

@@ -20,8 +20,13 @@ public class RecommendationStats {
         this.jdbc = jdbc;
     }
 
+    /** 화면이 "무제한"으로 보내는 값(999,999MB 이하의 가장 큰 GB). 그 이상은 모두 무제한으로 센다(G-88 b). */
+    static final int UNLIMITED_GB = 976;
+
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void record(long topPlanId, int dataGb) {
+        // 공개 경로라 값마다 새 행이 생기면 표가 끝없이 자란다 — 무제한 이상은 한 칸이다.
+        dataGb = Math.min(dataGb, UNLIMITED_GB);
         try {
             jdbc.update("""
                     INSERT INTO recommendation_daily (day, plan_id, data_gb, count) VALUES (CURRENT_DATE, ?, ?, 1)

@@ -51,6 +51,10 @@ public class SwitchTimingService {
         List<Long> tierIds = jdbc.queryForList(
                 "SELECT tier_id FROM user_subscription WHERE user_id = ? AND ended_at IS NULL", Long.class, userId);
 
+        // 옮길 곳은 지금 가입할 수 있는 요금제여야 한다. 지금 요금제는 판매가 끝났어도 된다(G-88 d).
+        if (!Boolean.TRUE.equals(jdbc.query("SELECT active FROM mobile_plan WHERE id = ?",
+                rs -> rs.next() ? rs.getBoolean(1) : null, targetPlanId)))
+            throw ApiException.planNotFound("지금은 가입할 수 없는 요금제예요. 결과 화면에서 다시 골라 주세요.");
         long current = effectiveCost(currentPlanId, tierIds);
         long target = effectiveCost(targetPlanId, tierIds);
         SwitchTiming.Result result;

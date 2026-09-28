@@ -84,11 +84,11 @@ public class SavingsStatsController {
     }
 
     private Savings collect() {
-        // 계정당 한 행이다(테이블이 보장한다). 0 이하(더 내는 조합)는 "절감액 표본"이 아니므로 뺀다.
+        // 계정당 한 행이다(테이블이 보장한다). 뭉개서 0원이 되는 값(500원 미만, 더 내는 조합 포함)은 표본이 아니다(G-88 a).
         List<Long> samples = jdbc.queryForList("""
                 SELECT monthly_savings FROM member_savings
-                WHERE monthly_savings > 0 ORDER BY seen_at DESC LIMIT ?
-                """, Long.class, MAX_SAMPLES);
+                WHERE monthly_savings >= ? ORDER BY seen_at DESC LIMIT ?
+                """, Long.class, PUBLIC_ROUNDING / 2, MAX_SAMPLES);
         // 정확한 값을 공개하지 않는다 — 1,000원 단위로 뭉갠다. 평균·중앙값도 같은 값에서 낸다:
         // 원본으로 평균을 내고 표본만 뭉개면 평균에서 원본이 역산될 여지가 남는다.
         samples = samples.stream().map(v -> Math.round((double) v / PUBLIC_ROUNDING) * PUBLIC_ROUNDING).toList();

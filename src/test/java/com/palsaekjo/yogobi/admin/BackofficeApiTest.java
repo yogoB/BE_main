@@ -152,6 +152,25 @@ class BackofficeApiTest {
         assertThat((Integer) harvest.harvest().get("proposedMobilePlans")).isZero();
     }
 
+    /** G-88 c. 일주일 넘은 시세로는 가격 변경을 제안하지 않는다 — 스윕이 막혀도 옛 값으로 제안이 계속 나왔다. */
+    @Test
+    void staleSnapshotsDoNotBecomeProposals() throws Exception {
+        var plan = jdbc.queryForMap("""
+                SELECT c.name AS carrier, m.name AS plan_name, m.base_price
+                FROM mobile_plan m JOIN carrier c ON c.id = m.carrier_id WHERE m.active LIMIT 1""");
+        long theirs = ((Number) plan.get("base_price")).longValue() + 5000;
+        // 다른 테스트가 남긴 스냅샷·대기 제안이 있으면 이 검사가 헛통과한다. 먼저 지운다.
+        jdbc.update("DELETE FROM smartchoice_plan_snapshot");
+        jdbc.update("DELETE FROM catalog_change_request WHERE status = 'PENDING'");
+        jdbc.update("""
+                INSERT INTO smartchoice_plan_snapshot
+                    (carrier, plan_name, network_type, contract_months, plan_price, discounted_price, source_url, collected_at)
+                VALUES (?, ?, '5G', 0, ?, ?, 'https://api.smartchoice.or.kr/api/openAPI.xml', now() - interval '8 days')""",
+                plan.get("carrier"), plan.get("plan_name"), theirs, theirs);
+
+        assertThat((Integer) harvest.harvest().get("proposedMobilePlans")).isZero();
+    }
+
     /**
      * G-55 — 스마트초이스가 확인한 청년 파생형 결손은 자동 검토 제안이 되고,
      * 운영자가 승인한 뒤에만 합본 CSV와 DB에 함께 들어간다.
