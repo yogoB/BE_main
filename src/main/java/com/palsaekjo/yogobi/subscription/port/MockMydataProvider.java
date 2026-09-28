@@ -44,7 +44,8 @@ public class MockMydataProvider implements PaymentHistoryProvider {
                 String merchant = n.path("merchant_name").isTextual() ? n.get("merchant_name").textValue().trim() : "";
                 JsonNode amount = n.path("approved_amt");
                 String dtime = n.path("approved_dtime").asText(""); // yyyyMMddHHmmss
-                if (merchant.isBlank() || !amount.isIntegralNumber() || !amount.canConvertToLong()
+                // NUL 은 DB text 가 거부해 가져오기 전체가 500 으로 롤백됐다(G-86 g).
+                if (merchant.isBlank() || merchant.indexOf('\0') >= 0 || !amount.isIntegralNumber() || !amount.canConvertToLong()
                         || amount.longValue() < 0 || !"KRW".equals(n.path("currency_code").asText())
                         || !dtime.matches("[0-9]{14}")) {
                     throw ApiException.requiredMissing("approved_list", "결제 항목 형식 오류(merchant_name·approved_amt·approved_dtime).");

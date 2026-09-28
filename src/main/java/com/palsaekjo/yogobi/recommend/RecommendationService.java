@@ -141,7 +141,8 @@ public class RecommendationService {
         java.util.Optional<CandidatePlan> currentPlan = findCurrentPlan(optional);
         String currentCarrier = currentCarrier(optional, currentPlan);
 
-        long dataMb = (long) required.monthlyDataGb() * MB_PER_GB;
+        // 무제한(999,999MB)을 넘는 요청은 무제한으로 읽는다. 넘기면 무제한 요금제까지 걸러졌다(G-86 d).
+        long dataMb = Math.min((long) required.monthlyDataGb() * MB_PER_GB, UNLIMITED_DATA_MB);
         List<CandidatePlan> candidates = catalog.findCandidatePlans(dataMb, networkType);
         if (candidates.isEmpty()) {
             if (recordGaps) gaps.record(Kind.MOBILE_PLAN, "dataMb>=" + dataMb + ",network=" + (networkType == null ? "ANY" : networkType));
@@ -340,7 +341,10 @@ public class RecommendationService {
 
         // 계산기는 사용자가 카탈로그에서 고른 ID를 받는다 — 없는 ID는 결손이 아니라 잘못된 요청이라 400 그대로다.
         // 다만 해외 결제 등급은 위에서 걸러 안내로 싣는다.
-        List<MissingInput> missing = missingInputs(optional, currentCarrier, familyDiscount, List.of(), foreignPriced);
+        // 결합 할인이 빠졌으면 말한다 — 추천 경로와 같은 안내·순서(사실 먼저)다. 전엔 조용히 빠지고 FULL 이었다(G-86 c).
+        List<MissingInput> missing = new ArrayList<>();
+        addFamilyBundleCarrierNotice(missing, familyDiscount, currentCarrier, List.of(result));
+        missing.addAll(missingInputs(optional, currentCarrier, familyDiscount, List.of(), foreignPriced));
         Accuracy accuracy = missing.isEmpty() ? Accuracy.FULL : Accuracy.PARTIAL;
         return new CalculatorResponse(accuracy, missing, result);
     }

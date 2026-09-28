@@ -33,6 +33,8 @@ public class UserSubscriptionService {
                 date(rs, 5), date(rs, 6)), userId);
     }
 
+    static final int MAX_PER_MEMBER = 100;
+
     @Transactional
     public View add(long userId, Long tierId, Long monthlyPrice) {
         if (tierId == null) {
@@ -47,6 +49,12 @@ public class UserSubscriptionService {
         }
         if (jdbc.queryForObject("SELECT count(*) FROM subscription_tier WHERE id = ? AND active", Integer.class, tierId) == 0) {
             throw ApiException.requiredMissing("tierId", "지금은 없는 구독이에요. 구독을 다시 골라 주세요.");
+        }
+        // 회원당 상한(G-86 i). 회원 행을 잠가 동시 추가가 상한을 함께 넘지 못하게 한다.
+        jdbc.queryForList("SELECT id FROM app_user WHERE id = ? FOR UPDATE", userId);
+        if (jdbc.queryForObject("SELECT count(*) FROM user_subscription WHERE user_id = ?", Integer.class, userId)
+                >= MAX_PER_MEMBER) {
+            throw ApiException.conflict("구독은 " + MAX_PER_MEMBER + "개까지 등록할 수 있어요. 쓰지 않는 구독을 지운 뒤 추가해 주세요.");
         }
         long id = jdbc.queryForObject("""
                 INSERT INTO user_subscription (user_id, tier_id, monthly_price, started_at)

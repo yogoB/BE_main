@@ -1,6 +1,10 @@
 package com.palsaekjo.yogobi.common;
 
+import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.StreamReadConstraints;
+import com.fasterxml.jackson.databind.DeserializationContext;
+import com.fasterxml.jackson.databind.deser.std.StringDeserializer;
+import java.io.IOException;
 import org.springframework.boot.autoconfigure.jackson.Jackson2ObjectMapperBuilderCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -16,7 +20,24 @@ public class JsonLimits {
 
     @Bean
     Jackson2ObjectMapperBuilderCustomizer documentLengthLimit() {
-        return builder -> builder.postConfigurer(mapper -> mapper.getFactory().setStreamReadConstraints(
-                StreamReadConstraints.builder().maxDocumentLength(MAX_DOCUMENT_CHARS).build()));
+        return builder -> builder
+                .deserializerByType(String.class, new NoNulString())
+                .postConfigurer(mapper -> mapper.getFactory().setStreamReadConstraints(
+                        StreamReadConstraints.builder().maxDocumentLength(MAX_DOCUMENT_CHARS).build()));
+    }
+
+    /**
+     * NUL 문자는 Postgres text·jsonb 가 거부한다. 저장 단계에서 500 이 나고 쓰기 전체가 롤백됐다(G-86 g) —
+     * 제보·저장 결과 등 JSON 입구마다 따로 막는 대신 본문을 읽을 때 한 번 막는다. 실패는 기존 400 처리기로 간다.
+     */
+    static final class NoNulString extends StringDeserializer {
+        @Override
+        public String deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+            String value = super.deserialize(p, ctxt);
+            if (value != null && value.indexOf('\0') >= 0) {
+                return (String) ctxt.handleWeirdStringValue(String.class, value, "NUL 문자는 받지 않는다");
+            }
+            return value;
+        }
     }
 }

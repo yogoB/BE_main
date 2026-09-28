@@ -88,6 +88,19 @@ class MeApiTest {
         assertThat(added.getResponse().getContentAsString()).contains("monthlyPrice");
     }
 
+    /**
+     * G-86 i. 회원당 구독은 100개까지다. 상한이 없어 행이 쌓이면 변경 시점 계산의 IN 목록이 드라이버 한도를 넘어
+     * 500 이 났고, 그 전부터 추가·탐지가 매번 전체를 다시 읽었다. 사람이 쓰는 구독 수로는 닿지 않는 값이다.
+     */
+    @Test void g86i_subscriptionsHaveAPerMemberCeiling() throws Exception {
+        Browser a = new Browser(); long id = signup("many@example.com", a);
+        jdbc.update("INSERT INTO user_subscription(user_id,tier_id,monthly_price) SELECT ?,2,13500 FROM generate_series(1,100)", id);
+        var added = a.send(post("/api/v1/me/subscriptions").contentType("application/json")
+                .content("{\"tierId\":2,\"monthlyPrice\":13500}"));
+        assertThat(added.getResponse().getStatus()).isEqualTo(409);
+        assertThat(added.getResponse().getContentAsString()).contains("100개까지");
+    }
+
     @Test void addListDeleteSubscription() throws Exception {
         Browser a = new Browser(); signup("alice@example.com", a);
         var added = a.send(post("/api/v1/me/subscriptions").contentType("application/json")

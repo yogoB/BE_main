@@ -27,7 +27,9 @@ class MockMydataProviderTest {
                 wrap(payment("-1", "KRW", "20260914123000")),
                 wrap(payment("100", "USD", "20260914123000")),
                 wrap(payment("100", "KRW", "20260230123000")),
-                wrap(payment("100", "KRW", "20260914253000")))) {
+                wrap(payment("100", "KRW", "20260914253000")),
+                // G-86 g — DB text 는 NUL 을 받지 않는다. 저장 단계 500 + 가져오기 전체 롤백이던 것을 여기서 400 으로.
+                wrap(payment("100", "KRW", "20260914123000").replace("NETFLIX", "NET\\u0000FLIX")))) {
             assertThatThrownBy(() -> provider.parse(payload)).isInstanceOfSatisfying(ApiException.class,
                     error -> assertThat(error.status()).isEqualTo(400));
         }

@@ -1,6 +1,7 @@
 package com.palsaekjo.yogobi.recommend;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -57,6 +58,37 @@ class RecommendationApiTest {
                 INSERT INTO plan_benefit(mobile_plan_id,service_id,tier_id,benefit_type,is_exclusive,source_url,collected_at)
                 VALUES (1,1,NULL,'FREE',false,'http://seed','2026-09-08'),
                        (2,4,NULL,'FREE',false,'http://seed','2026-09-08')""");
+    }
+
+    /**
+     * G-86 d. 무제한은 카탈로그에서 999,999MB 다. 977GB 이상을 적으면 그 값을 넘어 <b>무제한 요금제까지 사라지고</b>
+     * "카탈로그에 없다"는 답과 값마다 새 결손 행이 남았다. 요청량은 무제한에서 멈춘다.
+     */
+    @Test
+    void moreThanUnlimitedStillFindsUnlimitedPlans_g86d() throws Exception {
+        jdbc.execute("""
+                INSERT INTO mobile_plan(id,carrier_id,name,network_type,base_price,data_mb,voice_min,sms_cnt,source_url,collected_at)
+                VALUES (4,1,'무제한플랜','FIVE_G',69000,999999,999999,9999,'http://seed','2026-09-08')""");
+        mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
+                {"required":{"monthlyDataGb":2000,"wantedServiceIds":[1]},"optional":{"contractType":"NONE"}}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.results[0].planName").value("무제한플랜"));
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM catalog_candidate WHERE kind='MOBILE_PLAN'", Long.class))
+                .isZero();
+    }
+
+    /** G-86 j. 기간이 끝난 혜택은 할인하지 않는다 — 넷플릭스 무료가 어제 끝났으면 넷플플랜은 정가다. */
+    @Test
+    void anExpiredBenefitNoLongerDiscounts_g86j() throws Exception {
+        jdbc.execute("UPDATE plan_benefit SET valid_to = (now() AT TIME ZONE 'Asia/Seoul')::date - 1 WHERE mobile_plan_id = 1");
+        mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
+                {"required":{"monthlyDataGb":20,"wantedServiceIds":[1]},"optional":{"contractType":"NONE"}}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.results[0].planName").value("웨이브플랜"))
+                .andExpect(jsonPath("$.data.results[1].monthlyTotal").value(55000 + 13500));
+        mvc.perform(get("/api/v1/catalog/plans/1/benefits"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(0));
     }
 
     @Test

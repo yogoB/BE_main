@@ -109,6 +109,35 @@ class PricingEdgeGoldenTest {
                 .singleElement().satisfies(l -> assertThat(l.value().provenance()).isEqualTo(Provenance.OFFICIAL));
     }
 
+    /** G-86 a. 등급 미상 포함은 금액을 바꾸지 않는다 — 혜택 꼬리표·DERIVED 를 달지 않고 사실만 적는다. */
+    @Test
+    void g86a_등급_미상_포함은_혜택으로_적지_않는다() {
+        var included = new PlanBenefit(NETFLIX, null, BenefitType.BUNDLE_INCLUDED, null, false, null);
+
+        var result = calculator.calculate(plan(List.of(included)), Set.of(T2), ctx(List.of()));
+
+        assertThat(result.lines()).filteredOn(l -> l.label().equals(T2.name())).singleElement().satisfies(l -> {
+            assertThat(l.value().amount().won()).isEqualTo(13_500);
+            assertThat(l.value().provenance()).isEqualTo(Provenance.OFFICIAL);
+            assertThat(l.note()).isEqualTo("요금제에 포함된 서비스예요 — 등급을 몰라 정가로 계산했어요");
+        });
+    }
+
+    /** G-86 b. 금액을 바꾸지 않는 포함 혜택이 뒤의 무료 혜택을 가리지 않는다. */
+    @Test
+    void g86b_포함_혜택이_무료_혜택을_가리지_않는다() {
+        var included = new PlanBenefit(NETFLIX, null, BenefitType.BUNDLE_INCLUDED, null, false, null);
+        var free = new PlanBenefit(NETFLIX, 2L, BenefitType.FREE, null, false, null);
+
+        var result = calculator.calculate(plan(List.of(included, free)), Set.of(T2), ctx(List.of()));
+
+        assertThat(result.effectiveMonthlyCost()).isEqualTo(50_000);
+        assertThat(result.lines()).filteredOn(l -> l.label().equals(T2.name())).singleElement().satisfies(l -> {
+            assertThat(l.value().provenance()).isEqualTo(Provenance.DERIVED);
+            assertThat(l.note()).isEqualTo("제휴 혜택 적용");
+        });
+    }
+
     /* ── 혜택 유형 네 가지 (PlanBenefit.apply) ──────────────────────────────── */
 
     @Test

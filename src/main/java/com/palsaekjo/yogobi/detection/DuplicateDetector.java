@@ -75,6 +75,10 @@ public final class DuplicateDetector {
     private static DetectionFinding waste(PlanBenefit benefit, ActiveSubscription sub) {
         String ref = "service:" + sub.serviceId();
         if (benefit.benefitType() == BenefitType.BUNDLE_INCLUDED) {
+            // 0원으로 적었으면 요금제로 받고 있는 것이다. "월 0원 낭비"는 경고가 아니다(G-86 e).
+            if (sub.monthlyAmount() == 0) {
+                return null;
+            }
             return new DetectionFinding(DetectionRule.BENEFIT_OVERLAP, ref, sub.monthlyAmount(),
                     benefit.tierId() == null ? Provenance.ESTIMATED : Provenance.DERIVED);
         }
@@ -96,6 +100,10 @@ public final class DuplicateDetector {
             }
             long total = entry.getValue().stream().mapToLong(ActiveSubscription::monthlyAmount).sum();
             long keep = entry.getValue().stream().mapToLong(ActiveSubscription::monthlyAmount).max().orElse(0);
+            // 나머지가 전부 0원이면 줄일 돈이 없다(G-86 f).
+            if (total == keep) {
+                continue;
+            }
             findings.add(DetectionFinding.derived(DetectionRule.TIER_DUPLICATE,
                     "service:" + entry.getKey(), total - keep));
         }

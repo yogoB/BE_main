@@ -165,6 +165,9 @@ public class SecurityConfig {
                                         || path.equals("/api/v1/recommendations/narrate")
                                         || path.equals("/api/v1/calculator")))
                                 limits.check("calc:" + clientKey(req), calcLimit);
+                            // CSRF 토큰 발급은 세션이 없으면 서버 세션을 새로 만든다. 새로 만드는 요청만 센다(G-86 h).
+                            if (path.equals("/api/v1/auth/csrf") && req.getSession(false) == null)
+                                limits.check("csrf:" + clientKey(req), ipLimit);
                             // 이벤트는 별도 버킷이다. 화면이 많이 보내도 추천 예산을 갉아먹지 않는다.
                             if ("POST".equals(req.getMethod()) && path.equals("/api/v1/events"))
                                 limits.check("evt:" + clientKey(req), calcLimit);

@@ -56,7 +56,7 @@ class DetectionControllerTest {
         assertThat(view.lines()).extracting(DetectionNarrator.Explained::amount)
                 .containsExactly("월 13,500원", "월 13,500원");
         assertThat(view.lines()).extracting(DetectionNarrator.Explained::how)
-                .containsOnly("더 비싼 등급 하나만 남기면 나머지가 줄어요.");
+                .containsOnly("더 비싼 등급 하나만 남기면 싼 등급 결제만큼 줄어요.");
         assertThat(view.summary()).isEmpty();
     }
 

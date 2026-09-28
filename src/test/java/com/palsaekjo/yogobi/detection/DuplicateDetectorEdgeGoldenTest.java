@@ -85,6 +85,23 @@ class DuplicateDetectorEdgeGoldenTest {
         assertThat(detector.detect(List.of(payingLess), List.of(discount), List.of())).isEmpty();
     }
 
+    /** G-86 e. 요금제에 포함된 서비스를 0원으로 적었으면(요금제로 받는 중) 버리는 돈이 없다 — "월 0원 낭비"를 말하지 않는다. */
+    @Test
+    void g86e_포함_서비스를_0원으로_쓰면_낭비가_아니다() {
+        var included = new PlanBenefit(TVING, null, BenefitType.BUNDLE_INCLUDED, null, false, null);
+        var viaPlan = new ActiveSubscription(TVING, 8L, "티빙(요금제 포함)", 0, 13_500);
+
+        assertThat(detector.detect(List.of(viaPlan), List.of(included), List.of())).isEmpty();
+    }
+
+    /** G-86 f. 같은 서비스 두 등급 중 하나가 0원이면 줄일 돈이 없다. */
+    @Test
+    void g86f_두_등급_중_하나가_0원이면_등급_중복_낭비가_아니다() {
+        var free = new ActiveSubscription(TVING, 6L, "티빙 광고형(무료 이벤트)", 0, 5_500);
+
+        assertThat(detector.detect(List.of(TVING_STD, free), List.of(), List.of())).isEmpty();
+    }
+
     /* ── 번들 겹침으로 보지 않아야 하는 것 ─────────────────────────────────── */
 
     /** G-26e. 번들 구성 등급을 <b>전부</b> 결제 중이 아니면 번들 낭비가 아니다. */

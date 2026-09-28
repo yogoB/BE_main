@@ -91,4 +91,26 @@ class CalculatorApiTest {
                 .andExpect(jsonPath("$.error.code").value("YGB-REQ-001"))
                 .andExpect(jsonPath("$.error.field").value("tierIds"));
     }
+
+    /** G-86 c. 가족결합 할인을 반영하지 못하면 계산기도 그 사실을 말한다 — 추천 경로와 같은 안내. */
+    @Test
+    void familyDiscountLeftOutIsTold_g86c() throws Exception {
+        // 통신사를 모른다 → 할인을 넣지 않았고, 어느 통신사인지 묻는다.
+        mvc.perform(post("/api/v1/calculator").contentType(MediaType.APPLICATION_JSON).content("""
+                {"planId":5,"tierIds":[6],"optional":{"contractType":"NONE","hasFamilyBundle":true,
+                 "familyBundleDiscountKrw":11000}}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.result.monthlyTotal").value(33333 + 5500))
+                .andExpect(jsonPath("$.data.accuracy").value("PARTIAL"))
+                .andExpect(jsonPath("$.data.missingInputs[?(@.field=='currentCarrier')].impact")
+                        .value(org.hamcrest.Matchers.hasItem(org.hamcrest.Matchers.containsString("11,000원은 이번 계산에 넣지 않았어요"))));
+        // 다른 통신사 요금제를 골랐다 → 결합이 풀린다고 말한다.
+        mvc.perform(post("/api/v1/calculator").contentType(MediaType.APPLICATION_JSON).content("""
+                {"planId":5,"tierIds":[6],"optional":{"contractType":"NONE","hasFamilyBundle":true,
+                 "familyBundleDiscountKrw":11000,"currentCarrier":"KT"}}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.accuracy").value("PARTIAL"))
+                .andExpect(jsonPath("$.data.missingInputs[?(@.field=='familyBundleDiscountKrw')].impact")
+                        .value(org.hamcrest.Matchers.hasItem(org.hamcrest.Matchers.containsString("KT 요금제에만 반영했어요"))));
+    }
 }

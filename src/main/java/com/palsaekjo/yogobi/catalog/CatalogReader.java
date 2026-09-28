@@ -113,7 +113,8 @@ public class CatalogReader {
                 SELECT b.service_id, s.name AS service_name, b.tier_id, b.benefit_type,
                        b.discount_value, b.is_exclusive, b.exclusive_group
                 FROM plan_benefit b JOIN subscription_service s ON s.id = b.service_id
-                WHERE b.mobile_plan_id = :id ORDER BY b.id
+                WHERE b.mobile_plan_id = :id AND """ + BENEFIT_IN_EFFECT.replace("valid_", "b.valid_") + """
+                ORDER BY b.id
                 """, new MapSqlParameterSource("id", planId), (rs, i) -> new BenefitView(
                 rs.getLong("service_id"), rs.getString("service_name"), rs.getObject("tier_id", Long.class),
                 rs.getString("benefit_type"), rs.getBigDecimal("discount_value"),
@@ -494,12 +495,20 @@ public class CatalogReader {
         return found;
     }
 
+    /**
+     * 기간이 적힌 혜택은 그 기간에만 쓴다(G-86 j). 칼럼은 V1 부터 있었는데 아무도 읽지 않아, 끝난 혜택이
+     * 계속 할인하고 그 요금제를 1순위로 올릴 수 있었다. 날짜는 한국 기준 — DB 시계는 UTC 다.
+     */
+    private static final String BENEFIT_IN_EFFECT = """
+            (valid_from IS NULL OR valid_from <= (now() AT TIME ZONE 'Asia/Seoul')::date)
+            AND (valid_to IS NULL OR valid_to >= (now() AT TIME ZONE 'Asia/Seoul')::date)""";
+
     private Map<Long, List<PlanBenefit>> loadBenefits(List<Long> planIds) {
         var byPlan = new LinkedHashMap<Long, List<PlanBenefit>>();
         jdbc.query("""
                 SELECT mobile_plan_id, service_id, tier_id, benefit_type, discount_value,
                        is_exclusive, exclusive_group
-                FROM plan_benefit WHERE mobile_plan_id IN (:planIds)
+                FROM plan_benefit WHERE mobile_plan_id IN (:planIds) AND """ + BENEFIT_IN_EFFECT + """
                 """, new MapSqlParameterSource("planIds", planIds), rs -> {
             var benefit = new PlanBenefit(
                     rs.getLong("service_id"),

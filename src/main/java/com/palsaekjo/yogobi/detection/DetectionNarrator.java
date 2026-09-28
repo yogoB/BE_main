@@ -20,7 +20,7 @@ public interface DetectionNarrator {
             com.palsaekjo.yogobi.common.DetectionRule.BENEFIT_OVERLAP, new String[] {
                     "요금제에 포함된 구독을 따로 결제 중", "요금제 혜택으로 이미 제공돼요. 개별 결제를 해지하면 그만큼 줄어요."},
             com.palsaekjo.yogobi.common.DetectionRule.TIER_DUPLICATE, new String[] {
-                    "같은 서비스를 두 등급으로 결제 중", "더 비싼 등급 하나만 남기면 나머지가 줄어요."},
+                    "같은 서비스를 두 등급으로 결제 중", "더 비싼 등급 하나만 남기면 싼 등급 결제만큼 줄어요."},
             com.palsaekjo.yogobi.common.DetectionRule.BUNDLE_OVERLAP, new String[] {
                     "묶음 상품이 더 싼 조합", "개별 결제 합계가 묶음 상품보다 비싸요. 묶음으로 바꾸면 그만큼 줄어요."});
 

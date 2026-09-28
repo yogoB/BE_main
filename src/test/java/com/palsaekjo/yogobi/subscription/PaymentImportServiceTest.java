@@ -82,6 +82,21 @@ class PaymentImportServiceTest {
         assertThat(jdbc.queryForObject("SELECT service_id FROM payment_record WHERE merchant_raw='배달의민족'", Long.class)).isNull();
     }
 
+    /** G-86 k. 매달 같은 가맹점은 "무엇인지 알려 주세요" 목록에 한 번만 나온다 — 1년 치를 올리면 12번 떴다. */
+    @Test void aMonthlyUnknownMerchantIsAskedOnce() {
+        long userId = jdbc.queryForObject(
+                "INSERT INTO app_user(email,password_hash,email_verified) VALUES ('m@example.com','x',TRUE) RETURNING id", Long.class);
+        String row = "{\"status\":\"01\",\"merchant_name\":\"동네헬스\",\"approved_amt\":50000,"
+                + "\"currency_code\":\"KRW\",\"approved_dtime\":\"2026%02d01120000\"}";
+        String year = "{\"approved_list\":[" + String.join(",",
+                java.util.stream.IntStream.rangeClosed(1, 12).mapToObj(m -> String.format(row, m)).toList()) + "]}";
+
+        var result = service.importPayments(userId, provider, year);
+
+        assertThat(result.imported()).isEqualTo(12);
+        assertThat(result.unrecognized()).containsExactly("동네헬스");
+    }
+
     @Test void reimportingSameFileAddsNothing() {
         long userId = jdbc.queryForObject(
                 "INSERT INTO app_user(email,password_hash,email_verified) VALUES ('b@example.com','x',TRUE) RETURNING id", Long.class);

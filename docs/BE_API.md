@@ -131,6 +131,7 @@ AI 연결과 내부 인증은 BE가 담당하며 프론트에는 AI 주소·내�
 ```
 
 - `field`는 입력 검증 오류일 때만 채워지고, 아니면 `null`.
+- JSON 본문의 문자열에 **NUL 문자(`\u0000`)** 가 있으면 본문을 읽지 않고 **400** `YGB-REQ-001`(G-86 g). DB 가 저장하지 못하는 값이다.
 
 ### 에러 코드
 
@@ -454,7 +455,7 @@ JWT 절대 수명 24시간·유휴 제한 2시간(refresh 없음, D-48). 상태�
 | Method | Path | 요청 | 응답 |
 |---|---|---|---|
 | GET | `/oauth2/authorization/google` → `/login/oauth2/code/google` | — | **유일한 가입·로그인 경로.** 완료 후 `AUTH_RETURN_URL#auth=success\|failed\|account-conflict` 로 리다이렉트 |
-| GET | `/api/v1/auth/csrf` | — | `{headerName,token}` — 공개. 헤더 이름은 `X-CSRF-TOKEN` |
+| GET | `/api/v1/auth/csrf` | — | `{headerName,token}` — 공개. 헤더 이름은 `X-CSRF-TOKEN`. 세션이 없어 새로 만드는 호출만 IP 한도로 세며 넘으면 **429**(G-86 h) |
 | POST | `/api/v1/auth/consent` | `{age14,terms,privacy,savingsAlerts,marketing}`, CSRF | `{accepted:true}`. 앞의 3개가 `true`여야 하며 같은 세션에서만 OAuth 시작 가능 |
 | POST | `/api/v1/auth/logout` | 인증+CSRF | `{loggedOut:true}` — 현재 로그인만 폐기 |
 | POST | `/api/v1/auth/logout-all` | 인증+CSRF | `{loggedOut:true}` — 이 회원의 모든 로그인 폐기 |
@@ -495,6 +496,7 @@ JWT 절대 수명 24시간·유휴 제한 2시간(refresh 없음, D-48). 상태�
 
 **POST** 요청 `{ "tierId": 2, "monthlyPrice": 13500 }` → 응답 200 `data`는 생성된 구독 1건(위 View 형태).
 `tierId` 누락·미존재, `monthlyPrice` null·음수·**10,000,000 초과** → **400** `YGB-REQ-001`(G-76 d).
+이미 **100개**면 **409** `YGB-CAT-002` "100개까지"(G-86 i).
 
 **DELETE** `/subscriptions/{id}` → 응답 200 `{ "data": { "removed": true } }`.
 없거나 남의 구독이면 **404** `YGB-SUB-404`.
@@ -518,7 +520,7 @@ JWT 절대 수명 24시간·유휴 제한 2시간(refresh 없음, D-48). 상태�
 ```
 
 - `imported` **이번에 새로 저장된** 건수(취소 제외), `recognized` 그중 가맹점→서비스 매칭 성공 건수.
-- 미인식 가맹점은 `service_id=null`로 저장하고 `unrecognized`로 되돌려 **사용자에게 확인**을 요청한다(추측 매핑 금지).
+- 미인식 가맹점은 `service_id=null`로 저장하고 `unrecognized`로 되돌려 **사용자에게 확인**을 요청한다(추측 매핑 금지). 같은 가맹점은 **한 번만** 싣는다(G-86 k).
 - 형식 오류는 **400** `YGB-REQ-001`이며 전체 입력을 저장하지 않는다(부분 저장 없음).
 - **상한(G-76)**: 본문 1MB(`field=payload`)·항목 1,000건·가맹점명 200자(`field=approved_list`)를 넘으면 **400** — 문구는 "기간을 나눠 올려 주세요"처럼 다음 행동을 말한다.
 - **재업로드는 중복을 만들지 않는다.** (회원, 가맹점 원문, 금액, 결제일, 출처)가 같으면 같은 결제로 보고 건너뛴다.

@@ -53,6 +53,15 @@ class ServiceReportTest {
                 .contentType("application/json").content(body);
     }
 
+    /** G-86 g. NUL 문자는 DB text 가 거부한다 — 저장 단계 500 이던 것을 본문을 읽을 때 400 으로. 모든 JSON 입구에 걸린다. */
+    @Test void nulCharacterIs400NotServerError() throws Exception {
+        mvc.perform(report("""
+                {"category":"SYSTEM","description":"다음 버튼이\\u0000안 눌려요","pageUrl":"/results"}"""))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("YGB-REQ-001"));
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM service_report", Long.class)).isZero();
+    }
+
     @Test void guestCanReportWithCsrfAndNobodyCanRead() throws Exception {
         mvc.perform(post("/api/v1/reports").contentType("application/json").content(BODY)).andExpect(status().isForbidden());
         mvc.perform(report(BODY)).andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("PENDING"));

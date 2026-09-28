@@ -286,6 +286,19 @@ class AuthSecurityTest {
      * 비밀번호 추측 제한은 D-34 로 사라졌다 — 추측할 비밀번호가 없다. IP 제한은 남고, 이제 그 제한이 걸리는
      * 곳은 **로그인 입구 자체**다. X-Forwarded-For 를 바꿔도 같은 발신지로 센다.
      */
+    /**
+     * G-86 h. CSRF 토큰 발급은 세션이 없으면 <b>서버 세션을 새로 만든다</b> — 인증도 한도도 없어 루프 하나로
+     * 메모리 세션을 무한히 쌓을 수 있었다. 새 세션을 만드는 요청만 센다. 세션이 있는 브라우저는 세지 않는다.
+     */
+    @Test void csrfTokenCallsThatCreateSessionsAreLimited() throws Exception {
+        MvcResult first = mvc.perform(get("/api/v1/auth/csrf")).andExpect(status().isOk()).andReturn();
+        var session = (org.springframework.mock.web.MockHttpSession) first.getRequest().getSession(false);
+        for (int i = 1; i < 40; i++) mvc.perform(get("/api/v1/auth/csrf")).andExpect(status().isOk());
+        mvc.perform(get("/api/v1/auth/csrf")).andExpect(status().isTooManyRequests());
+        // 이미 세션이 있는 사용자는 한도와 상관없이 토큰을 다시 받는다.
+        mvc.perform(get("/api/v1/auth/csrf").session(session)).andExpect(status().isOk());
+    }
+
     @Test void ipRateLimitCountsTheRealPeerAndIgnoresForwardedForSpoofing() throws Exception {
         // 동의 POST + OAuth GET 이 로그인 한 번에 두 번 센다. 운영 상한은 2000이고 테스트만 40으로 낮춘다.
         for (int i = 0; i < 20; i++) start(new Browser());

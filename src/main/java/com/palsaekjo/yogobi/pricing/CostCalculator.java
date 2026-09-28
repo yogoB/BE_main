@@ -1,5 +1,7 @@
 package com.palsaekjo.yogobi.pricing;
 
+import com.palsaekjo.yogobi.common.BenefitType;
+
 import com.palsaekjo.yogobi.common.Accuracy;
 import com.palsaekjo.yogobi.common.Provenance;
 import com.palsaekjo.yogobi.pricing.domain.BundleProduct;
@@ -103,7 +105,9 @@ public final class CostCalculator {
         for (SubscriptionTier tier : remaining.values()) {
             PlanBenefit benefit = findApplicableBenefit(plan, tier, exclusiveWinnerTierIds);
             long cost = benefit == null ? tier.listPrice() : benefit.apply(tier.listPrice());
-            String note = benefit == null ? null : "제휴 혜택 적용";
+            // 등급 미상 포함은 금액을 바꾸지 않는다(§3). 혜택처럼 적지 않고 사실만 적는다(G-86 a).
+            String note = benefit != null ? "제휴 혜택 적용"
+                    : includedWithUnknownTier(plan, tier) ? "요금제에 포함된 서비스예요 — 등급을 몰라 정가로 계산했어요" : null;
             // 혜택이 깎은 금액은 공시가가 아니라 공시가에서 계산한 값이다(원칙 4, G-73 e).
             lines.add(new CostLine(tier.name(),
                     new ValuedAmount(Money.of(cost), benefit == null ? Provenance.OFFICIAL : Provenance.DERIVED), note));
@@ -135,6 +139,11 @@ public final class CostCalculator {
         return new HashSet<>(winnerTierIdByGroup.values());
     }
 
+    private static boolean includedWithUnknownTier(MobilePlan plan, SubscriptionTier tier) {
+        return plan.benefits().stream()
+                .anyMatch(b -> b.benefitType() == BenefitType.BUNDLE_INCLUDED && b.matches(tier));
+    }
+
     private PlanBenefit findApplicableBenefit(MobilePlan plan, SubscriptionTier tier,
             Set<Long> exclusiveWinnerTierIds) {
         for (PlanBenefit benefit : plan.benefits()) {
@@ -142,6 +151,10 @@ public final class CostCalculator {
                 continue;
             }
             if (benefit.exclusive() && !exclusiveWinnerTierIds.contains(tier.id())) {
+                continue;
+            }
+            // 금액을 바꾸지 않는 포함 표시가 뒤의 무료·할인 혜택을 가리지 않게 건너뛴다(G-86 b).
+            if (benefit.benefitType() == BenefitType.BUNDLE_INCLUDED) {
                 continue;
             }
             return benefit;

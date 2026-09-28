@@ -5,7 +5,6 @@ import com.palsaekjo.yogobi.common.MatchType;
 import com.palsaekjo.yogobi.subscription.domain.MerchantAlias;
 import com.palsaekjo.yogobi.subscription.port.PaymentHistoryProvider;
 import java.sql.Date;
-import java.util.ArrayList;
 import java.util.List;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -48,7 +47,8 @@ public class PaymentImportService {
 
         int imported = 0;
         int recognized = 0;
-        var unrecognized = new ArrayList<String>();
+        // 매달 같은 가맹점은 한 번만 묻는다 — 1년 치면 12번 떴다(G-86 k).
+        var unrecognized = new java.util.LinkedHashSet<String>();
         for (var p : payments) {
             Long serviceId = normalizer.resolve(p.merchantRaw(), aliases).orElse(null);
             // 이미 있는 결제(같은 자연키, V8)는 조용히 건너뛴다 — 응답의 세 값은 "이번에 새로 저장된 것"만 센다.
@@ -67,6 +67,6 @@ public class PaymentImportService {
                 unrecognized.add(p.merchantRaw());
             }
         }
-        return new Result(imported, recognized, unrecognized);
+        return new Result(imported, recognized, List.copyOf(unrecognized));
     }
 }
