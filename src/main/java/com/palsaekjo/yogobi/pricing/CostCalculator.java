@@ -141,7 +141,9 @@ public final class CostCalculator {
 
     private static boolean includedWithUnknownTier(MobilePlan plan, SubscriptionTier tier) {
         return plan.benefits().stream()
-                .anyMatch(b -> b.benefitType() == BenefitType.BUNDLE_INCLUDED && b.matches(tier));
+                // "등급을 몰라"는 등급 미지정일 때만 참이고, 택1 묶음은 하나만 고를 수 있어 "포함"이라 단정하지 않는다.
+                .anyMatch(b -> b.benefitType() == BenefitType.BUNDLE_INCLUDED && b.tierId() == null && !b.exclusive()
+                        && b.matches(tier));
     }
 
     private PlanBenefit findApplicableBenefit(MobilePlan plan, SubscriptionTier tier,
@@ -165,7 +167,8 @@ public final class CostCalculator {
     // ponytail: 번들 대비 개별가 비교용 — 택1 경쟁은 무시한다(번들+택1 동시 케이스는 골든 케이스 없음).
     private long individualCost(MobilePlan plan, SubscriptionTier tier) {
         for (PlanBenefit benefit : plan.benefits()) {
-            if (benefit.matches(tier)) {
+            // 최종 금액(findApplicableBenefit)과 같은 규칙 — 포함 표시가 뒤의 무료 혜택을 가리면 번들 비교가 어긋난다(G-86 b′).
+            if (benefit.matches(tier) && benefit.benefitType() != BenefitType.BUNDLE_INCLUDED) {
                 return benefit.apply(tier.listPrice());
             }
         }

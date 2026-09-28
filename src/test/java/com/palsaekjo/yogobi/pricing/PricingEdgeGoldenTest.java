@@ -138,6 +138,31 @@ class PricingEdgeGoldenTest {
         });
     }
 
+    /** G-86 b′. 번들 비교도 같은 규칙이다 — 포함 표시 뒤의 무료 혜택을 보고 번들을 쓰지 않는다. */
+    @Test
+    void g86b2_번들_비교도_포함_혜택_뒤의_무료_혜택을_본다() {
+        var included = new PlanBenefit(NETFLIX, null, BenefitType.BUNDLE_INCLUDED, null, false, null);
+        var free = new PlanBenefit(NETFLIX, 2L, BenefitType.FREE, null, false, null);
+        var bundle = new BundleProduct(9, "넷플릭스×티빙 묶음", 15_000, Set.of(2L, 8L));
+
+        var result = calculator.calculate(plan(List.of(included, free)), Set.of(T2, T8), ctx(List.of(bundle)));
+
+        // 개별: 넷플릭스 0 + 티빙 13,500 = 13,500 < 번들 15,000 → 번들을 쓰지 않는다.
+        assertThat(result.lines()).noneMatch(l -> l.label().equals(bundle.name()));
+        assertThat(result.effectiveMonthlyCost()).isEqualTo(50_000 + 13_500);
+    }
+
+    /** G-86 a′. 등급을 지정한 포함·택1 포함에는 "등급을 몰라" 꼬리표를 달지 않는다 — 사실이 아니다. */
+    @Test
+    void g86a2_등급_지정_또는_택1_포함에는_등급_미상_꼬리표가_없다() {
+        for (var benefit : List.of(new PlanBenefit(NETFLIX, 2L, BenefitType.BUNDLE_INCLUDED, null, false, null),
+                new PlanBenefit(NETFLIX, null, BenefitType.BUNDLE_INCLUDED, null, true, "OTT"))) {
+            var result = calculator.calculate(plan(List.of(benefit)), Set.of(T2), ctx(List.of()));
+            assertThat(result.lines()).filteredOn(l -> l.label().equals(T2.name())).singleElement()
+                    .satisfies(l -> assertThat(l.note()).isNull());
+        }
+    }
+
     /* ── 혜택 유형 네 가지 (PlanBenefit.apply) ──────────────────────────────── */
 
     @Test

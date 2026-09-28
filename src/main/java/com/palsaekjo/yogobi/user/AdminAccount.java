@@ -87,15 +87,20 @@ public class AdminAccount implements ApplicationRunner {
      * 아이디·비밀번호 확인. 실패는 회원 로그인과 같은 401 이며 아이디 존재 여부를 구분해 알리지 않는다.
      * 같은 아이디에 대한 시도 횟수를 제한한다(무차별 대입 방어).
      */
+    /** 백오피스 로그인 실패. 회원의 "로그인이 끝났어요"와 달리 무엇을 확인할지 말한다 — 존재 여부는 여전히 가리지 않는다. */
+    private static ApiException wrongCredentials() {
+        return new ApiException("YGB-AUTH-001", 401, "아이디 또는 비밀번호를 확인해 주세요.", null);
+    }
+
     public AuthService.Member login(String rawId, String rawPassword) {
-        if (!configured()) throw AuthService.unauthorized();
+        if (!configured()) throw wrongCredentials();
         String attempted = rawId == null ? "" : rawId.strip();
         limits.check("admin:" + attempted, 10);
         long adminId = id.get();
-        if (adminId == 0 || !loginId.equals(attempted)) throw AuthService.unauthorized();
+        if (adminId == 0 || !loginId.equals(attempted)) throw wrongCredentials();
         String hash = jdbc.queryForObject("SELECT password_hash FROM app_user WHERE id = ?", String.class, adminId);
         if (hash == null || rawPassword == null || !passwords.matches(rawPassword, hash))
-            throw AuthService.unauthorized();
+            throw wrongCredentials();
         return jdbc.queryForObject("""
                 SELECT id, email, name, nickname, credential_version FROM app_user WHERE id = ?""",
                 (rs, i) -> new AuthService.Member(rs.getLong(1), rs.getString(2), rs.getString(3), rs.getString(4),

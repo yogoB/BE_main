@@ -86,7 +86,7 @@ public class CatalogChangeRequests {
                 case UPDATE -> store.update(dataset, key, read(request), approverId, trace);
                 case DELETE -> store.delete(dataset, key, approverId, trace);
             }
-        } catch (RuntimeException e) {
+        } catch (RuntimeException | Error e) {   // 먼저 APPROVED 로 닫았으니 어떤 실패든 FAILED 로 돌려놓는다
             jdbc.update("UPDATE catalog_change_request SET status = 'FAILED', decision_note = ? WHERE id = ? AND status = 'APPROVED'",
                     cut(e.getMessage()), requestId);
             throw e;

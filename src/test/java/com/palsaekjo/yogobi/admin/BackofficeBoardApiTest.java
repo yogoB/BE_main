@@ -104,6 +104,20 @@ class BackofficeBoardApiTest {
         loginAsAdmin();   // 여전히 들어온다
     }
 
+    /** G-86 g′·G-88 f. 운영 메모의 NUL 은 400, 관리자 비밀번호가 틀리면 "로그인이 끝났어요"가 아니라 확인할 것을 말한다. */
+    @Test
+    void adminNoteNulIs400AndWrongPasswordSaysWhatToCheck() throws Exception {
+        jdbc.update("INSERT INTO catalog_candidate(kind, query_text, status, requested_cnt) VALUES ('MOBILE_PLAN', 'carrier:널문자', 'REQUESTED', 1)");
+        long id = jdbc.queryForObject("SELECT id FROM catalog_candidate WHERE query_text = 'carrier:널문자'", Long.class);
+        send(post("/api/v1/admin/gaps/{id}", id).with(r -> { r.setMethod("PATCH"); return r; })
+                .contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"IN_PROGRESS\",\"note\":\"a\\u0000b\"}"), loginAsAdmin())
+                .andExpect(status().isBadRequest());
+        send(post("/api/v1/admin/login").contentType(MediaType.APPLICATION_JSON)
+                .content(JSON.writeValueAsBytes(Map.of("id", "yogogo", "password", "wrong"))), new Cookie[0])
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.message").value("아이디 또는 비밀번호를 확인해 주세요."));
+    }
+
     /** G-38 c — 제보에 처리 메모가 붙고, 목록에 메모와 갱신 시각이 보인다. */
     @Test
     void reportNoteIsStoredAndListed() throws Exception {

@@ -1845,7 +1845,7 @@ G-71 이 남긴 한계를 닫는다. KB리브모바일 페이지는 `기본료 �
 
 ## G-86. 5차 감사 — 보이는 말과 계산이 어긋나는 곳 (2026-09-28)
 
-**검증**: `PricingEdgeGoldenTest` (a·b) · `CalculatorApiTest` (c) · `RecommendationApiTest` (d·j) · `DuplicateDetectorEdgeGoldenTest` (e·f) · `ServiceReportTest`·`MockMydataProviderTest` (g) · `AuthSecurityTest` (h) · `MeApiTest` (i) · `PaymentImportServiceTest` (k)
+**검증**: `PricingEdgeGoldenTest` (a·b·a′·b′) · `CalculatorApiTest` (c) · `RecommendationApiTest` (d·j) · `DuplicateDetectorEdgeGoldenTest` (e·f) · `ServiceReportTest`·`MockMydataProviderTest` (g) · `AuthSecurityTest` (h) · `MeApiTest` (i) · `PaymentImportServiceTest` (k) · `BackofficeBoardApiTest` (g′)
 
 ### a·b. `BUNDLE_INCLUDED` 는 혜택으로 적지 않는다
 
@@ -1857,6 +1857,8 @@ G-71 이 남긴 한계를 닫는다. KB리브모바일 페이지는 `기본료 �
 |---|---|---|
 | a | 요금제 혜택이 넷플릭스 `BUNDLE_INCLUDED`(등급 미상) 하나 | 넷플릭스 줄 **13,500원 · `OFFICIAL`**, 꼬리표는 "요금제에 포함된 서비스예요 — 등급을 몰라 정가로 계산했어요" |
 | b | 같은 등급에 `BUNDLE_INCLUDED` 다음 `FREE` | **0원 · `DERIVED` · "제휴 혜택 적용"** — 금액을 바꾸는 혜택이 이긴다 |
+| a′ | 등급을 지정한 `BUNDLE_INCLUDED` / 택1 묶음의 `BUNDLE_INCLUDED` | 꼬리표 **없음** — "등급을 몰라"·"포함"이 사실이 아니다 |
+| b′ | b 의 요금제 + 넷플릭스·티빙 번들 15,000원 | 번들 비교도 무료 혜택을 본다 → 개별 13,500 < 15,000 이라 **번들 안 씀** |
 
 ### c. 계산기도 가족결합 할인이 빠진 것을 말한다
 
@@ -1888,6 +1890,7 @@ G-71 이 남긴 한계를 닫는다. KB리브모바일 페이지는 `기본료 �
 | | 입력 | 정답 |
 |---|---|---|
 | g | JSON 문자열·결제내역 가맹점에 **NUL 문자** | **400** — 전엔 Postgres 가 저장 단계에서 거부해 500, 쓰기 전체 롤백 |
+| g′ | `JsonNode` 로 받는 운영 메모(결손·제보 보드)에 NUL | **400** — 이 경로는 문자열 역직렬화를 거치지 않아 따로 막는다(`BackofficeBoardApiTest`) |
 | h | 세션 없이 `GET /auth/csrf` 반복 | 새 세션을 만드는 요청만 IP 한도(`ip-limit`)로 센다 → 넘으면 **429**. 세션이 있으면 세지 않는다 |
 | i | 구독이 이미 100개인 회원이 하나 더 | **409** "100개까지" — 전엔 상한이 없어 변경 시점 계산이 드라이버 IN 한도에서 500 |
 | j | `plan_benefit.valid_to` 가 어제 | 그 혜택은 계산에도 요금제 혜택 목록에도 **쓰지 않는다**(한국 날짜 기준) |

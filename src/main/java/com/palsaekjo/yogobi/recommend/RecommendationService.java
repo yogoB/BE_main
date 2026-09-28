@@ -149,7 +149,8 @@ public class RecommendationService {
             // 사실과 바꿀 조건을 먼저 말한다. 선택약정·가족결합·통신사를 알려 줘도 요금제가 생기지 않으니 묻지 않는다(G-87 a).
             var noPlan = new ArrayList<MissingInput>();
             noPlan.add(new MissingInput("monthlyDataGb",
-                    "데이터 " + required.monthlyDataGb() + "GB 이상" + (networkType == null ? "" : "·" + displayNetwork(networkType)) + " 요금제를 찾지 못했어요",
+                    (required.monthlyDataGb() >= RecommendationStats.UNLIMITED_GB ? "데이터 무제한"
+                            : "데이터 " + required.monthlyDataGb() + "GB 이상") + (networkType == null ? "" : "·" + displayNetwork(networkType)) + " 요금제를 찾지 못했어요",
                     networkType == null ? "데이터 사용량을 줄여서 다시 찾아보세요"
                             : "데이터 사용량을 줄이거나 통신 규격을 '상관없어요'로 두고 다시 찾아보세요"));
             addAgeRestrictionNotice(noPlan, dataMb, networkType);

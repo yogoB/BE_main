@@ -63,6 +63,8 @@ public class GapBoardController {
         if (status == null || !STATUSES.contains(status)) throw ApiException.requiredMissing("status", "상태를 확인해 주세요.");
         String note = body.hasNonNull("note") ? body.get("note").asText() : null;
         if (note != null && note.length() > 1000) throw ApiException.requiredMissing("note", "메모는 1,000자까지예요.");
+        // JsonNode 본문은 문자열 NUL 방어(JsonLimits)를 거치지 않는다. DB text 가 거부해 500 이 났다(G-86 g).
+        if (note != null && note.indexOf('\0') >= 0) throw ApiException.requiredMissing("note", "메모에 쓸 수 없는 문자가 있어요.");
         int updated = body.hasNonNull("note")
                 ? jdbc.update("UPDATE catalog_candidate SET status = ?, note = NULLIF(?, ''), updated_at = now() WHERE id = ?", status, note, id)
                 : jdbc.update("UPDATE catalog_candidate SET status = ?, updated_at = now() WHERE id = ?", status, id);
