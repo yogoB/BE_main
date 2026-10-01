@@ -71,4 +71,11 @@ class SwitchTimingGoldenTest {
         assertThat(r.status()).isEqualTo(Status.NO_BENEFIT);
         assertThat(r.monthlySavings()).isEqualTo(5_000);   // 특가 동안의 월 절감은 그대로 싣는다
     }
+
+    /** 특가 뒤 금액을 모르면(정상가 미상) 예전처럼 월로만 센다 — 모르는 값을 지어내지 않는다. */
+    @Test void g11k_unknownAfterPromoFallsBackToMonthly() {
+        var r = SwitchTiming.evaluate(50_000, 5_000, 12, 6, null);
+        assertThat(r.paybackMonths()).isEqualTo(10);
+        assertThat(r.status()).isEqualTo(Status.SWITCH_NOW);
+    }
 }
