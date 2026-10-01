@@ -58,8 +58,21 @@ public final class SwitchTiming {
             paybackMonths = Math.addExact(promoMonths, Math.toIntExact(Math.ceilDiv(left, afterSavings)));
         }
         // 약정 잔여 0 = 기다릴 대상이 없다. 비교만 쓰면 "회수 4 < 잔여 0"이 거짓이라 끝난 약정을 기다리게 된다(G-11 g).
-        Status status = remainingContractMonths == 0 || paybackMonths < remainingContractMonths
+        // 회수개월은 올림이라 "회수 = 잔여" 인 달엔 쌓인 절감이 비용을 넘을 수도 같을 수도 있다. 그 경계만 실제 합으로
+        // 가린다 — 전엔 `회수 < 잔여` 만 봐서 한 달 치 절감만큼 이득인데도 기다리라고 했다(G-11 l·m·n).
+        boolean gainsBeforeExpiry = paybackMonths < remainingContractMonths
+                || (paybackMonths == remainingContractMonths
+                    && savedBy(remainingContractMonths, monthlySavings, promoMonths, afterSavings) > switchingCost);
+        Status status = remainingContractMonths == 0 || gainsBeforeExpiry
                 ? Status.SWITCH_NOW : Status.WAIT_UNTIL_EXPIRY;
         return new Result(switchingCost, monthlySavings, paybackMonths, remainingContractMonths, status);
+    }
+
+    /** months 개월 동안 쌓이는 절감. 특가가 있으면 두 구간이다(회수개월 계산과 같은 모델). */
+    private static long savedBy(int months, long monthlySavings, Integer promoMonths, Long afterSavings) {
+        if (promoMonths == null || afterSavings == null || months <= promoMonths)
+            return Math.multiplyExact((long) months, monthlySavings);
+        return Math.addExact(Math.multiplyExact((long) promoMonths, monthlySavings),
+                Math.multiplyExact((long) (months - promoMonths), afterSavings));
     }
 }

@@ -78,4 +78,38 @@ class SwitchTimingGoldenTest {
         assertThat(r.paybackMonths()).isEqualTo(10);
         assertThat(r.status()).isEqualTo(Status.SWITCH_NOW);
     }
+
+    /** G-11 l. 회수 4 = 잔여 4 — 만료까지 70,800원이 쌓여 비용 60,000원보다 10,800원 이득이다. 전엔 "기다리세요"였다. */
+    @Test void g11l_paybackEqualToRemainingStillGainsSwitchesNow() {
+        var r = SwitchTiming.evaluate(60_000, 17_700, 4);
+        assertThat(r.paybackMonths()).isEqualTo(4);
+        assertThat(r.status()).isEqualTo(Status.SWITCH_NOW);
+    }
+
+    /** G-11 m. 만료까지 쌓인 절감이 비용과 같으면 옮겨도 이득이 없다 — 기다린다. */
+    @Test void g11m_breakEvenAtExpiryWaits() {
+        var r = SwitchTiming.evaluate(70_800, 17_700, 4);
+        assertThat(r.paybackMonths()).isEqualTo(4);
+        assertThat(r.status()).isEqualTo(Status.WAIT_UNTIL_EXPIRY);
+    }
+
+    /** G-11 n. 특가 두 구간에서도 같은 경계: 30,000 + 10×2,000 = 50,000 > 49,000. */
+    @Test void g11n_promoBoundaryUsesAccumulatedSavings() {
+        var r = SwitchTiming.evaluate(49_000, 5_000, 16, 6, 2_000L);
+        assertThat(r.paybackMonths()).isEqualTo(16);
+        assertThat(r.status()).isEqualTo(Status.SWITCH_NOW);
+    }
+
+    /** G-11 o. 경계가 특가 안이면 특가 절감만 센다: 4×17,700 = 70,800 > 60,000. */
+    @Test void g11o_boundaryInsidePromoUsesPromoSavings() {
+        var r = SwitchTiming.evaluate(60_000, 17_700, 4, 6, 1_000L);
+        assertThat(r.status()).isEqualTo(Status.SWITCH_NOW);
+    }
+
+    /** G-11 p. 특가 뒤를 모르면 월로만 센다: 10×5,000 = 50,000 = 비용 → 이득 없음. */
+    @Test void g11p_boundaryWithUnknownAfterPromoUsesMonthly() {
+        var r = SwitchTiming.evaluate(50_000, 5_000, 10, 6, null);
+        assertThat(r.paybackMonths()).isEqualTo(10);
+        assertThat(r.status()).isEqualTo(Status.WAIT_UNTIL_EXPIRY);
+    }
 }
