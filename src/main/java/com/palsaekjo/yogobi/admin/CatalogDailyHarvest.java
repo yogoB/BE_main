@@ -66,7 +66,7 @@ public class CatalogDailyHarvest {
                                @Value("${yogobi.harvest.subscription-limit:20}") int subscriptionLimit,
                                @Value("${yogobi.harvest.subscription-services:"
                                        + "Spotify,Apple Music,iCloud+,멜론,벅스,크레마클럽,교보 sam,윌라,Microsoft 365,"
-                                       + "Notion,Google One,스토리텔,애플TV+,리디셀렉트,카카오 이모티콘 플러스}")
+                                       + "Google One,스토리텔,애플TV+,리디셀렉트,카카오 이모티콘 플러스}")
                                List<String> subscriptionServices) {
         this.jdbc = jdbc;
         this.requests = requests;
