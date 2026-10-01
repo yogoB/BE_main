@@ -37,6 +37,7 @@ class CatalogApiTest {
 
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;
+    @Autowired CatalogReader reader;
 
     @Test
     void servicesReturnSeededServicesWithTiers() throws Exception {
@@ -88,6 +89,30 @@ class CatalogApiTest {
                 .andExpect(jsonPath("$.data.length()").value(1))
                 .andExpect(jsonPath("$.data[0].serviceName").value("넷플릭스"))
                 .andExpect(jsonPath("$.data[0].benefitType").value("FREE"));
+    }
+
+    /**
+     * G-93 d. 가입 자격이 필요한 등급(청소년·학생 등)이 가장 싸도 <b>기본 등급</b>이 아니다. 화면은 첫 등급을 기본값으로 쓰고
+     * 추천은 대표 등급으로 계산해, 자격 없는 사람의 금액이 그 등급으로 나왔다(지니뮤직 종량제를 뺀 뒤 청소년 등급이 1순위가 되는 경로).
+     */
+    @Test
+    void eligibilityTiersAreNeitherTheDefaultNorTheRepresentative() throws Exception {
+        long service = jdbc.queryForObject("""
+                INSERT INTO subscription_service(name, category, official_url) VALUES ('자격검증음악','MUSIC','https://example.test')
+                RETURNING id""", Long.class);
+        jdbc.update("INSERT INTO subscription_tier(service_id,name,price,currency,tax_included) VALUES (?, '청소년 음악', 3000, 'KRW', TRUE)", service);
+        jdbc.update("INSERT INTO subscription_tier(service_id,name,price,currency,tax_included) VALUES (?, '일반 음악', 8000, 'KRW', TRUE)", service);
+        try {
+        mvc.perform(get("/api/v1/catalog/services"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[?(@.id==" + service + ")].tiers[0].name").value(org.hamcrest.Matchers.hasItem("일반 음악")));
+        var representative = reader.findRepresentativeTiers(java.util.List.of(service));
+        org.assertj.core.api.Assertions.assertThat(representative).singleElement()
+                .satisfies(t -> org.assertj.core.api.Assertions.assertThat(t.name()).contains("일반 음악"));
+        } finally {   // 같은 DB 를 쓰는 다른 테스트가 서비스 수를 센다
+            jdbc.update("DELETE FROM subscription_tier WHERE service_id = ?", service);
+            jdbc.update("DELETE FROM subscription_service WHERE id = ?", service);
+        }
     }
 
     /** 내장 합본 시드의 데이터셋 행수(헤더 제외). 건수를 박으면 시드가 늘 때마다 깨진다. */

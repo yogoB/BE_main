@@ -69,8 +69,9 @@ public class CatalogReader {
                 SELECT service_id, id, name, price, currency, tax_included, concurrent_streams, quality, note
                 FROM subscription_tier WHERE active AND service_id IN (SELECT id FROM subscription_service WHERE active)
                 -- 원화 먼저(G-82 a). 숫자만 보면 $4 가 4,900원보다 앞서고, 프론트는 첫 등급을 기본값으로 쓴다.
-                ORDER BY service_id, (currency <> 'KRW'), price, id
-                """, new MapSqlParameterSource(), rs -> {
+                -- 자격 제한 등급(청소년·학생 등)은 아무리 싸도 첫 등급(화면 기본값)이 아니다(G-93 d).
+                ORDER BY service_id, (currency <> 'KRW'), (name ~ :eligibility), price, id
+                """, new MapSqlParameterSource("eligibility", ELIGIBILITY_TIER), rs -> {
                     String currency = rs.getString("currency");
                     long price = rs.getLong("price");
                     boolean taxIncluded = rs.getBoolean("tax_included");
@@ -533,6 +534,9 @@ public class CatalogReader {
      * 존재하지 않는 서비스 ID 는 결과에서 빠지므로 호출부가 누락을 검증한다.
      * ponytail: 서비스→티어 매핑은 휴리스틱. 사용자가 티어를 직접 고르게 하려면 계약(§3) 변경 필요.
      */
+    /** 가입 자격이 필요한 등급 이름(G-93 d). 기본값·대표 등급에서 뺀다 — 자격 없는 사람의 금액이 그 등급으로 나왔다. */
+    static final String ELIGIBILITY_TIER = "청소년|학생|Student|키즈|시니어|청년";
+
     public List<SubscriptionTier> findRepresentativeTiers(List<Long> serviceIds) {
         var tiers = jdbc.query("""
                 SELECT t.id, t.service_id, s.name AS service_name, t.name AS tier_name, t.price
@@ -545,9 +549,13 @@ public class CatalogReader {
                         rs.getLong("price")));
 
         var byPrice = Comparator.comparingLong(SubscriptionTier::listPrice);
+        var open = java.util.regex.Pattern.compile(ELIGIBILITY_TIER).asPredicate().negate();
         return tiers.stream()
                 .collect(Collectors.groupingBy(SubscriptionTier::serviceId))
                 .values().stream()
+                // 자격 제한 등급은 대표가 아니다(G-93 d). 그런 등급뿐인 서비스는 예전처럼 그 안에서 고른다.
+                .map(group -> group.stream().filter(t -> open.test(t.name())).toList().isEmpty() ? group
+                        : group.stream().filter(t -> open.test(t.name())).toList())
                 .map(group -> group.stream()
                         .filter(t -> t.name().contains("스탠다드") && !t.name().contains("광고")).min(byPrice)
                         .or(() -> group.stream().filter(t -> !t.name().contains("광고")).min(byPrice))

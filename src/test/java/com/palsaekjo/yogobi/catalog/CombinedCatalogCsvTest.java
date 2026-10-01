@@ -14,6 +14,44 @@ class CombinedCatalogCsvTest {
         return new ClassPathResource("db/seed/catalog_combined.csv").getContentAsString(StandardCharsets.UTF_8);
     }
 
+    /**
+     * G-93 a·b. data_mb 는 요금제 이름이 밝힌 양이다. '매일 N GB'는 (기본량 + 30×N) GB, 'NGB+'(그 뒤 속도 제한)는 N GB.
+     * 같은 '매일 5GB'가 통신사마다 0·5,120·153,600 으로 섞여 있었고, 'LTE 무제한 7GB+' 같은 38행이 무제한(999,999)으로 적혀
+     * 50GB 를 쓰는 사람에게 7GB 뒤 속도 제한 요금제가 무제한처럼 추천됐다(운영 사용자 흐름 검증 2026-10-01).
+     */
+    @Test
+    void dataFollowsWhatThePlanNameStates_g93() throws Exception {
+        var section = CombinedCatalogCsv.parse(source()).get("mobile_plan");
+        var header = CombinedCatalogCsv.fields(section.header());
+        int name = header.indexOf("plan_name"), data = header.indexOf("data_mb");
+        var daily = java.util.regex.Pattern.compile("(?:매일|(?<![가-힣])일)\\s*(\\d+(?:\\.\\d+)?)\\s*G(?:B)?");
+        var baseBeforeDaily = java.util.regex.Pattern.compile("(\\d+(?:\\.\\d+)?)GB\\s*\\+\\s*(?:매일|일)");
+        var qos = java.util.regex.Pattern.compile("(\\d+(?:\\.\\d+)?)GB\\+");
+        var wrong = new java.util.ArrayList<String>();
+        for (String row : section.rows()) {
+            var f = CombinedCatalogCsv.fields(row);
+            String plan = f.get(name);
+            long mb = Long.parseLong(f.get(data));
+            var d = daily.matcher(plan);
+            if (d.find()) {
+                var b = baseBeforeDaily.matcher(plan);
+                double gb = (b.find() ? Double.parseDouble(b.group(1)) : 0) + 30 * Double.parseDouble(d.group(1));
+                if (mb != (long) (gb * 1024)) wrong.add(plan + " " + mb);
+            } else if (mb == 999_999 && qos.matcher(plan).find()) {
+                wrong.add(plan + " 무제한으로 적힘");
+            }
+        }
+        assertThat(wrong).isEmpty();
+    }
+
+    /** G-93 c. 월 금액이 사용량에 따라 정해지는 종량제 등급은 싣지 않는다 — 기본료만 월 정가로 계산되어 금액이 과소였다(지니뮤직 110원). */
+    @Test
+    void noUsageBilledTierIsListedAsAMonthlyPrice_g93c() throws Exception {
+        var section = CombinedCatalogCsv.parse(source()).get("subscription_tier");
+        int note = CombinedCatalogCsv.fields(section.header()).indexOf("note");
+        assertThat(section.rows()).noneMatch(row -> CombinedCatalogCsv.fields(row).get(note).contains("과금"));
+    }
+
     @Test
     void parsesEveryDatasetFromTheRealFile() throws Exception {
         var sections = CombinedCatalogCsv.parse(source());
