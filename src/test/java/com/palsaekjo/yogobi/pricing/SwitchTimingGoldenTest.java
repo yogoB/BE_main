@@ -49,4 +49,26 @@ class SwitchTimingGoldenTest {
         assertThat(r.paybackMonths()).isZero();
         assertThat(r.status()).isEqualTo(Status.SWITCH_NOW);
     }
+
+    /** 특가 안에 회수되면 예전과 같다. */
+    @Test void g11h_paybackWithinPromoIsUnchanged() {
+        var r = SwitchTiming.evaluate(60_000, 17_700, 10, 6, -5_000L); // 4 <= 6
+        assertThat(r.paybackMonths()).isEqualTo(4);
+        assertThat(r.status()).isEqualTo(Status.SWITCH_NOW);
+    }
+
+    /** 특가가 끝나면 남은 비용을 줄어든 절감으로 센다: 6×5000=30000, 남은 20000 ÷ 2000 = 10 → 16. */
+    @Test void g11i_paybackContinuesWithSmallerSavingsAfterPromo() {
+        var r = SwitchTiming.evaluate(50_000, 5_000, 12, 6, 2_000L);
+        assertThat(r.paybackMonths()).isEqualTo(16);   // 월만 보면 10 → SWITCH_NOW 였다
+        assertThat(r.status()).isEqualTo(Status.WAIT_UNTIL_EXPIRY);
+    }
+
+    /** 특가 안에 못 갚고 그 뒤 절감이 없으면 영영 회수하지 못한다. */
+    @Test void g11j_neverRecoupedAfterPromoIsNoBenefit() {
+        var r = SwitchTiming.evaluate(50_000, 5_000, 0, 6, -1_000L);
+        assertThat(r.paybackMonths()).isNull();
+        assertThat(r.status()).isEqualTo(Status.NO_BENEFIT);
+        assertThat(r.monthlySavings()).isEqualTo(5_000);   // 특가 동안의 월 절감은 그대로 싣는다
+    }
 }

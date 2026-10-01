@@ -59,7 +59,12 @@ public class SwitchTimingService {
         long target = effectiveCost(targetPlanId, tierIds);
         SwitchTiming.Result result;
         try {
-            result = SwitchTiming.evaluate(switchingCost, current - target, remainingContractMonths);
+            // 옮길 요금제가 특가면 그 뒤 달은 (정상가 - 특가)만큼 덜 아낀다. 모르면 예전처럼 월로만 본다.
+            var plan = catalog.findPlanById(targetPlanId).orElseThrow().plan();
+            boolean promo = plan.promoMonths() != null && plan.regularPrice() != null;
+            result = SwitchTiming.evaluate(switchingCost, current - target, remainingContractMonths,
+                    promo ? plan.promoMonths() : null,
+                    promo ? Math.subtractExact(current - target, plan.regularPrice() - plan.basePrice()) : null);
         } catch (ArithmeticException e) {
             throw ApiException.requiredMissing("switchingCost", "전환비용이 너무 커 회수 개월을 계산할 수 없습니다.");
         }
