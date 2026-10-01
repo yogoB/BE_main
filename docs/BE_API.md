@@ -262,6 +262,7 @@ AI 연결과 내부 인증은 BE가 담당하며 프론트에는 AI 주소·내�
 | `results[].breakdown[]` | object[] | 항목별 내역. `amount` 할인은 음수. `provenance`·`note` |
 | `results[].breakdown[].note` | string\|null | 꼬리표. `"제휴 혜택 적용"` · `"번들 적용"`(2026-09-20). **묶음은 음수 줄을 만들지 않는다** — 등급 여러 줄이 한 줄로 바뀌므로 음수만 보면 "할인 없음"으로 읽힌다 |
 | `minimalChange` | object\|null | **번호이동 없이 요금제만 바꿀 때** 가장 싼 조합(D-55). `results[]` 와 같은 모양. 현재 통신사를 모르거나 그 통신사에 후보가 없으면 `null`. `results[0]` 과 같을 수 있다 |
+| `current`·`paid` 공통 | | `minimalChangeMonthlySavings`·`minimalChangeAnnualSavings` — 지금 대비 '번호이동 없이'(`minimalChange`) 조합의 월·1년 절감(G-95 b). `minimalChange` 가 없으면 null |
 | `paid` | object\|null | 사용자가 **지금 낸다고 한 금액** 대비 절감(G-94). `current` 와 같은 모양 — `cost.breakdown[0]` 이 "지금 내는 통신비"(`USER_PROVIDED`), 그 뒤가 고른 구독(정가). `currentMonthlyPayment` 를 줬고 `current` 가 null 일 때만 |
 | `current` | object\|null | 지금 쓰는 요금제로 **같은 구독을 유지했을 때**의 금액(G-30). `currentPlanId` 를 줬고 카탈로그에 있을 때만 |
 | `current.cost` | object | `results[]` 와 같은 모양. 후보와 같은 계산기·같은 컨텍스트로 낸 값이다 |
@@ -319,7 +320,7 @@ CSV에 없는 것을 물어도 **200으로 답한다.** 아는 것으로 계산�
 
 ### 에러
 
-- `400 YGB-REQ-001` — `monthlyDataGb` 누락/≤0, `wantedServiceIds` **비었음**, 잘못된 `contractType`/`networkType`
+- `400 YGB-REQ-001` — `monthlyDataGb` 누락/≤0, 잘못된 `contractType`/`networkType`. `wantedServiceIds` 가 비어도 **200** — 통신비만으로 추천한다(G-95 a, 2026-10-01)
 - `422 YGB-CAL-001` — 이 엔드포인트는 더 이상 반환하지 않는다 (위 표 참고)
 
 ---

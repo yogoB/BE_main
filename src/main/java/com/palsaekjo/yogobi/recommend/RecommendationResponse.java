@@ -44,7 +44,14 @@ public record RecommendationResponse(
      * <b>0 이 아니라 null 이다</b> — 0 은 "안 아낀다"는 뜻이라 다른 거짓말이 된다.
      */
     public record CurrentCost(CostResult cost, long monthlySavings, Long annualSavings,
-                             Long semiannualSavings, CurrentPlanExclusion excluded) {
+                             Long semiannualSavings, CurrentPlanExclusion excluded,
+                             /** 지금 대비 '번호이동 없이'(minimalChange) 조합의 월·1년 절감(G-95 b). minimalChange 가 없으면 null. */
+                             Long minimalChangeMonthlySavings, Long minimalChangeAnnualSavings) {
+        public CurrentCost(CostResult cost, long monthlySavings, Long annualSavings, Long semiannualSavings,
+                           CurrentPlanExclusion excluded) {
+            this(cost, monthlySavings, annualSavings, semiannualSavings, excluded, null, null);
+        }
+
         /**
          * {@code excluded} 는 지금 요금제가 <b>후보에서 빠진 이유</b>다(D-61). 후보였으면 null 이고
          * 화면은 그때 이유를 말하지 않는다. '변경 최소'가 지금보다 비싸거나 null 인 이유가 여기 있다(G-51).

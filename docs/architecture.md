@@ -293,7 +293,7 @@ Google 전용 계정은 동일 Google `sub` 재인증으로 자체 비밀번호�
 ```jsonc
 // POST /api/v1/recommendations
 {
-  "required": { "monthlyDataGb": 20, "wantedServiceIds": [1, 5],
+  "required": { "monthlyDataGb": 20, "wantedServiceIds": [1, 5],   // 비어도 된다 — 통신비만으로 추천(G-95 a)
                 "wantedTierIds": [2, 12] },   // 선택 — 비우면 서버가 대표 등급(스탠다드 우선)을 고른다
   "optional": { "currentCarrier": "SKT", "networkType": "5G",
                 "contractType": "SELECTIVE_25", "hasFamilyBundle": true,
@@ -337,7 +337,8 @@ Google 전용 계정은 동일 Google `sub` 재인증으로 자체 비밀번호�
   "paid": {                                               // G-94: currentMonthlyPayment 를 줬고 current 가 null 일 때만. current 와 같은 모양
     "cost": { "planId": 0, "planName": "지금 내는 금액", "monthlyTotal": 73500,
               "breakdown": [{ "label": "지금 내는 통신비", "amount": 60000, "provenance": "USER_PROVIDED" }, "…같은 구독(정가)"] },
-    "monthlySavings": 45510, "annualSavings": 546120
+    "monthlySavings": 45510, "annualSavings": 546120,
+    "minimalChangeMonthlySavings": 20000, "minimalChangeAnnualSavings": 240000   // G-95 b: 지금 대비 minimalChange. 없으면 null(current 도 같다)
   },
   "minimalChange": { "planId": 7, "planName": "5G 슬림+", "carrier": "SKT", "…": "results 와 같은 모양" },
                                                           // D-55: 번호이동 없이 요금제만 바꾸는 선택지(현재 통신사 안 최저).

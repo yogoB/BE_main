@@ -386,13 +386,35 @@ class RecommendationApiTest {
                 .andExpect(jsonPath("$.data.missingInputs").isEmpty());
     }
 
+    /** G-95 a. 구독을 안 쓰는 사람도 통신비만으로 추천받는다(결정 ⑥). 데이터 사용량이 없으면 여전히 400. */
     @Test
-    void missingRequired_returns400() throws Exception {
+    void noSubscriptionsStillRecommendsPlans_g95a() throws Exception {
         mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
                 {"required":{"monthlyDataGb":20,"wantedServiceIds":[]},"optional":{}}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.results[0].planName").value("웨이브플랜"))
+                .andExpect(jsonPath("$.data.results[0].monthlyTotal").value(45000))
+                .andExpect(jsonPath("$.data.results[0].breakdown.length()").value(1));
+        mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
+                {"required":{"wantedServiceIds":[]},"optional":{}}"""))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error.code").value("YGB-REQ-001"))
-                .andExpect(jsonPath("$.error.field").value("wantedServiceIds"));
+                .andExpect(jsonPath("$.error.field").value("monthlyDataGb"));
+    }
+
+    /** G-95 b. 지금(paid) 대비 '번호이동 없이' 조합의 절감도 BE 가 낸다 — 화면이 빼지 않는다. */
+    @Test
+    void paidCarriesSavingsAgainstTheMinimalChange_g95b() throws Exception {
+        var body = mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
+                {"required":{"monthlyDataGb":20,"wantedServiceIds":[1],"wantedTierIds":[2]},
+                 "optional":{"currentCarrier":"KT","currentMonthlyPayment":60000}}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.minimalChange.planName").value("웨이브플랜"))
+                .andReturn().getResponse().getContentAsString();
+        var data = new com.fasterxml.jackson.databind.ObjectMapper().readTree(body).path("data");
+        long paidTotal = data.path("paid").path("cost").path("monthlyTotal").asLong();
+        long minimal = data.path("minimalChange").path("monthlyTotal").asLong();
+        assertThat(data.path("paid").path("minimalChangeMonthlySavings").asLong()).isEqualTo(paidTotal - minimal);
+        assertThat(data.path("paid").path("minimalChangeAnnualSavings").asLong()).isEqualTo((paidTotal - minimal) * 12);
     }
 
     // --- G-12 카탈로그 결손은 막지 않는다 (D-17) ---

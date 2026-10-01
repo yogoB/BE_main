@@ -105,9 +105,9 @@ public class RecommendationService {
         if (required == null || required.monthlyDataGb() == null || required.monthlyDataGb() <= 0) {
             throw ApiException.requiredMissing("monthlyDataGb", "월 데이터 사용량(GB)이 필요합니다.");
         }
-        if (required.wantedServiceIds() == null || required.wantedServiceIds().isEmpty()) {
-            throw ApiException.requiredMissing("wantedServiceIds", "원하는 서비스를 하나 이상 선택하세요.");
-        }
+        // 구독을 안 쓰는 사람도 통신비만으로 추천받는다(G-95 a, 결정 ⑥). 비었거나 없으면 빈 목록이다.
+        if (required.wantedServiceIds() == null)
+            required = new RecommendationRequest.Required(required.monthlyDataGb(), List.of(), required.wantedTierIds());
         requireSane(required.wantedServiceIds(), "wantedServiceIds");
         requireSane(required.wantedTierIds(), "wantedTierIds");
         Long payment = request.optional() == null ? null : request.optional().currentMonthlyPayment();
@@ -195,7 +195,7 @@ public class RecommendationService {
         // 후보에서 빠졌다면 그 이유도 같이 싣는다(D-61) — '변경 최소'가 지금보다 비싸거나 null 인 이유다(G-51).
         var current = currentPlan
                 .map(p -> currentCost(toResult(p, calculator.calculate(p.plan(), wanted, forCarrier(ctx, p.carrier(), mno))), results,
-                        catalog.currentPlanExclusion(p.plan().id(), dataMb, networkType).orElse(null)))
+                        catalog.currentPlanExclusion(p.plan().id(), dataMb, networkType).orElse(null), minimalChange))
                 .orElse(null);
 
         // 사실(금액을 바꾸는 것·뺀 것)을 먼저, 입력 요청을 뒤에 둔다 — 요청 뒤에 묻힌 경고는 읽히지 않았다(G-75 d).
@@ -212,7 +212,7 @@ public class RecommendationService {
         Accuracy accuracy = missing.isEmpty() ? Accuracy.FULL : Accuracy.PARTIAL;
         // 지금 요금제를 모르면 사용자가 낸다고 한 금액으로 비교한다(G-94). 같은 구독을 계속 낸다고 보고 정가로 더한다.
         var paid = current != null || optional == null || optional.currentMonthlyPayment() == null ? null
-                : currentCost(paidCost(optional.currentMonthlyPayment(), wanted, currentCarrier), results, null);
+                : currentCost(paidCost(optional.currentMonthlyPayment(), wanted, currentCarrier), results, null, minimalChange);
         return new RecommendationResponse(accuracy, missing, results, candidates.size(), current, minimalChange, paid);
     }
 
@@ -237,13 +237,16 @@ public class RecommendationService {
     }
 
     private static RecommendationResponse.CurrentCost currentCost(CostResult cost, List<CostResult> results,
-            CurrentPlanExclusion excluded) {
+            CurrentPlanExclusion excluded, CostResult minimalChange) {
         CostResult top = results.get(0);
         long monthly = cost.monthlyTotal() - top.monthlyTotal();
+        // '번호이동 없이' 조합 대비도 같은 규칙으로 낸다(G-95 b) — 화면이 그 카드만 정가 대비로 적고 있었다.
+        Long minimalMonthly = minimalChange == null ? null : cost.monthlyTotal() - minimalChange.monthlyTotal();
         return new RecommendationResponse.CurrentCost(cost, monthly,
                 vsCurrent(monthly, 12, top.annualSavings(), top),
                 vsCurrent(monthly, 6, top.semiannualSavings(), top),
-                excluded);
+                excluded, minimalMonthly,
+                minimalMonthly == null ? null : vsCurrent(minimalMonthly, 12, minimalChange.annualSavings(), minimalChange));
     }
 
     /**

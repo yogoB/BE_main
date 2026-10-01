@@ -538,6 +538,7 @@ public class CatalogReader {
     static final String ELIGIBILITY_TIER = "청소년|학생|Student|키즈|시니어|청년";
 
     public List<SubscriptionTier> findRepresentativeTiers(List<Long> serviceIds) {
+        if (serviceIds.isEmpty()) return List.of();   // 구독 없이 추천(G-95 a) — IN () 은 SQL 오류다
         var tiers = jdbc.query("""
                 SELECT t.id, t.service_id, s.name AS service_name, t.name AS tier_name, t.price
                   FROM subscription_tier t JOIN subscription_service s ON s.id = t.service_id

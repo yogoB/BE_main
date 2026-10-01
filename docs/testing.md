@@ -2028,3 +2028,13 @@ a·b 는 `data_mb` 71행만 바꿨다(이름이 공식 페이지의 표기이므
 | b | 지금 요금제(`currentPlanId`)도 함께 | `current` 가 이기고 `paid` 는 **null** — 카탈로그 요금제가 더 정확하다 |
 | c | `current` 없이 `paid` 만 | 설명(`/narrate`)이 `paid` 를 "지금 내는 금액"으로 쓴다(내레이터 계약 필드 `currentMonthlyTotal`·`currentMonthlySavings` 그대로) |
 | d | 통신비 −1 · 10,000,001 | **400** `field=currentMonthlyPayment` |
+
+
+## G-95. 구독 없는 사람·번호이동 없는 조합의 '지금 대비' (2026-10-01, 결정 ⑥ 등 사용자 승인)
+
+**검증**: `RecommendationApiTest` (a·b)
+
+| | 입력 | 정답 |
+|---|---|---|
+| a | `wantedServiceIds: []`(구독 안 씀) | **200** — 통신비만으로 추천한다. 결과 줄에 구독이 없다. 전엔 400 "하나 이상 선택"이라 통신비만 줄이려는 사람이 막혔다. `monthlyDataGb` 누락은 여전히 400 |
+| b | 지금 요금제(`current`) 또는 지금 내는 금액(`paid`) + 현재 통신사의 '번호이동 없이' 조합(`minimalChange`) | `current`·`paid` 에 `minimalChangeMonthlySavings` = 지금 총액 − minimalChange 총액, `minimalChangeAnnualSavings`(1년, 특가 반영). minimalChange 가 없으면 null. 화면의 'SKT 그대로' 카드만 정가 대비로 남던 것 |
