@@ -338,7 +338,7 @@ Google 전용 계정은 동일 Google `sub` 재인증으로 자체 비밀번호�
     "cost": { "planId": 0, "planName": "지금 내는 금액", "monthlyTotal": 73500,
               "breakdown": [{ "label": "지금 내는 통신비", "amount": 60000, "provenance": "USER_PROVIDED" }, "…같은 구독(정가)"] },
     "monthlySavings": 45510, "annualSavings": 546120,
-    "minimalChangeMonthlySavings": 20000, "minimalChangeAnnualSavings": 240000   // G-95 b: 지금 대비 minimalChange. 없으면 null(current 도 같다)
+    "minimalChangeMonthlySavings": 20000, "minimalChangeSemiannualSavings": 120000, "minimalChangeAnnualSavings": 240000   // G-95 b: 지금 대비 minimalChange. 없으면 null(current 도 같다)
   },
   "minimalChange": { "planId": 7, "planName": "5G 슬림+", "carrier": "SKT", "…": "results 와 같은 모양" },
                                                           // D-55: 번호이동 없이 요금제만 바꾸는 선택지(현재 통신사 안 최저).

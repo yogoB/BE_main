@@ -246,6 +246,7 @@ public class RecommendationService {
                 vsCurrent(monthly, 12, top.annualSavings(), top),
                 vsCurrent(monthly, 6, top.semiannualSavings(), top),
                 excluded, minimalMonthly,
+                minimalMonthly == null ? null : vsCurrent(minimalMonthly, 6, minimalChange.semiannualSavings(), minimalChange),
                 minimalMonthly == null ? null : vsCurrent(minimalMonthly, 12, minimalChange.annualSavings(), minimalChange));
     }
 

@@ -415,6 +415,7 @@ class RecommendationApiTest {
         long minimal = data.path("minimalChange").path("monthlyTotal").asLong();
         assertThat(data.path("paid").path("minimalChangeMonthlySavings").asLong()).isEqualTo(paidTotal - minimal);
         assertThat(data.path("paid").path("minimalChangeAnnualSavings").asLong()).isEqualTo((paidTotal - minimal) * 12);
+        assertThat(data.path("paid").path("minimalChangeSemiannualSavings").asLong()).isEqualTo((paidTotal - minimal) * 6);
     }
 
     // --- G-12 카탈로그 결손은 막지 않는다 (D-17) ---

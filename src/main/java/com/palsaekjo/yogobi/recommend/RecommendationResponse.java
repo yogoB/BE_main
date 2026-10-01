@@ -46,10 +46,11 @@ public record RecommendationResponse(
     public record CurrentCost(CostResult cost, long monthlySavings, Long annualSavings,
                              Long semiannualSavings, CurrentPlanExclusion excluded,
                              /** 지금 대비 '번호이동 없이'(minimalChange) 조합의 월·1년 절감(G-95 b). minimalChange 가 없으면 null. */
-                             Long minimalChangeMonthlySavings, Long minimalChangeAnnualSavings) {
+                             Long minimalChangeMonthlySavings, Long minimalChangeSemiannualSavings,
+                             Long minimalChangeAnnualSavings) {
         public CurrentCost(CostResult cost, long monthlySavings, Long annualSavings, Long semiannualSavings,
                            CurrentPlanExclusion excluded) {
-            this(cost, monthlySavings, annualSavings, semiannualSavings, excluded, null, null);
+            this(cost, monthlySavings, annualSavings, semiannualSavings, excluded, null, null, null);
         }
 
         /**
