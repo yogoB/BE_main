@@ -79,10 +79,17 @@ class NarratorClientTest {
                 new CostResult(2, "지금 요금제", "KT", 70390, 70390, 0, 0L, List.of()), 17100, 205_200L, 102_600L);
 
         client.narrationFor(COST, List.of(), 127, current);
-        assertThat(received).contains("\"currentMonthlyTotal\":70390").contains("\"currentMonthlySavings\":17100");
+        assertThat(received).contains("\"currentMonthlyTotal\":70390").contains("\"currentMonthlySavings\":17100")
+                .contains("\"currentAnnualSavings\":205200");
+
+        // 특가 뒤를 몰라 1년 합계가 비면 그 필드만 뺀다 — null 을 보내지 않는다.
+        client.narrationFor(COST, List.of(), 127, new RecommendationResponse.CurrentCost(
+                new CostResult(2, "지금 요금제", "KT", 70390, 70390, 0, 0L, List.of()), 17100, null, null));
+        assertThat(received).contains("currentMonthlySavings").doesNotContain("currentAnnualSavings");
 
         client.narrationFor(COST, List.of(), 127, null);
-        assertThat(received).doesNotContain("currentMonthlyTotal").doesNotContain("currentMonthlySavings");
+        assertThat(received).doesNotContain("currentMonthlyTotal").doesNotContain("currentMonthlySavings")
+                .doesNotContain("currentAnnualSavings");
     }
 
     /**

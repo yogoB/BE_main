@@ -390,7 +390,7 @@ narrate 오케스트레이션은 컨트롤러가 한다(`RecommendationControlle
 위 문단은 그 분리 이전의 서술이다.
 
 **`/narrate` 요청에 싣는 필드는 아래 10개뿐이다**(`NarratorClient.NARRATE_FIELDS`):
-`planId`·`planName`·`carrier`·`monthlyTotal`·`baseline`·`monthlySavings`·`annualSavings`·`breakdown`·`missingInputs`·`candidateCount`·`currentMonthlyTotal`·`currentMonthlySavings`(뒤 둘은 선택, 같이 온다).
+`planId`·`planName`·`carrier`·`monthlyTotal`·`baseline`·`monthlySavings`·`annualSavings`·`breakdown`·`missingInputs`·`candidateCount`·`currentMonthlyTotal`·`currentMonthlySavings`(뒤 둘은 선택, 같이 온다)·`currentAnnualSavings`(선택, 2026-10-01).
 `currentMonthlyTotal` 은 응답 `current.cost.monthlyTotal`, `currentMonthlySavings` 는 `current.monthlySavings` 이며 `currentPlanId` 를 받았을 때만 싣는다 — 있으면 내레이터가 "지금보다" 기준으로 말하고 없으면 정가 기준이다(2026-09-18 사용자 승인. 히어로와 문장이 어긋나던 것을 맞춘다). 절감액을 같이 보내는 이유는 내레이터가 두 수를 빼지 않게 하려는 것이다(절대 원칙 2). 두 값이 어긋나면 내레이터는 정가 기준으로 물러난다.
 `candidateCount`는 `CostResult`에 없어 컨트롤러가 따로 싣는다. **기준 카탈로그 1,706개 중 1,645개는
 제휴 혜택도 약정할인도 없어 절감액이 0이다** — 그런 요금제에는 "몇 개 중에서 골랐나"가 유일한 근거다.
@@ -436,8 +436,9 @@ narrate 오케스트레이션은 컨트롤러가 한다(`RecommendationControlle
 ③ `currentMonthlySavings ≤ 0` 이면 사유에서 "정가보다 월 N원 덜 내세요"를 빼 '지금보다 더 낸다'와 싸우지 않게 했다.
 ④ `monthlySavings > 0` 인데 `annualSavings ≤ 0`(특가 뒤 비싸짐)이면 `message`·사유 모두
 "처음엔 정가보다 월 N원 덜 내지만, 1년 합계로는 M원 더 내요(·정가와 같아요)."로 말한다. 두 수 모두 BE 값을 옮긴다.
-**지금 요금제 기준의 1년 합계는 아직 내레이터에 가지 않는다**(`current.annualSavings` 가 `NARRATE_FIELDS` 밖) —
-그 경우는 여전히 월만 말한다.
+**지금 기준도 같다(2026-10-01, 사용자 승인).** BE 가 `current.annualSavings` 를 `currentAnnualSavings` 로 싣는다 —
+특가 뒤를 몰라 null 이면 필드를 뺀다. 지금 대비 월은 싼데 이 값이 0 이하면 "처음엔 지금보다 월 N원 덜 내지만,
+1년 합계로는 M원 더 내요(·지금과 같아요)." **배포는 내레이터 먼저다** — 거꾸로면 `extra=forbid` 로 422 가 나 설명이 통째로 빈다.
 
 `reasons`는 화면의 "왜 나에게 이 상품이 추천됐나요?" 목록을 채운다. 보조 정보이므로 **비어 있을 수 있다.**
 **모델 장애 시에는 내레이터가 규칙으로 만든 사유가 내려간다**(D-38, 사용자 승인 2026-09-17).

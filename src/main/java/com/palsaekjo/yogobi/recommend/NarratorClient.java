@@ -36,7 +36,7 @@ public class NarratorClient implements Narrator, DetectionNarrator, SwitchTiming
     private static final Set<String> NARRATE_FIELDS = Set.of(
             "planId", "planName", "carrier", "monthlyTotal", "baseline",
             "monthlySavings", "annualSavings", "breakdown", "missingInputs", "candidateCount",
-            "currentMonthlyTotal", "currentMonthlySavings");
+            "currentMonthlyTotal", "currentMonthlySavings", "currentAnnualSavings");
 
     private static final Logger log = LoggerFactory.getLogger(NarratorClient.class);
 
@@ -85,6 +85,9 @@ public class NarratorClient implements Narrator, DetectionNarrator, SwitchTiming
         if (current != null) {
             request.put("currentMonthlyTotal", current.cost().monthlyTotal());
             request.put("currentMonthlySavings", current.monthlySavings());
+            // 1년 합계는 특가가 끝난 뒤 달을 다르게 더한 값이다. 월만 보내면 "지금보다 싸다"가 1년을 속인다.
+            // 특가 뒤를 모르면 null 이다 — 그때는 필드를 빼서 내레이터가 월만 말하게 둔다.
+            if (current.annualSavings() != null) request.put("currentAnnualSavings", current.annualSavings());
         }
         // 후보가 몇 개였는지는 CostResult 에 없다. 혜택도 할인도 없는 요금제에는
         // 이 값이 "왜 추천됐나"의 유일한 근거라 따로 싣는다.
