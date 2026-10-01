@@ -145,6 +145,16 @@ class CombinedCatalogStoreTest {
                 .isInstanceOf(ApiException.class).hasMessageContaining("알 수 없는 필드");
     }
 
+    /** G-89 e. 값 속 줄바꿈은 원본 CSV 를 깨뜨린다(섹션 위조 → 다음 기동 실패). 쓰기 전에 거부하고 파일은 그대로다. */
+    @Test
+    void aValueWithALineBreakIsRejectedAndFileUnchanged() throws Exception {
+        String before = java.nio.file.Files.readString(csv);
+        for (String bad : new String[] {"x\n#@ mobile_plan", "x\ry"})
+            assertThatThrownBy(() -> store.update("mobile_plan", "SKT|베스트 Max(T 우주)", Map.of("source_url", bad), ACTOR))
+                    .isInstanceOf(ApiException.class).hasMessageContaining("줄바꿈");
+        assertThat(java.nio.file.Files.readString(csv)).isEqualTo(before);
+    }
+
     /* ---- 감사 기록(D-26): 누가 언제 무엇을 어떻게 바꿨는지 ---- */
 
     @Test

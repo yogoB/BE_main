@@ -156,7 +156,9 @@ public class SecurityConfig {
                                                         new SimpleGrantedAuthority("ROLE_ADMIN"))
                                                 : List.of(new SimpleGrantedAuthority("ROLE_MEMBER"))));
                         try {
-                            String path = req.getRequestURI();
+                            // 라우팅과 같은 디코딩한 경로로 비교한다. 원본 URI 로 비교하면 /api/v1/%63alculator 처럼
+                            // 한 글자만 인코딩해 한도를 건너뛰었다(G-89 c).
+                            String path = org.springframework.web.util.UrlPathHelper.defaultInstance.getPathWithinApplication(req);
                             if ((path.startsWith("/api/v1/auth/") && "POST".equals(req.getMethod()))
                                     || path.equals("/oauth2/authorization/google"))
                                 limits.check("ip:" + clientKey(req), ipLimit);

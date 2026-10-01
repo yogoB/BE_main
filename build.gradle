@@ -28,6 +28,17 @@ dependencies {
     implementation 'org.flywaydb:flyway-database-postgresql'
     implementation 'org.postgresql:postgresql'
 
+    // 보안 패치 고정(2026-10-01, OSV 조회). Boot 3.5.16 BOM 이 아직 올리지 않은 버전이다 — Boot 를 올릴 때
+    // 그 BOM 이 같거나 높은 버전을 담으면 이 블록을 지운다. 목표 버전은 OSV 에서 알려진 권고가 없음을 확인했다.
+    implementation platform('com.fasterxml.jackson:jackson-bom:2.21.7')        // GHSA-cxp5·q4xh·wv8q (High, DoS 포함)
+    implementation platform('org.apache.logging.log4j:log4j-bom:2.25.5')       // GHSA-qv9r
+    constraints {
+        implementation('org.apache.tomcat.embed:tomcat-embed-core:10.1.60') { because 'GHSA-gcx9·9xv2·h3x4 (Critical)' }
+        implementation('org.apache.tomcat.embed:tomcat-embed-el:10.1.60') { because 'tomcat-embed-core 와 맞춘다' }
+        implementation('org.apache.tomcat.embed:tomcat-embed-websocket:10.1.60') { because 'tomcat-embed-core 와 맞춘다' }
+        implementation('org.postgresql:postgresql:42.7.12') { because 'GHSA-j92g (High, 채널 바인딩 다운그레이드)' }
+    }
+
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.testcontainers:junit-jupiter'
     testImplementation 'org.testcontainers:postgresql'

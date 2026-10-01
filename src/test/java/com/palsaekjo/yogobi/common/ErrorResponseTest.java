@@ -66,8 +66,9 @@ class ErrorResponseTest {
         String ids = "1,".repeat(1_500_000) + "1";              // 약 3MB
         var response = post("/api/v1/recommendations",
                 "{\"required\":{\"monthlyDataGb\":10,\"wantedServiceIds\":[" + ids + "]}}", MediaType.APPLICATION_JSON);
-        assertThat(response.getStatusCode().value()).isEqualTo(400);
-        // 파서가 끊었다는 증거: 목록 길이 검사(역직렬화 뒤)의 문구가 아니라 본문을 읽지 못했다는 문구다.
+        // G-89 b 부터는 파서보다 앞의 본문 상한 필터가 413 으로 끊는다(길이를 밝힌 본문은 읽지도 않는다).
+        assertThat(response.getStatusCode().value()).isEqualTo(413);
+        // 끊었다는 증거: 목록 길이 검사(역직렬화 뒤)의 문구가 아니다.
         assertThat(response.getBody()).contains("YGB-REQ-001").doesNotContain("200개까지");
     }
 
@@ -79,6 +80,18 @@ class ErrorResponseTest {
                 new HttpEntity<>(headers), byte[].class);
         assertThat(response.getStatusCode().value()).isEqualTo(200);
         assertThat(response.getHeaders().getFirst(HttpHeaders.CONTENT_ENCODING)).isEqualTo("gzip");
+    }
+
+    /**
+     * G-89 a. TLS 는 Fly 프록시가 끝내고 BE 는 평문 HTTP 를 받는다. 전달 헤더를 읽지 않으면 요청이 "안전하지 않다"고 보아
+     * HSTS 를 한 번도 보내지 않았다. 신뢰하는 프록시(여기선 루프백)가 https 라고 전하면 HSTS 가 나간다.
+     */
+    @Test void hstsIsSentWhenTheProxySaysHttps() {
+        var headers = new HttpHeaders();
+        headers.set("X-Forwarded-Proto", "https");
+        var response = rest.exchange("/api/v1/catalog/services", org.springframework.http.HttpMethod.GET,
+                new HttpEntity<>(headers), String.class);
+        assertThat(response.getHeaders().getFirst("Strict-Transport-Security")).contains("max-age=");
     }
 
     /** d. 숫자 자리에 문자가 오면 400 이고, 어느 칸인지와 다음 행동을 말한다. */

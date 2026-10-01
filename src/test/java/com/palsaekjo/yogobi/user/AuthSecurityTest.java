@@ -299,6 +299,15 @@ class AuthSecurityTest {
         mvc.perform(get("/api/v1/auth/csrf").session(session)).andExpect(status().isOk());
     }
 
+    /**
+     * G-89 c. 한도 필터가 디코딩 전 경로와 비교해서 {@code /api/v1/%61uth/csrf} 처럼 한 글자만 인코딩하면 검사를 건너뛰었다.
+     * 라우팅은 디코딩한 경로로 하므로 요청은 그대로 처리됐다. 같은 경로로 센다.
+     */
+    @Test void percentEncodedPathsAreCountedLikeThePlainPath() throws Exception {
+        for (int i = 0; i < 40; i++) mvc.perform(get("/api/v1/auth/csrf")).andExpect(status().isOk());
+        mvc.perform(get(java.net.URI.create("/api/v1/%61uth/csrf"))).andExpect(status().isTooManyRequests());
+    }
+
     @Test void ipRateLimitCountsTheRealPeerAndIgnoresForwardedForSpoofing() throws Exception {
         // 동의 POST + OAuth GET 이 로그인 한 번에 두 번 센다. 운영 상한은 2000이고 테스트만 40으로 낮춘다.
         for (int i = 0; i < 20; i++) start(new Browser());

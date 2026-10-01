@@ -75,7 +75,7 @@ public class AuthController {
     @PostMapping({"/auth/logout", "/auth/logout-all"})
     public ApiResponse<Map<String, Boolean>> logout(Principal principal, HttpServletRequest request,
                                                    HttpServletResponse response) {
-        if (request.getRequestURI().endsWith("/logout-all")) tokens.revokeAll(Long.parseLong(principal.getName()));
+        if (org.springframework.web.util.UrlPathHelper.defaultInstance.getPathWithinApplication(request).endsWith("/logout-all")) tokens.revokeAll(Long.parseLong(principal.getName()));
         else tokens.revokeCurrent(request);
         tokens.clear(response);
         GoogleLogin.invalidate(request);

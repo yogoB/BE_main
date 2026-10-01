@@ -20,7 +20,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 /** 카탈로그 GET API 검증. 서비스/티어는 시드로 실동작, 요금제는 시드 전이라 fixture 로 확인. */
 // 로컬 .env(spring.config.import)가 CORS 오리진을 좁혀도 프리플라이트 단언은 여기서 고정한다.
-@SpringBootTest(properties = "yogobi.cors.allowed-origins=http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,https://yogob.fly.dev")
+@SpringBootTest(properties = {"yogobi.cors.allowed-origins=http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,https://yogob.fly.dev",
+        "yogobi.catalog.memo-seconds=0"})   // 운영은 60초 기억. 여기서는 테스트마다 넣은 행을 바로 봐야 한다
 @AutoConfigureMockMvc
 @Testcontainers
 class CatalogApiTest {

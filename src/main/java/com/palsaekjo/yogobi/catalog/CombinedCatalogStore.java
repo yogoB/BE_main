@@ -259,8 +259,15 @@ public class CombinedCatalogStore {
 
     /** 헤더 순서대로 값을 정렬한다. 헤더에 없는 필드는 거부한다(오타가 조용히 사라지지 않게). */
     private static List<String> ordered(List<String> columns, Map<String, String> values) {
-        for (String field : values.keySet())
+        for (var entry : values.entrySet()) {
+            String field = entry.getKey();
             if (!columns.contains(field)) throw ApiException.requiredMissing(field, "알 수 없는 필드: " + field);
+            // 파서는 줄 단위로 읽는다. 값 속 줄바꿈은 행을 쪼개고, '#@ ' 로 시작하는 줄은 섹션으로 읽혀
+            // 다음 기동부터 원본 전체를 못 읽는다(G-89 e). 외부 수집값이 그대로 제안에 실리므로 여기서 막는다.
+            String value = entry.getValue();
+            if (value != null && (value.indexOf('\n') >= 0 || value.indexOf('\r') >= 0))
+                throw ApiException.requiredMissing(field, "값에 줄바꿈을 넣을 수 없어요: " + field);
+        }
         var out = new ArrayList<String>();
         for (String column : columns) out.add(values.getOrDefault(column, ""));
         return out;

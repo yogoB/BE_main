@@ -19,9 +19,25 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/catalog")
 public class CatalogController {
     private final CatalogReader reader;
+    private final Duration memo;
+    private volatile Memo<List<ServiceView>> services;
+    private volatile Memo<List<PlanView>> plans;
 
-    public CatalogController(CatalogReader reader) {
+    /**
+     * 서버 쪽 짧은 기억(G-89 f). 브라우저 캐시는 공격자에게 의미가 없다 — 공개·무제한 경로에서 요청마다
+     * 1,700행 조인을 다시 해, 동시 수백 건이면 작은 머신과 커넥션 10개가 찼다(이 경로가 상태 검사이기도 하다).
+     * 카탈로그는 하루에 많아야 한 번 바뀌므로 60초 늦게 보여도 된다.
+     */
+    public CatalogController(CatalogReader reader,
+                             @org.springframework.beans.factory.annotation.Value("${yogobi.catalog.memo-seconds:60}") long memoSeconds) {
         this.reader = reader;
+        this.memo = Duration.ofSeconds(memoSeconds);
+    }
+
+    private record Memo<T>(T value, java.time.Instant at) {
+        boolean fresh(Duration ttl) {
+            return at.plus(ttl).isAfter(java.time.Instant.now());
+        }
     }
 
     /**
@@ -34,12 +50,16 @@ public class CatalogController {
 
     @GetMapping("/services")
     public ResponseEntity<ApiResponse<List<ServiceView>>> services() {
-        return ResponseEntity.ok().cacheControl(CACHE).body(ApiResponse.ok(reader.listServices()));
+        var current = services;
+        if (current == null || !current.fresh(memo)) services = current = new Memo<>(reader.listServices(), java.time.Instant.now());
+        return ResponseEntity.ok().cacheControl(CACHE).body(ApiResponse.ok(current.value()));
     }
 
     @GetMapping("/plans")
     public ResponseEntity<ApiResponse<List<PlanView>>> plans() {
-        return ResponseEntity.ok().cacheControl(CACHE).body(ApiResponse.ok(reader.listPlans()));
+        var current = plans;
+        if (current == null || !current.fresh(memo)) plans = current = new Memo<>(reader.listPlans(), java.time.Instant.now());
+        return ResponseEntity.ok().cacheControl(CACHE).body(ApiResponse.ok(current.value()));
     }
 
     @GetMapping("/plans/{id}/benefits")

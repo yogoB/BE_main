@@ -44,6 +44,15 @@ public class AdminAccount implements ApplicationRunner {
         this.password = password == null ? "" : password;
     }
 
+    private volatile String decoy;
+
+    /** 아이디가 틀렸을 때 대신 비교할 해시. 같은 인코더라 같은 비용이 든다. 처음 한 번만 만든다. */
+    private String decoyHash() {
+        String value = decoy;
+        if (value == null) decoy = value = passwords.encode(java.util.UUID.randomUUID().toString());
+        return value;
+    }
+
     public boolean configured() {
         return !loginId.isBlank() && !password.isBlank();
     }
@@ -59,6 +68,9 @@ public class AdminAccount implements ApplicationRunner {
             log.info("백오피스 관리자 미설정 — ADMIN_ID·ADMIN_PASSWORD 가 없으면 관리자 페이지는 잠겨 있다");
             return;
         }
+        // 막지는 않는다 — 운영 값이 짧으면 배포가 백오피스를 잠근다. 대신 기동마다 눈에 띄게 남긴다(G-89).
+        if (password.length() < 16)
+            log.warn("백오피스 관리자 비밀번호가 {}자다 — 16자 이상의 무작위 문자열로 바꿔 주세요(.env.example 참고)", password.length());
         var found = jdbc.query("SELECT id, password_hash FROM app_user WHERE email = ?",
                 (rs, i) -> new long[]{rs.getLong(1), 0}, loginId);
         if (found.isEmpty()) {
@@ -97,9 +109,15 @@ public class AdminAccount implements ApplicationRunner {
         String attempted = rawId == null ? "" : rawId.strip();
         limits.check("admin:" + attempted, 10);
         long adminId = id.get();
-        if (adminId == 0 || !loginId.equals(attempted)) throw wrongCredentials();
-        String hash = jdbc.queryForObject("SELECT password_hash FROM app_user WHERE id = ?", String.class, adminId);
-        if (hash == null || rawPassword == null || !passwords.matches(rawPassword, hash))
+        // 아이디가 틀려도 같은 일을 한다 — 틀린 아이디만 즉시 401 이면 응답 시간(bcrypt 수백 ms)으로 아이디가 드러났다(G-89 d).
+        boolean idMatches = adminId != 0 && java.security.MessageDigest.isEqual(
+                loginId.getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                attempted.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        String hash = idMatches
+                ? jdbc.queryForObject("SELECT password_hash FROM app_user WHERE id = ?", String.class, adminId)
+                : decoyHash();
+        boolean passwordMatches = hash != null && rawPassword != null && passwords.matches(rawPassword, hash);
+        if (!idMatches || !passwordMatches)
             throw wrongCredentials();
         return jdbc.queryForObject("""
                 SELECT id, email, name, nickname, credential_version FROM app_user WHERE id = ?""",

@@ -21,5 +21,8 @@ WORKDIR /app
 # G-85 b. OOM 뒤 좀비로 남지 않고 재시작되게, 512MB VM 에서 비힙(메타스페이스·스레드) 여유를 남긴다.
 ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=60.0 -XX:+ExitOnOutOfMemoryError"
 COPY --from=build /app/build/libs/yogobi-0.0.1-SNAPSHOT.jar app.jar
+# root 로 돌리지 않는다(G-89). 런타임에 쓰는 파일은 /tmp(Tomcat 작업 디렉터리)뿐이다.
+RUN useradd --system --uid 10001 --no-create-home app
+USER 10001
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "app.jar"]
