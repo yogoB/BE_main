@@ -102,6 +102,8 @@ class CatalogApiTest {
                 RETURNING id""", Long.class);
         jdbc.update("INSERT INTO subscription_tier(service_id,name,price,currency,tax_included) VALUES (?, '청소년 음악', 3000, 'KRW', TRUE)", service);
         jdbc.update("INSERT INTO subscription_tier(service_id,name,price,currency,tax_included) VALUES (?, '일반 음악', 8000, 'KRW', TRUE)", service);
+        // 통신사 전용 상품(지니뮤직 'U+ 모바일 음악감상' 같은)도 그 통신사 가입자만 산다 — 기본값이 아니다.
+        jdbc.update("INSERT INTO subscription_tier(service_id,name,price,currency,tax_included) VALUES (?, 'U+ 음악', 5000, 'KRW', TRUE)", service);
         try {
         mvc.perform(get("/api/v1/catalog/services"))
                 .andExpect(status().isOk())

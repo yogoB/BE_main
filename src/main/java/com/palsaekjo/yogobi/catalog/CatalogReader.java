@@ -535,7 +535,7 @@ public class CatalogReader {
      * ponytail: 서비스→티어 매핑은 휴리스틱. 사용자가 티어를 직접 고르게 하려면 계약(§3) 변경 필요.
      */
     /** 가입 자격이 필요한 등급 이름(G-93 d). 기본값·대표 등급에서 뺀다 — 자격 없는 사람의 금액이 그 등급으로 나왔다. */
-    static final String ELIGIBILITY_TIER = "청소년|학생|Student|키즈|시니어|청년";
+    static final String ELIGIBILITY_TIER = "청소년|학생|Student|키즈|시니어|청년|U\\+";   // U+ = LG U+ 가입자 전용(지니뮤직)
 
     public List<SubscriptionTier> findRepresentativeTiers(List<Long> serviceIds) {
         if (serviceIds.isEmpty()) return List.of();   // 구독 없이 추천(G-95 a) — IN () 은 SQL 오류다
