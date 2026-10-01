@@ -66,6 +66,6 @@ public class RecommendationController {
         if (result.results().isEmpty())
             return ApiResponse.ok(new Narrator.Narration(null, List.of(), NarratorClient.fallbackNotices(result.missingInputs())));
         return ApiResponse.ok(narrator.narrationFor(
-                result.results().get(0), result.missingInputs(), result.candidateCount(), result.current()));
+                result.results().get(0), result.missingInputs(), result.candidateCount(), result.currentOrPaid()));
     }
 }

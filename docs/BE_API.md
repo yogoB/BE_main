@@ -199,6 +199,7 @@ AI 연결과 내부 인증은 BE가 담당하며 프론트에는 AI 주소·내�
 | `optional.hasFamilyBundle` | bool | | 가족 결합 여부 |
 | `optional.familyLineCount` | int | | 결합 회선 수. **금액 계산에 쓰지 않는다** — 근거 문구용이다 |
 | `optional.familyBundleDiscountKrw` | long (≥0) | | 가족결합 월 할인액. **사용자가 확인해 적어 준 금액**을 그대로 뺀다(`USER_PROVIDED`). 선택약정 25% 적용 **후**에 뺀다(`domain.md §4` 300). 결합 중이 아니면 무시하고, 요금보다 크면 0원까지만 깎는다. 음수는 400. **현재 통신사의 요금제에만 반영한다**(G-29) — 옮기면 결합이 풀리므로 다른 통신사 후보에서는 빼지 않는다 |
+| `optional.currentMonthlyPayment` | long | | 지금 내는 월 통신비(할인 반영 후, 원, 0~10,000,000 — 벗어나면 400 `field=currentMonthlyPayment`). 지금 요금제(`currentPlanId`)를 모를 때 응답 `paid` 의 기준(G-94) |
 | `optional.currentPlanId` | long | | 지금 쓰는 요금제 ID(G-30). 응답 `current` 를 채우고, 그 요금제의 통신사를 **현재 통신사로 확정**한다(`currentCarrier` 보다 우선). 카탈로그에 없는 ID 는 400 이 아니라 `missingInputs` 안내 |
 
 `optional`의 빈 필드는 응답 `missingInputs`로 안내된다.
@@ -261,6 +262,7 @@ AI 연결과 내부 인증은 BE가 담당하며 프론트에는 AI 주소·내�
 | `results[].breakdown[]` | object[] | 항목별 내역. `amount` 할인은 음수. `provenance`·`note` |
 | `results[].breakdown[].note` | string\|null | 꼬리표. `"제휴 혜택 적용"` · `"번들 적용"`(2026-09-20). **묶음은 음수 줄을 만들지 않는다** — 등급 여러 줄이 한 줄로 바뀌므로 음수만 보면 "할인 없음"으로 읽힌다 |
 | `minimalChange` | object\|null | **번호이동 없이 요금제만 바꿀 때** 가장 싼 조합(D-55). `results[]` 와 같은 모양. 현재 통신사를 모르거나 그 통신사에 후보가 없으면 `null`. `results[0]` 과 같을 수 있다 |
+| `paid` | object\|null | 사용자가 **지금 낸다고 한 금액** 대비 절감(G-94). `current` 와 같은 모양 — `cost.breakdown[0]` 이 "지금 내는 통신비"(`USER_PROVIDED`), 그 뒤가 고른 구독(정가). `currentMonthlyPayment` 를 줬고 `current` 가 null 일 때만 |
 | `current` | object\|null | 지금 쓰는 요금제로 **같은 구독을 유지했을 때**의 금액(G-30). `currentPlanId` 를 줬고 카탈로그에 있을 때만 |
 | `current.cost` | object | `results[]` 와 같은 모양. 후보와 같은 계산기·같은 컨텍스트로 낸 값이다 |
 | `current.monthlySavings` / `annualSavings` / `semiannualSavings` | long(원) | `current.cost.monthlyTotal - results[0].monthlyTotal` / ×12 / ×6. **지금이 더 싸면 음수 그대로** — 화면이 빼지 않도록 여기서 준다(원칙 2). **1순위 기준이다** — `minimalChange` 기준이 아니다 |

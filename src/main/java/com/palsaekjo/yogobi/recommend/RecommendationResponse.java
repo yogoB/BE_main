@@ -24,7 +24,12 @@ public record RecommendationResponse(
          * 현재 통신사를 모르거나 그 통신사에 후보가 없으면 null. 전체 1순위와 같을 수 있다
          * (지금 통신사가 이미 가장 싸다는 뜻이고, 그것도 답이다).
          */
-        CostResult minimalChange
+        CostResult minimalChange,
+        /**
+         * 사용자가 <b>지금 낸다고 한 금액</b>(통신비 입력 + 같은 구독) 대비 절감(G-94). {@code current} 와 같은 모양이고
+         * 통신비 줄은 {@code USER_PROVIDED} 다. {@code current} 가 있으면 그쪽이 더 정확해 null 이다.
+         */
+        CurrentCost paid
 ) {
     /**
      * 지금 쓰는 요금제로 <b>같은 구독을 유지했을 때</b>의 실질월비용과, 1순위 추천 대비 절감액.
@@ -51,17 +56,27 @@ public record RecommendationResponse(
 
     /** 후보를 찾지 못한 경로. 설명할 결과가 없다. */
     public RecommendationResponse(Accuracy accuracy, List<MissingInput> missingInputs, List<CostResult> results) {
-        this(accuracy, missingInputs, results, List.of(), null, null, List.of(), null, null);
+        this(accuracy, missingInputs, results, List.of(), null, null, List.of(), null, null, null);
     }
 
     /** 계산 경로는 설명 없이 만든다 — 컨트롤러가 채운다({@link #withNarration}). */
     public RecommendationResponse(Accuracy accuracy, List<MissingInput> missingInputs,
             List<CostResult> results, int candidateCount, CurrentCost current, CostResult minimalChange) {
-        this(accuracy, missingInputs, results, List.of(), null, candidateCount, List.of(), current, minimalChange);
+        this(accuracy, missingInputs, results, candidateCount, current, minimalChange, null);
+    }
+
+    public RecommendationResponse(Accuracy accuracy, List<MissingInput> missingInputs, List<CostResult> results,
+            int candidateCount, CurrentCost current, CostResult minimalChange, CurrentCost paid) {
+        this(accuracy, missingInputs, results, List.of(), null, candidateCount, List.of(), current, minimalChange, paid);
+    }
+
+    /** 설명이 "지금"으로 삼을 금액 — 카탈로그 요금제가 있으면 그것, 없으면 사용자가 낸다고 한 금액(G-94 c). */
+    public CurrentCost currentOrPaid() {
+        return current != null ? current : paid;
     }
 
     public RecommendationResponse withNarration(Narrator.Narration narration) {
         return new RecommendationResponse(accuracy, missingInputs, results,
-                narration.reasons(), narration.message(), candidateCount, narration.notices(), current, minimalChange);
+                narration.reasons(), narration.message(), candidateCount, narration.notices(), current, minimalChange, paid);
     }
 }

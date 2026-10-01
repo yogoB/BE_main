@@ -298,7 +298,8 @@ Google 전용 계정은 동일 Google `sub` 재인증으로 자체 비밀번호�
   "optional": { "currentCarrier": "SKT", "networkType": "5G",
                 "contractType": "SELECTIVE_25", "hasFamilyBundle": true,
                 "familyLineCount": 3, "familyBundleDiscountKrw": 11000,
-                "currentPlanId": 42 }   // 선택 — 지금 쓰는 요금제(G-30). 없는 id 는 400 이 아니라 안내
+                "currentPlanId": 42,    // 선택 — 지금 쓰는 요금제(G-30). 없는 id 는 400 이 아니라 안내
+                "currentMonthlyPayment": 60000 }  // 선택 — 지금 내는 월 통신비(할인 반영 후, 0~10,000,000). 응답 paid 의 기준(G-94, 2026-10-01 사용자 승인)
 }
 ```
 
@@ -332,6 +333,11 @@ Google 전용 계정은 동일 Google `sub` 재인증으로 자체 비밀번호�
     "cost": { "planId": 7, "planName": "5G 언리미티드", "carrier": "SKT", "monthlyTotal": 82300, "…": "results 와 같은 모양" },
     "monthlySavings": 11000,                              // current − results[0]. 지금이 더 싸면 음수 그대로
     "annualSavings": 132000
+  },
+  "paid": {                                               // G-94: currentMonthlyPayment 를 줬고 current 가 null 일 때만. current 와 같은 모양
+    "cost": { "planId": 0, "planName": "지금 내는 금액", "monthlyTotal": 73500,
+              "breakdown": [{ "label": "지금 내는 통신비", "amount": 60000, "provenance": "USER_PROVIDED" }, "…같은 구독(정가)"] },
+    "monthlySavings": 45510, "annualSavings": 546120
   },
   "minimalChange": { "planId": 7, "planName": "5G 슬림+", "carrier": "SKT", "…": "results 와 같은 모양" },
                                                           // D-55: 번호이동 없이 요금제만 바꾸는 선택지(현재 통신사 안 최저).
@@ -391,7 +397,7 @@ narrate 오케스트레이션은 컨트롤러가 한다(`RecommendationControlle
 
 **`/narrate` 요청에 싣는 필드는 아래 10개뿐이다**(`NarratorClient.NARRATE_FIELDS`):
 `planId`·`planName`·`carrier`·`monthlyTotal`·`baseline`·`monthlySavings`·`annualSavings`·`breakdown`·`missingInputs`·`candidateCount`·`currentMonthlyTotal`·`currentMonthlySavings`(뒤 둘은 선택, 같이 온다)·`currentAnnualSavings`(선택, 2026-10-01).
-`currentMonthlyTotal` 은 응답 `current.cost.monthlyTotal`, `currentMonthlySavings` 는 `current.monthlySavings` 이며 `currentPlanId` 를 받았을 때만 싣는다 — 있으면 내레이터가 "지금보다" 기준으로 말하고 없으면 정가 기준이다(2026-09-18 사용자 승인. 히어로와 문장이 어긋나던 것을 맞춘다). 절감액을 같이 보내는 이유는 내레이터가 두 수를 빼지 않게 하려는 것이다(절대 원칙 2). 두 값이 어긋나면 내레이터는 정가 기준으로 물러난다.
+`currentMonthlyTotal` 은 응답 `current.cost.monthlyTotal`, `currentMonthlySavings` 는 `current.monthlySavings` 이며 `currentPlanId` 를 받았을 때만 싣는다. **`current` 가 없고 `paid` 가 있으면 `paid` 의 값을 같은 자리에 싣는다**(G-94 — 필드는 그대로, 2026-10-01) — 있으면 내레이터가 "지금보다" 기준으로 말하고 없으면 정가 기준이다(2026-09-18 사용자 승인. 히어로와 문장이 어긋나던 것을 맞춘다). 절감액을 같이 보내는 이유는 내레이터가 두 수를 빼지 않게 하려는 것이다(절대 원칙 2). 두 값이 어긋나면 내레이터는 정가 기준으로 물러난다.
 `candidateCount`는 `CostResult`에 없어 컨트롤러가 따로 싣는다. **기준 카탈로그 1,706개 중 1,645개는
 제휴 혜택도 약정할인도 없어 절감액이 0이다** — 그런 요금제에는 "몇 개 중에서 골랐나"가 유일한 근거다.
 `CostResult`를 통째로 직렬화하면 AI가 쓰지 않는 필드까지 나간다 — 복구된 `priceCrossCheck`가 실제로 그랬다.

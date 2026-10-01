@@ -26,6 +26,8 @@ public record RecommendationRequest(Required required, Optional optional) {
     public record Optional(String currentCarrier, String networkType,
                            String contractType, Boolean hasFamilyBundle,
                            Integer familyLineCount, Long familyBundleDiscountKrw,
-                           Long currentPlanId) {
+                           Long currentPlanId,
+                           /** 지금 내는 월 통신비(할인 반영 후, 사용자 입력). 지금 요금제를 모를 때 절감의 기준이 된다(G-94). */
+                           Long currentMonthlyPayment) {
     }
 }

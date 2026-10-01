@@ -123,6 +123,35 @@ class RecommendationApiTest {
         assertThat(body).contains("선택약정(요금할인 25%)은 SKT·KT·LG U+ 요금제에만 반영했어요");
     }
 
+    /** G-94 a·b·d. 지금 내는 월 통신비를 받으면 그 금액 대비 절감을 낸다. 지금 요금제가 있으면 그쪽이 이긴다. 범위 밖은 400. */
+    @Test
+    void paidAmountGivesSavingsAgainstWhatTheUserPays_g94() throws Exception {
+        String base = "{\"required\":{\"monthlyDataGb\":20,\"wantedServiceIds\":[1],\"wantedTierIds\":[2]},\"optional\":{%s}}";
+        var top = mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON)
+                        .content(base.formatted("\"currentMonthlyPayment\":60000")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.current").doesNotExist())
+                .andExpect(jsonPath("$.data.paid.cost.monthlyTotal").value(73500))
+                .andExpect(jsonPath("$.data.paid.cost.breakdown[0].amount").value(60000))
+                .andExpect(jsonPath("$.data.paid.cost.breakdown[0].provenance").value("USER_PROVIDED"))
+                .andReturn().getResponse().getContentAsString();
+        var data = new com.fasterxml.jackson.databind.ObjectMapper().readTree(top).path("data");
+        assertThat(data.path("paid").path("monthlySavings").asLong())
+                .isEqualTo(73500 - data.path("results").get(0).path("monthlyTotal").asLong());
+
+        mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON)
+                        .content(base.formatted("\"currentMonthlyPayment\":60000,\"currentPlanId\":1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.current.cost.planName").value("넷플플랜"))
+                .andExpect(jsonPath("$.data.paid").doesNotExist());
+
+        for (String bad : new String[] {"-1", "10000001"})
+            mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON)
+                            .content(base.formatted("\"currentMonthlyPayment\":" + bad)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.error.field").value("currentMonthlyPayment"));
+    }
+
     @Test
     void wantingNetflix_netflixPlanWins() throws Exception {
         mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""

@@ -87,6 +87,17 @@ class RecommendationControllerTest {
         assertThat(narration.notices()).containsExactly("확인 필요 — 마이페이지");
     }
 
+    /** G-94 c. 지금 요금제가 없고 지금 내는 금액(paid)만 있으면 그것이 설명의 '지금'이다. */
+    @Test
+    void narrateUsesThePaidAmountWhenThereIsNoCurrentPlan() {
+        when(service.recommend(any(), eq(false)))
+                .thenReturn(new RecommendationResponse(Accuracy.PARTIAL, missing, List.of(best), 127, null, null, current));
+        when(narrator.narrationFor(best, missing, 127, current))
+                .thenReturn(new Narrator.Narration("지금 내시는 금액보다 덜 내요.", List.of(), List.of()));
+
+        assertThat(controller.narrate(request).data().message()).isEqualTo("지금 내시는 금액보다 덜 내요.");
+    }
+
     /** 내레이터 장애는 빈 설명이다 — 200 이고 결과 경로는 애초에 무관하다. */
     @Test
     void narratorFailureYieldsEmptyNarration() {

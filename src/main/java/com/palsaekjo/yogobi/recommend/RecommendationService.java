@@ -110,6 +110,9 @@ public class RecommendationService {
         }
         requireSane(required.wantedServiceIds(), "wantedServiceIds");
         requireSane(required.wantedTierIds(), "wantedTierIds");
+        Long payment = request.optional() == null ? null : request.optional().currentMonthlyPayment();
+        if (payment != null && (payment < 0 || payment > 10_000_000))
+            throw ApiException.requiredMissing("currentMonthlyPayment", "지금 내는 월 통신비를 원 단위로 다시 적어 주세요.");
 
         // 카탈로그에 없는 서비스는 막지 않는다(G-12·D-17). 아는 것으로 계산하고 모르는 것은 안내·기록한다.
         // 사용자가 **해외 결제 등급**을 골랐으면 그 서비스는 계산에서 뺀다. 대표 원화 등급으로 바꿔 계산하면
@@ -207,7 +210,10 @@ public class RecommendationService {
         addUnknownCurrentPlanNotice(missing, optional, currentPlan);
         missing.addAll(missingInputs(optional, currentCarrier, familyDiscount, unknownServiceIds, foreignPriced));
         Accuracy accuracy = missing.isEmpty() ? Accuracy.FULL : Accuracy.PARTIAL;
-        return new RecommendationResponse(accuracy, missing, results, candidates.size(), current, minimalChange);
+        // 지금 요금제를 모르면 사용자가 낸다고 한 금액으로 비교한다(G-94). 같은 구독을 계속 낸다고 보고 정가로 더한다.
+        var paid = current != null || optional == null || optional.currentMonthlyPayment() == null ? null
+                : currentCost(paidCost(optional.currentMonthlyPayment(), wanted, currentCarrier), results, null);
+        return new RecommendationResponse(accuracy, missing, results, candidates.size(), current, minimalChange, paid);
     }
 
     /**
@@ -218,6 +224,18 @@ public class RecommendationService {
      * 지금 요금제 쪽의 특가는 보지 않는다: 여기서 묻는 것은 "옮기면 얼마를 아끼나"이고 그 답은
      * 옮겨 갈 요금제가 얼마나 오래 그 금액인지에 달려 있다.
      */
+    /** 사용자가 낸다고 한 통신비(USER_PROVIDED) + 고른 구독(정가). 계산기를 거치지 않는다 — 요금제를 모른다. */
+    private static CostResult paidCost(long payment, Set<SubscriptionTier> wanted, String carrier) {
+        var lines = new ArrayList<BreakdownLine>();
+        lines.add(new BreakdownLine("지금 내는 통신비", payment, "USER_PROVIDED", "입력한 금액"));
+        long total = payment;
+        for (SubscriptionTier tier : wanted) {
+            lines.add(new BreakdownLine(tier.name(), tier.listPrice(), "OFFICIAL", null));
+            total += tier.listPrice();
+        }
+        return new CostResult(0, "지금 내는 금액", carrier == null ? "" : carrier, total, total, 0, 0L, List.copyOf(lines));
+    }
+
     private static RecommendationResponse.CurrentCost currentCost(CostResult cost, List<CostResult> results,
             CurrentPlanExclusion excluded) {
         CostResult top = results.get(0);

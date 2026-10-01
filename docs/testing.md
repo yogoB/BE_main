@@ -2012,3 +2012,19 @@ Hikari 최대 5·유휴 1 로 줄였다. V37 은 G-90 c 이전 표본을 비우�
 
 a·b 는 `data_mb` 71행만 바꿨다(이름이 공식 페이지의 표기이므로 근거는 그 행의 `source_url` 과 같다). '모바일 5G' 처럼
 '일' 앞에 한글이 붙은 경우는 매일이 아니다.
+
+
+## G-94. 사용자가 낸다고 한 금액 대비 절감 (2026-10-01, 계약 ① · 사용자 승인)
+
+**검증**: `RecommendationApiTest` (a·b·d) · `RecommendationControllerTest` (c)
+
+운영 흐름 검증에서 "지금 85,400원 낸다"고 입력한 사람에게 결과 화면이 "최대 2,725원 절감"(정가 대비)만 말했다.
+입력한 실제 납부액이 BE 로 가지 않아 지금 대비 절감을 만들 수 없었다. `optional.currentMonthlyPayment`(지금 내는 월 통신비,
+할인 반영 후)를 받아 응답 `paid` 로 돌려준다 — `current` 와 같은 모양이고, 통신비 줄은 `USER_PROVIDED` 다.
+
+| | 입력 | 정답 |
+|---|---|---|
+| a | 통신비 60,000 · 넷플릭스 스탠다드(13,500) · 1순위 총액 T | `paid.cost.monthlyTotal` = 73,500(통신비 60,000 `USER_PROVIDED` + 구독 13,500), `paid.monthlySavings` = 73,500 − T |
+| b | 지금 요금제(`currentPlanId`)도 함께 | `current` 가 이기고 `paid` 는 **null** — 카탈로그 요금제가 더 정확하다 |
+| c | `current` 없이 `paid` 만 | 설명(`/narrate`)이 `paid` 를 "지금 내는 금액"으로 쓴다(내레이터 계약 필드 `currentMonthlyTotal`·`currentMonthlySavings` 그대로) |
+| d | 통신비 −1 · 10,000,001 | **400** `field=currentMonthlyPayment` |
