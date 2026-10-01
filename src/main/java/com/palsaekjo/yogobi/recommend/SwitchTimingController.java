@@ -67,7 +67,7 @@ public class SwitchTimingController {
                 ? new SwitchTimingNarrator.Wording("약정 해지 비용 확인 필요",
                         "약정이 " + remainingContractMonths + "개월 남았어요. 해지하면 위약금이 생길 수 있어 "
                                 + "지금 바꿀지는 판단하지 않았어요. 위약금은 통신사 앱의 약정 정보에서 확인할 수 있어요.")
-                : port == null ? SwitchTimingNarrator.fallback(timing.status())
+                : port == null ? SwitchTimingNarrator.fallback(timing)
                 : port.explain(timing, expiryDate);
         return ApiResponse.ok(new TimingView(timing, wording.headline(), wording.note()));
     }

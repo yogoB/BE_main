@@ -14,7 +14,12 @@ public interface SwitchTimingNarrator {
      * 내레이터가 닿지 않을 때 BE 가 쓰는 최소 문구. 판정은 우리가 아는 값이라 배지는 남기고
      * 설명만 비운다 — 화면이 "언제 옮겨야 하나"를 아예 못 말하면 이 화면의 쓸모가 사라진다.
      */
-    static Wording fallback(String status) {
+    static Wording fallback(SwitchTimingService.Response timing) {
+        String status = timing.status();
+        // 매달은 싼데 특가가 끝나 회수하지 못하는 NO_BENEFIT 이면 "절감 없음"은 월 절감과 싸운다.
+        // 내레이터 `switch_timing` 과 같은 배지를 쓴다 — 두 곳의 말이 갈라지지 않게(2026-10-01).
+        if ("NO_BENEFIT".equals(status) && timing.monthlySavings() > 0)
+            return new Wording("전환비용 회수 불가 · 참고용 일정", "");
         return new Wording(switch (status) {
             case "SWITCH_NOW" -> "지금이 최적 실행 시점";
             case "WAIT_UNTIL_EXPIRY" -> "약정 만료 후가 이득";
