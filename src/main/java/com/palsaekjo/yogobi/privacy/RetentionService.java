@@ -28,6 +28,8 @@ public class RetentionService {
     private record Target(String name, String table, String where, Object... args) {
     }
 
+    static final int STALE_GAP_DAYS = 30;
+
     /** 실행 시각에 따라 달라지는 값이 있어 호출마다 만든다. 보유기간은 처리방침과 같은 상수다. */
     private static List<Target> targets() {
         return List.of(
@@ -42,7 +44,12 @@ public class RetentionService {
                 new Target("catalog_report", "catalog_report",
                         "created_at < now() - (? * interval '1 day')", PrivacyPolicy.REPORT_RETENTION_DAYS),
                 new Target("service_report", "service_report",
-                        "created_at < now() - (? * interval '1 day')", PrivacyPolicy.REPORT_RETENTION_DAYS));
+                        "created_at < now() - (? * interval '1 day')", PrivacyPolicy.REPORT_RETENTION_DAYS),
+                // 개인정보가 아니라 표 상한(10,000) 보호다(G-90 d). 비회원 입력으로도 쌓이는데 지우는 곳이 없어, 한 번 차면
+                // 진짜 결손 기록이 영원히 멈췄다. 다시 찾은 적 없고 운영자도 손대지 않은 한 번짜리 요청만 지운다.
+                new Target("catalog_candidate", "catalog_candidate",
+                        "status = 'REQUESTED' AND requested_cnt = 1 AND note IS NULL"
+                                + " AND last_requested_at < now() - (? * interval '1 day')", STALE_GAP_DAYS));
     }
 
     /**

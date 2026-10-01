@@ -62,7 +62,7 @@ class RecommendationControllerTest {
         when(service.recommend(any()))
                 .thenReturn(new RecommendationResponse(Accuracy.PARTIAL, missing, List.of(best), 127, current, null));
         controller.recommend(request, member, http);
-        org.mockito.Mockito.verify(memberSavings).record(7L, 15390L);
+        org.mockito.Mockito.verify(memberSavings).record(7L, current.cost().planId(), 15390L);
 
         controller.recommend(request, null, http);                     // 비회원
         when(service.recommend(any()))

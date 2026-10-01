@@ -1939,3 +1939,15 @@ d 와 의존성·컨테이너는 **테스트 없음** — d 는 응답 시간 �
 
 의존성 패치 고정(build.gradle): Tomcat 10.1.55→10.1.60(Critical 3), Jackson 2.21.4→2.21.7(High 3·DoS 포함),
 PostgreSQL 드라이버 42.7.11→42.7.12(High 1), log4j-api 2.24.3→2.25.5. Boot 3.5.16 이 최신이라 BOM 이 아직 담지 않았다.
+
+
+## G-90. 보안 검수 후속 — 승인된 4건 (2026-10-01)
+
+**검증**: `ClientAddressTest` (a) · `CatalogAdminApiTest` (b) · `SavingsStatsApiTest` (c) · `RetentionServiceTest` (d)
+
+| | 입력 | 정답 |
+|---|---|---|
+| a | 직접 호출자가 `X-Client-IP` 를 지어냄(비밀 헤더 없음/틀림) | 그 값을 **무시**하고 실제 발신지로 센다. 프론트 nginx 는 `X-Edge-Auth`(=`EDGE_SHARED_SECRET`)를 붙여 믿는다. 비밀값이 비어 있으면 예전처럼 믿고 기동마다 경고, 32자 미만이면 기동 실패 |
+| b | 운영자 목록(`CATALOG_ADMIN_USER_IDS`) 회원 | `ROLE_CATALOG` — 카탈로그·결손 보드·세션 확인만. 회원 목록·대시보드·파기 실행은 **403**. 백오피스 관리자 계정만 `ROLE_ADMIN` |
+| c | 로그인 회원의 추천·백필에서 "지금 요금제"가 저장해 둔 것과 다름 | 공개 절감 통계 표본이 **아니다**. 같을 때만 센다 |
+| d | 결손 표의 한 번짜리·30일 넘은·운영자 손 안 탄 행 | 매일 파기 작업이 지운다. 여러 번 요청됐거나 메모·상태가 있으면 남긴다 |

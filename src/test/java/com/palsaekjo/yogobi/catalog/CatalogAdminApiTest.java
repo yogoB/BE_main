@@ -127,6 +127,21 @@ class CatalogAdminApiTest {
         mvc.perform(get("/api/v1/catalog/services")).andExpect(status().isOk());
     }
 
+    /**
+     * G-90 b. 카탈로그 운영자 목록(D-24)의 회원은 <b>카탈로그 일만</b> 한다. 전엔 ROLE_ADMIN 을 통째로 받아 회원 목록(이메일),
+     * 세션 해지, 되돌릴 수 없는 파기 실행까지 할 수 있었다 — 그 Google 계정 하나가 털리면 백오피스 전체였다.
+     */
+    @Test
+    void catalogOperatorsCannotUseTheRestOfTheBackoffice() throws Exception {
+        Cookie[] operator = login(OPERATOR);
+        mvc.perform(get("/api/v1/admin/catalog/requests").cookie(operator)).andExpect(status().isOk());
+        mvc.perform(get("/api/v1/admin/gaps").cookie(operator)).andExpect(status().isOk());
+        mvc.perform(get("/api/v1/admin/session").cookie(operator)).andExpect(status().isOk());
+        mvc.perform(get("/api/v1/admin/members").cookie(operator)).andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/admin/dashboard").cookie(operator)).andExpect(status().isForbidden());
+        send(post("/api/v1/admin/retention/purge"), operator).andExpect(status().isForbidden());
+    }
+
     /* ---- 제안·승인 2단계(D-28): 승인 전에는 아무것도 바뀌지 않는다 ---- */
 
     @Test

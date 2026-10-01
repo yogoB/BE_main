@@ -42,6 +42,7 @@ class SavingsStatsApiTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired SavingsStatsController controller;
     @Autowired MemberSavingsBackfill backfill;
+    @Autowired MemberSavings memberSavings;
 
     @BeforeEach
     void clean() {
@@ -158,8 +159,12 @@ class SavingsStatsApiTest {
         saveRequest(untold, "{\"planId\":" + cheap + ",\"tierIds\":[1],\"optional\":{}}");
         saveRequest(live, "{\"planId\":" + cheap + ",\"tierIds\":[1],\"optional\":{\"currentPlanId\":" + pricey + "}}");
         jdbc.update("INSERT INTO member_savings(user_id, monthly_savings) VALUES (?, 777)", live);
+        // G-90 c — 저장해 둔 지금 요금제와 같은 요청만 되살린다. 아니면 백필이 표본 조작의 우회로가 된다.
+        jdbc.update("UPDATE app_user SET current_plan_id = ? WHERE id = ?", pricey, revived);
+        long forged = TestMembers.create(jdbc, "sample11@example.com");
+        saveRequest(forged, "{\"planId\":" + cheap + ",\"tierIds\":[1],\"optional\":{\"currentPlanId\":" + pricey + "}}");
 
-        assertThat(backfill.backfill()).isEqualTo(1);   // revived 만. untold 는 기준이 없고 live 는 이미 있다
+        assertThat(backfill.backfill()).isEqualTo(1);   // revived 만. untold 는 기준이 없고 live 는 이미 있고 forged 는 저장한 요금제가 없다
 
         Long amount = jdbc.queryForObject(
                 "SELECT monthly_savings FROM member_savings WHERE user_id = ?", Long.class, revived);
@@ -169,7 +174,28 @@ class SavingsStatsApiTest {
         assertThat(jdbc.queryForObject("SELECT monthly_savings FROM member_savings WHERE user_id = ?", Long.class, live))
                 .isEqualTo(777);                       // 살아 있는 조회가 이긴다 — 백필이 덮어쓰지 않는다
 
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM member_savings WHERE user_id = ?", Integer.class, forged)).isZero();
         assertThat(backfill.backfill()).isZero();      // 두 번째 실행은 아무것도 하지 않는다(멱등)
+    }
+
+    /**
+     * G-90 c. 요청에 적은 "지금 요금제"는 아무 값이나 될 수 있다. 저장해 둔 지금 요금제로 계산한 결과만 표본이다 —
+     * 계정 몇 개로 공개 숫자를 정하던 경로.
+     */
+    @Test
+    void g90c_onlyTheSavedCurrentPlanMakesASample() {
+        long userId = TestMembers.create(jdbc, "sample-g90@example.com");
+        long planId = jdbc.queryForObject("SELECT id FROM mobile_plan ORDER BY id LIMIT 1", Long.class);
+        long other = jdbc.queryForObject("SELECT id FROM mobile_plan ORDER BY id DESC LIMIT 1", Long.class);
+
+        memberSavings.record(userId, planId, 40_000);                         // 저장한 적 없다
+        jdbc.update("UPDATE app_user SET current_plan_id = ? WHERE id = ?", planId, userId);
+        memberSavings.record(userId, other, 90_000);                          // 저장한 것과 다른 요금제
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM member_savings WHERE user_id = ?", Integer.class, userId)).isZero();
+
+        memberSavings.record(userId, planId, 12_000);                         // 저장한 지금 요금제
+        assertThat(jdbc.queryForObject("SELECT monthly_savings FROM member_savings WHERE user_id = ?", Long.class, userId))
+                .isEqualTo(12_000);
     }
 
     private void saveRequest(long userId, String request) {

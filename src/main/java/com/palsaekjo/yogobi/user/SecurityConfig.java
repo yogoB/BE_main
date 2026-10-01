@@ -93,9 +93,8 @@ public class SecurityConfig {
      * (nginx 가 항상 덮어쓰므로 브라우저가 지어낸 값은 거기서 잘린다). 없으면 TCP peer — 프록시 뒤에서는
      * 전 사용자가 한 값이라 그때는 {@code ipLimit} 이 서비스 전체의 방어선이 된다(H-1).
      *
-     * <p>{@code X-Forwarded-For} 는 여전히 안 본다 — 누적 헤더라 첫 값을 사용자가 정한다.
-     * BE 가 공개 주소로도 열려 있어 직접 호출자는 {@code X-Client-IP} 를 지어낼 수 있지만, 그러면 <b>자기 버킷을
-     * 쪼갤 뿐</b> 남을 막지 못한다. 막으려는 것은 "남의 로그인을 막는 것" 이라 이 위협 모델에선 충분하다.
+     * <p>{@code X-Client-IP} 는 프론트 nginx 의 비밀 헤더가 함께 올 때만 믿는다(G-90 a, {@code ClientAddress}).
+     * 전엔 직접 호출자가 요청마다 지어내 매번 새 버킷을 받았다 — "자기 버킷만 쪼갠다"가 아니라 한도가 없어졌다.
      */
     private static String clientKey(HttpServletRequest req) {
         // 헤더가 비어 오면 조용히 peer 로 떨어져 버킷이 다시 공유된다 — 그걸 볼 수 있어야 한다(DEBUG 로 한 번 확인).
@@ -135,6 +134,9 @@ public class SecurityConfig {
                                 "/api/v1/auth/logout", "/api/v1/auth/logout-all").hasRole("MEMBER")
                         // 카탈로그 원본(합본 CSV) CRUD — 공개 읽기 경로와 분리하고 **운영자만** 허용한다(D-24).
                         // CSRF 보호는 기본값 그대로 적용된다. 운영자 지정은 CATALOG_ADMIN_USER_IDS(비면 아무도 못 쓴다).
+                        // 목록의 운영자(ROLE_CATALOG)는 카탈로그·결손 보드와 세션 확인만 쓴다(G-90 b).
+                        .requestMatchers("/api/v1/admin/catalog", "/api/v1/admin/catalog/**",
+                                "/api/v1/admin/gaps", "/api/v1/admin/gaps/**", "/api/v1/admin/session").hasAnyRole("ADMIN", "CATALOG")
                         .requestMatchers("/api/v1/admin", "/api/v1/admin/**").hasRole("ADMIN")
                         // 오류 디스패치(/error)는 원래 요청이 이미 체인을 통과한 뒤의 재진입이다. 막으면 415·405·500 이
                         // 전부 401 "로그인하세요"로 둔갑한다(G-74 a). 밖에서 /error 를 직접 부르는 것은 REQUEST 라 그대로 막힌다.
@@ -148,12 +150,15 @@ public class SecurityConfig {
                     @Override protected void doFilterInternal(HttpServletRequest req, HttpServletResponse res, FilterChain chain)
                             throws ServletException, IOException {
                         Long id = tokens.authenticate(req);
-                        // 운영자로 지정된 회원만 ROLE_ADMIN을 더 받는다(D-24). 그 외에는 기존과 동일하게 MEMBER뿐이다.
+                        // 백오피스 관리자 계정만 ROLE_ADMIN, 운영자 목록(D-24)의 회원은 ROLE_CATALOG 를 더 받는다(G-90 b).
                         if (id != null) SecurityContextHolder.getContext().setAuthentication(
                                 UsernamePasswordAuthenticationToken.authenticated(id.toString(), null,
-                                        operators.contains(id)
+                                        operators.isBackofficeAdmin(id)
                                                 ? List.of(new SimpleGrantedAuthority("ROLE_MEMBER"),
                                                         new SimpleGrantedAuthority("ROLE_ADMIN"))
+                                                : operators.contains(id)
+                                                ? List.of(new SimpleGrantedAuthority("ROLE_MEMBER"),
+                                                        new SimpleGrantedAuthority("ROLE_CATALOG"))
                                                 : List.of(new SimpleGrantedAuthority("ROLE_MEMBER"))));
                         try {
                             // 라우팅과 같은 디코딩한 경로로 비교한다. 원본 URI 로 비교하면 /api/v1/%63alculator 처럼

@@ -56,6 +56,25 @@ class RetentionServiceTest {
         assertThat(jdbc.queryForObject("SELECT target_ref FROM detection_result", String.class)).isEqualTo("new");
     }
 
+    /**
+     * G-90 d. 결손 표(상한 10,000행)는 비회원 입력으로도 쌓이는데 지우는 곳이 없어, 한 번 차면 진짜 결손 기록이 영원히 멈췄다.
+     * 아무도 다시 찾지 않고 운영자도 손대지 않은 한 번짜리 요청만 30일 뒤 지운다.
+     */
+    @Test void staleOneOffCatalogGapsAreDroppedButWorkedOnesStay() {
+        jdbc.execute("DELETE FROM catalog_candidate");
+        jdbc.update("""
+                INSERT INTO catalog_candidate(kind, query_text, status, requested_cnt, last_requested_at, note) VALUES
+                ('MOBILE_PLAN','stale-once','REQUESTED',1, now() - interval '31 days', NULL),
+                ('MOBILE_PLAN','recent-once','REQUESTED',1, now() - interval '3 days', NULL),
+                ('MOBILE_PLAN','stale-popular','REQUESTED',4, now() - interval '31 days', NULL),
+                ('MOBILE_PLAN','stale-noted','REQUESTED',1, now() - interval '31 days', '확인 중'),
+                ('MOBILE_PLAN','stale-verified','VERIFIED',1, now() - interval '31 days', NULL)""");
+
+        assertThat(retention.purge().get("catalog_candidate")).isEqualTo(1);
+        assertThat(jdbc.queryForList("SELECT query_text FROM catalog_candidate ORDER BY query_text", String.class))
+                .containsExactly("recent-once", "stale-noted", "stale-popular", "stale-verified");
+    }
+
     long oldPayment() {
         long user = jdbc.queryForObject("INSERT INTO app_user(email,password_hash) VALUES ('test@example.com','test') RETURNING id", Long.class);
         return jdbc.queryForObject("INSERT INTO payment_record(user_id,merchant_raw,amount,paid_at,source) VALUES (?,'MERCHANT',1000,CURRENT_DATE-interval '13 months','TEST') RETURNING id", Long.class, user);

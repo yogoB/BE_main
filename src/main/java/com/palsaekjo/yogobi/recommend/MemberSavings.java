@@ -23,13 +23,19 @@ public class MemberSavings {
         this.jdbc = jdbc;
     }
 
-    /** 집계용 부수 기록이라 실패해도 결과 응답을 막지 않는다 — 대신 침묵하지 않는다. */
-    public void record(long userId, long monthlySavings) {
+    /**
+     * 집계용 부수 기록이라 실패해도 결과 응답을 막지 않는다 — 대신 침묵하지 않는다.
+     *
+     * <p><b>저장해 둔 지금 요금제로 계산한 결과만 센다</b>(G-90 c). 요청의 지금 요금제는 아무 값이나 보낼 수 있어,
+     * 계정 몇 개가 가장 비싼 요금제를 "지금"이라 적어 랜딩의 공개 절감 숫자(최근 12건)를 통째로 정할 수 있었다.
+     */
+    public void record(long userId, long currentPlanId, long monthlySavings) {
         try {
             jdbc.update("""
-                    INSERT INTO member_savings(user_id, monthly_savings) VALUES (?, ?)
+                    INSERT INTO member_savings(user_id, monthly_savings)
+                    SELECT ?, ? WHERE EXISTS (SELECT 1 FROM app_user WHERE id = ? AND current_plan_id = ?)
                     ON CONFLICT (user_id) DO UPDATE SET monthly_savings = EXCLUDED.monthly_savings, seen_at = now()
-                    """, userId, monthlySavings);
+                    """, userId, monthlySavings, userId, currentPlanId);
         } catch (DataAccessException e) {
             log.warn("절감액 표본 기록 실패 user={}: {}", userId, e.getMessage());
         }

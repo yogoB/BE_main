@@ -54,7 +54,10 @@ public class MemberSavingsBackfill {
         List<Past> past = jdbc.query("""
                 SELECT DISTINCT ON (s.user_id) s.user_id, s.request::text, s.monthly_savings_vs_current, s.saved_at
                 FROM saved_result s
+                JOIN app_user u ON u.id = s.user_id
                 WHERE NOT EXISTS (SELECT 1 FROM member_savings m WHERE m.user_id = s.user_id)
+                  -- 저장해 둔 지금 요금제로 계산한 요청만(G-90 c). 아니면 살아 있는 기록이 거절한 표본을 기동마다 되살린다.
+                  AND s.request->'optional'->>'currentPlanId' = u.current_plan_id::text
                 ORDER BY s.user_id, s.saved_at DESC
                 """, (rs, i) -> new Past(rs.getLong(1), rs.getString(2), (Long) rs.getObject(3), rs.getTimestamp(4)));
 

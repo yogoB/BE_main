@@ -49,7 +49,8 @@ public class RecommendationController {
         if (!result.results().isEmpty())
             stats.record(result.results().get(0).planId(), request.required().monthlyDataGb());
         if (principal != null && result.current() != null)
-            memberSavings.record(Long.parseLong(principal.getName()), result.current().monthlySavings());
+            memberSavings.record(Long.parseLong(principal.getName()), result.current().cost().planId(),
+                    result.current().monthlySavings());
         return ApiResponse.ok(result);
     }
 

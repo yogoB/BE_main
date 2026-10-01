@@ -29,7 +29,12 @@ public class CatalogOperators {
 
     /** 백오피스 관리자 계정(D-32)은 목록에 없어도 운영자다 — 그 계정의 존재 이유가 운영이다. */
     public boolean contains(long userId) {
-        return userIds.contains(userId) || (admin.id() != 0 && admin.id() == userId);
+        return userIds.contains(userId) || isBackofficeAdmin(userId);
+    }
+
+    /** 백오피스 전체(회원·세션·파기·예약 작업)를 쓰는 사람. 목록의 회원은 카탈로그 일만 한다(G-90 b). */
+    public boolean isBackofficeAdmin(long userId) {
+        return admin.id() != 0 && admin.id() == userId;
     }
 
     /** 쉼표 구분 양의 정수만 받는다. 공백·빈 항목은 무시하고, 숫자가 아니면 설정 오류로 기동을 막는다. */

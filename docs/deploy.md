@@ -127,6 +127,24 @@ unset TOKEN
 - 포트는 붙이지 않는다. flycast 서비스가 80 → 8000 으로 넘긴다(`force_https = false` — 사설망엔 TLS 종단이 없다).
 - 순서가 중요하다: **AI 앱에 먼저** 넣는다. BE 가 먼저 주소를 알면 그동안 401 을 받아 설명이 빈다.
 - 두 앱의 `fly secrets list` 에서 `NARRATOR_INTERNAL_TOKEN` 의 DIGEST 가 같아야 한다. 다르면 값이 어긋난 것이다.
+
+#### 프론트 ↔ BE 공유 비밀 `EDGE_SHARED_SECRET` (G-90 a)
+
+BE 는 프론트 nginx 가 붙이는 `X-Edge-Auth` 가 이 값과 같을 때만 `X-Client-IP`(레이트 리밋 버킷 키)를 믿는다.
+BE 가 공개 주소로도 열려 있어, 없으면 직접 호출자가 `X-Client-IP` 를 지어내 공개 계산 한도를 우회한다.
+
+```bash
+EDGE="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
+fly secrets set EDGE_SHARED_SECRET="$EDGE" -a yogob --stage      # 프론트 먼저(다음 배포에 실린다)
+fly secrets set EDGE_SHARED_SECRET="$EDGE" -a yogob-api --stage
+unset EDGE
+# 그다음 프론트 → BE 순서로 배포한다.
+```
+
+- **순서: 프론트 먼저.** BE 가 먼저 값을 알면 그 사이 프론트 요청이 비밀 헤더 없이 와 모든 사용자가 nginx 주소 한 버킷으로 묶인다.
+- 프론트는 nginx 공식 이미지의 템플릿 치환으로 값을 넣는다(`/etc/nginx/templates/default.conf.template`).
+- BE 는 값이 비어 있으면 예전처럼 믿고 기동마다 경고를 남긴다. 32자 미만이면 기동하지 않는다.
+- 두 앱의 `fly secrets list` 에서 DIGEST 가 같아야 한다.
 - **`ANTHROPIC_API_KEY` 는 넣지 않아도 된다.** 설명 문장과 추천 사유는 결정론적 경로로 나온다(D-38·D-40).
   모델 키는 운영자 경로(`/catalog/candidates`·카탈로그 추출 배치)에만 필요하다.
 
