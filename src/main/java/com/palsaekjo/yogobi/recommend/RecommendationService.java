@@ -163,9 +163,10 @@ public class RecommendationService {
         // 그대로 둔다. 금액에서 빠지는 것은 할인액뿐이고, hasFamilyBundle 은 accuracy 판정에 쓰인다.
         var ctxWithoutBundle = new PricingContext(contractType, hasFamilyBundle, null, 0, bundles);
         // 같은 계산 결과로 정렬한다. 상위 N개가 응답이고, 같은 목록에서 '변경 최소'도 고른다(G-41).
+        Set<String> mno = catalog.mnoCarriers();
         var ranked = candidates.stream()
                 .map(c -> Map.entry(c, calculator.calculate(c.plan(), wanted,
-                        sameCarrier(c.carrier(), currentCarrier) ? ctx : ctxWithoutBundle)))
+                        forCarrier(sameCarrier(c.carrier(), currentCarrier) ? ctx : ctxWithoutBundle, c.carrier(), mno))))
                 // 동률은 요금제 id 로 가른다 — 행 순서에 맡기면 /narrate 가 다른 1순위를 설명할 수 있다(G-73 f).
                 .sorted(Comparator.<Map.Entry<CandidatePlan, CostBreakdown>>comparingLong(e -> e.getValue().effectiveMonthlyCost())
                         .thenComparingLong(e -> e.getKey().plan().id()))
@@ -190,7 +191,7 @@ public class RecommendationService {
         // 현재 요금제는 지금 통신사의 요금제다 — 결합 할인이 붙어 있는 쪽이라 ctx 를 그대로 쓴다(G-30 f).
         // 후보에서 빠졌다면 그 이유도 같이 싣는다(D-61) — '변경 최소'가 지금보다 비싸거나 null 인 이유다(G-51).
         var current = currentPlan
-                .map(p -> currentCost(toResult(p, calculator.calculate(p.plan(), wanted, ctx)), results,
+                .map(p -> currentCost(toResult(p, calculator.calculate(p.plan(), wanted, forCarrier(ctx, p.carrier(), mno))), results,
                         catalog.currentPlanExclusion(p.plan().id(), dataMb, networkType).orElse(null)))
                 .orElse(null);
 
@@ -198,6 +199,7 @@ public class RecommendationService {
         List<MissingInput> missing = new ArrayList<>();
         addPromotionPeriodNotice(missing, results);
         addFamilyBundleCarrierNotice(missing, familyDiscount, currentCarrier, results);
+        addSelectiveContractNotice(missing, contractType, results, mno);
         addLessDataThanNowNotice(missing, current, currentPlan, required.monthlyDataGb());
         addNetworkNarrowingNotice(missing, dataMb, networkType);
         addConditionalDiscountNotice(missing, dataMb, networkType);
@@ -336,9 +338,10 @@ public class RecommendationService {
         // 고른 요금제가 지금 통신사가 아니면 결합은 풀린다 — 추천 경로와 같은 규칙이다(G-29).
         String currentCarrier = currentCarrier(optional, findCurrentPlan(optional));
         Long familyDiscount = familyBundleDiscount(optional);
-        var ctx = new PricingContext(parseContract(optional),
+        Set<String> mno = catalog.mnoCarriers();
+        var ctx = forCarrier(new PricingContext(parseContract(optional),
                 optional == null ? null : optional.hasFamilyBundle(),
-                sameCarrier(candidate.carrier(), currentCarrier) ? familyDiscount : null, 0, bundles);
+                sameCarrier(candidate.carrier(), currentCarrier) ? familyDiscount : null, 0, bundles), candidate.carrier(), mno);
         CostResult result = toResult(candidate, calculator.calculate(candidate.plan(), wanted, ctx))
                 .withPriceCrossCheck(crossCheck.check(candidate));
 
@@ -347,6 +350,7 @@ public class RecommendationService {
         // 결합 할인이 빠졌으면 말한다 — 추천 경로와 같은 안내·순서(사실 먼저)다. 전엔 조용히 빠지고 FULL 이었다(G-86 c).
         List<MissingInput> missing = new ArrayList<>();
         addFamilyBundleCarrierNotice(missing, familyDiscount, currentCarrier, List.of(result));
+        addSelectiveContractNotice(missing, parseContract(optional), List.of(result), mno);
         missing.addAll(missingInputs(optional, currentCarrier, familyDiscount, List.of(), foreignPriced));
         Accuracy accuracy = missing.isEmpty() ? Accuracy.FULL : Accuracy.PARTIAL;
         return new CalculatorResponse(accuracy, missing, result);
@@ -502,6 +506,25 @@ public class RecommendationService {
      * <p>이 안내가 없으면 사용자는 결과 표의 "가족결합 할인 −11,000원"이 모든 후보에 붙어 있다고
      * 읽는다. 실제로는 지금 통신사 요금제에만 붙어 있고, 1등이 다른 통신사면 그 금액은 사라진다.
      */
+    /**
+     * 선택약정(요금할인 25%)은 이동통신 3사 제도다. 알뜰폰 후보엔 빼고 계산한다(G-92) — 붙이면 알뜰폰이 실제보다 싸 보여
+     * 1순위를 차지했다(운영 2026-10-01: KCT −2,248원).
+     */
+    private static PricingContext forCarrier(PricingContext ctx, String carrier, Set<String> mno) {
+        if (ctx.contractType() != ContractType.SELECTIVE_25 || mno.contains(carrier)) return ctx;
+        return new PricingContext(ContractType.NONE, ctx.hasFamilyBundle(), ctx.familyBundleDiscountKrw(),
+                ctx.planContractDiscount(), ctx.availableBundles());
+    }
+
+    /** 선택약정을 받는다고 했는데 결과에 알뜰폰이 있으면, 그 할인이 거기엔 없다는 사실을 먼저 말한다(G-92 b). */
+    private static void addSelectiveContractNotice(List<MissingInput> missing, ContractType contractType,
+            List<CostResult> results, Set<String> mno) {
+        if (contractType != ContractType.SELECTIVE_25 || results.stream().allMatch(r -> mno.contains(r.carrier()))) return;
+        missing.add(new MissingInput("contractType",
+                "선택약정(요금할인 25%)은 SKT·KT·LG U+ 요금제에만 반영했어요",
+                "알뜰폰으로 옮기면 그 할인은 없어요 — 알뜰폰 금액은 할인 없이 계산했어요"));
+    }
+
     private static void addFamilyBundleCarrierNotice(List<MissingInput> missing, Long familyDiscount,
             String currentCarrier, List<CostResult> results) {
         if (familyDiscount == null) {

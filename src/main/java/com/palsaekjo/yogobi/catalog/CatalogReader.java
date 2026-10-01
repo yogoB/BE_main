@@ -385,6 +385,12 @@ public class CatalogReader {
                 new MapSqlParameterSource("id", planId), (rs, i) -> rs.getLong("data_mb")).stream().findFirst();
     }
 
+    /** 이동통신 3사(carrier_type = MNO) 이름. 선택약정(요금할인 25%)은 이 통신사 요금제에만 있다(G-92). */
+    public Set<String> mnoCarriers() {
+        return Set.copyOf(jdbc.getJdbcTemplate().queryForList(
+                "SELECT name FROM carrier WHERE carrier_type = 'MNO'", String.class));
+    }
+
     public java.util.Optional<CandidatePlan> findPlanById(long planId) {
         var plans = jdbc.query("""
                 SELECT p.id, p.name, p.base_price, p.contract_discount_12m, p.contract_discount_24m,

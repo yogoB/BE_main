@@ -113,4 +113,17 @@ class CalculatorApiTest {
                 .andExpect(jsonPath("$.data.missingInputs[?(@.field=='familyBundleDiscountKrw')].impact")
                         .value(org.hamcrest.Matchers.hasItem(org.hamcrest.Matchers.containsString("KT 요금제에만 반영했어요"))));
     }
+
+    /** G-92 c. 계산기도 알뜰폰 요금제에는 선택약정을 붙이지 않는다. */
+    @Test
+    void selectiveContractIsNotAppliedToMvnoPlans_g92c() throws Exception {
+        jdbc.execute("INSERT INTO carrier(id,name,carrier_type) VALUES (9,'알뜰모바일','MVNO')");
+        jdbc.execute("""
+                INSERT INTO mobile_plan(id,carrier_id,name,network_type,base_price,data_mb,voice_min,sms_cnt,source_url,collected_at)
+                VALUES (9,9,'알뜰5G','FIVE_G',20000,100000,999999,9999,'http://seed','2026-09-08')""");
+        mvc.perform(post("/api/v1/calculator").contentType(MediaType.APPLICATION_JSON).content("""
+                {"planId":9,"tierIds":[6],"optional":{"contractType":"SELECTIVE_25"}}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.result.monthlyTotal").value(20000 + 5500));
+    }
 }

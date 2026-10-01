@@ -105,6 +105,24 @@ class RecommendationApiTest {
                 .andExpect(jsonPath("$.data.length()").value(0));
     }
 
+    /** G-92 a·b. 선택약정은 이동통신 3사 요금제에만. 알뜰폰 후보엔 그 줄이 없고, 결과에 알뜰폰이 있으면 그렇다고 말한다. */
+    @Test
+    void selectiveContractIsNotAppliedToMvnoPlans_g92() throws Exception {
+        jdbc.execute("INSERT INTO carrier(id,name,carrier_type) VALUES (3,'알뜰모바일','MVNO')");
+        jdbc.execute("""
+                INSERT INTO mobile_plan(id,carrier_id,name,network_type,base_price,data_mb,voice_min,sms_cnt,source_url,collected_at)
+                VALUES (4,3,'알뜰5G','FIVE_G',20000,100000,999999,9999,'http://seed','2026-09-08')""");
+        var body = mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
+                {"required":{"monthlyDataGb":20,"wantedServiceIds":[1]},"optional":{"contractType":"SELECTIVE_25","currentCarrier":"SKT"}}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.results[0].planName").value("알뜰5G"))
+                .andExpect(jsonPath("$.data.results[0].monthlyTotal").value(20000 + 13500))
+                .andExpect(jsonPath("$.data.results[0].breakdown[?(@.label=='%s')]", "선택약정 25% 할인").isEmpty())
+                .andExpect(jsonPath("$.data.results[?(@.planName=='넷플플랜')].monthlyTotal").value(org.hamcrest.Matchers.hasItem(41250)))
+                .andReturn().getResponse().getContentAsString();
+        assertThat(body).contains("선택약정(요금할인 25%)은 SKT·KT·LG U+ 요금제에만 반영했어요");
+    }
+
     @Test
     void wantingNetflix_netflixPlanWins() throws Exception {
         mvc.perform(post("/api/v1/recommendations").contentType(MediaType.APPLICATION_JSON).content("""
