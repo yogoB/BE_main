@@ -58,4 +58,32 @@ class RequestBodyLimitTest {
 
         assertThat(new String(seen.get().getInputStream().readAllBytes())).isEqualTo("{\"a\":1}");
     }
+
+    /** G-91. 길이를 밝히지 않은 큰 본문도 400("읽지 못했어요")이 아니라 413 이다. */
+    @Test
+    void anUndeclaredOversizedBodyIsAlso413() {
+        var handler = new GlobalExceptionHandler();
+        var unreadable = new org.springframework.http.converter.HttpMessageNotReadableException("x",
+                new RequestBodyLimit.TooLarge(), new org.springframework.mock.http.MockHttpInputMessage(new byte[0]));
+
+        var response = handler.handleUnreadable(unreadable);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(413);
+    }
+
+    /** 리더는 한 요청에 하나다. 알 수 없는 문자셋은 500 이 아니라 읽을 수 없는 요청이다. */
+    @Test
+    void theReaderIsReusedAndAnUnknownCharsetIsAnIoError() throws Exception {
+        var request = new MockHttpServletRequest("POST", "/x");
+        request.setContent("abc".getBytes());
+        var seen = new AtomicReference<HttpServletRequest>();
+        filter.doFilter(request, new MockHttpServletResponse(), (req, res) -> seen.set((HttpServletRequest) req));
+        assertThat(seen.get().getReader()).isSameAs(seen.get().getReader());
+
+        var odd = new MockHttpServletRequest("POST", "/x");
+        odd.setCharacterEncoding("no-such-charset");
+        odd.setContent("abc".getBytes());
+        filter.doFilter(odd, new MockHttpServletResponse(), (req, res) -> seen.set((HttpServletRequest) req));
+        assertThatThrownBy(() -> seen.get().getReader()).isInstanceOf(IOException.class);
+    }
 }

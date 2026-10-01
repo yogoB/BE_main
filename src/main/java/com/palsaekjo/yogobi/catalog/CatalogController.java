@@ -51,14 +51,27 @@ public class CatalogController {
     @GetMapping("/services")
     public ResponseEntity<ApiResponse<List<ServiceView>>> services() {
         var current = services;
-        if (current == null || !current.fresh(memo)) services = current = new Memo<>(reader.listServices(), java.time.Instant.now());
+        if (current == null || !current.fresh(memo)) {
+            // 만료 순간 몰린 요청이 다 같이 DB 를 읽지 않게 한 번에 하나만 갱신한다(풀이 5개다, G-91).
+            synchronized (this) {
+                current = services;
+                if (current == null || !current.fresh(memo))
+                    services = current = new Memo<>(reader.listServices(), java.time.Instant.now());
+            }
+        }
         return ResponseEntity.ok().cacheControl(CACHE).body(ApiResponse.ok(current.value()));
     }
 
     @GetMapping("/plans")
     public ResponseEntity<ApiResponse<List<PlanView>>> plans() {
         var current = plans;
-        if (current == null || !current.fresh(memo)) plans = current = new Memo<>(reader.listPlans(), java.time.Instant.now());
+        if (current == null || !current.fresh(memo)) {
+            synchronized (this) {
+                current = plans;
+                if (current == null || !current.fresh(memo))
+                    plans = current = new Memo<>(reader.listPlans(), java.time.Instant.now());
+            }
+        }
         return ResponseEntity.ok().cacheControl(CACHE).body(ApiResponse.ok(current.value()));
     }
 

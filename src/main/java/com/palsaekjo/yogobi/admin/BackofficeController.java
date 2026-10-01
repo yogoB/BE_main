@@ -73,9 +73,12 @@ public class BackofficeController {
 
     /** 로그인한 계정이 관리자인지. 화면이 진입 시 확인한다(회원 쿠키로는 false). */
     @GetMapping("/session")
-    public ApiResponse<Map<String, Object>> session(Principal principal) {
+    public ApiResponse<Map<String, Object>> session(org.springframework.security.core.Authentication principal) {
         long id = Long.parseLong(principal.getName());
-        return ApiResponse.ok(Map.of("userId", id, "admin", true, "loginId", metrics.loginId(id)));
+        // 카탈로그 운영자(ROLE_CATALOG)도 여기까지 온다(G-90 b). 화면이 보여 줄 카드를 고를 수 있게 역할을 같이 준다.
+        String role = principal.getAuthorities().stream().anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()))
+                ? "ADMIN" : "CATALOG";
+        return ApiResponse.ok(Map.of("userId", id, "admin", true, "role", role, "loginId", metrics.loginId(id)));
     }
 
     /** ① 사용 지표 대시보드. */

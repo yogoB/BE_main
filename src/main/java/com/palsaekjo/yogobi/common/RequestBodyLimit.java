@@ -26,6 +26,14 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class RequestBodyLimit extends OncePerRequestFilter {
     static final int MAX_BYTES = (int) JsonLimits.MAX_DOCUMENT_CHARS;
+    static final String TOO_LARGE_MESSAGE = "보내는 내용이 너무 커요. 나눠서 다시 보내 주세요.";
+
+    /** 읽는 도중 상한을 넘었다. 처리기가 이 원인을 보고 400 대신 413 으로 답한다. */
+    public static final class TooLarge extends IOException {
+        TooLarge() {
+            super("요청 본문이 상한을 넘었다");
+        }
+    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
@@ -34,7 +42,7 @@ public class RequestBodyLimit extends OncePerRequestFilter {
             response.setStatus(413);
             response.setContentType("application/json;charset=UTF-8");
             response.getWriter().write(
-                    "{\"error\":{\"code\":\"YGB-REQ-001\",\"message\":\"보내는 내용이 너무 커요. 나눠서 다시 보내 주세요.\",\"field\":null}}");
+                    "{\"error\":{\"code\":\"YGB-REQ-001\",\"message\":\"" + TOO_LARGE_MESSAGE + "\",\"field\":null}}");
             return;
         }
         chain.doFilter(new Limited(request), response);
@@ -42,6 +50,7 @@ public class RequestBodyLimit extends OncePerRequestFilter {
 
     private static final class Limited extends HttpServletRequestWrapper {
         private ServletInputStream stream;
+        private BufferedReader reader;
 
         Limited(HttpServletRequest request) {
             super(request);
@@ -55,9 +64,18 @@ public class RequestBodyLimit extends OncePerRequestFilter {
 
         @Override
         public BufferedReader getReader() throws IOException {
-            String encoding = getCharacterEncoding();
-            Charset charset = encoding == null ? StandardCharsets.UTF_8 : Charset.forName(encoding);
-            return new BufferedReader(new InputStreamReader(getInputStream(), charset));
+            // 한 요청에 리더는 하나다 — 매번 새로 만들면 앞 리더가 버퍼에 담아 둔 내용이 사라진다.
+            if (reader == null) {
+                String encoding = getCharacterEncoding();
+                Charset charset;
+                try {
+                    charset = encoding == null ? StandardCharsets.UTF_8 : Charset.forName(encoding);
+                } catch (IllegalArgumentException e) {   // 모르는 문자셋은 500 이 아니라 읽을 수 없는 요청이다
+                    throw new java.io.UnsupportedEncodingException(encoding);
+                }
+                reader = new BufferedReader(new InputStreamReader(getInputStream(), charset));
+            }
+            return reader;
         }
     }
 
@@ -70,7 +88,7 @@ public class RequestBodyLimit extends OncePerRequestFilter {
         }
 
         private int count(int n) throws IOException {
-            if (n > 0 && (read += n) > MAX_BYTES) throw new IOException("요청 본문이 상한을 넘었다");
+            if (n > 0 && (read += n) > MAX_BYTES) throw new TooLarge();
             return n;
         }
 

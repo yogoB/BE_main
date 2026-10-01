@@ -96,6 +96,7 @@ class BackofficeApiTest {
         mvc.perform(get("/api/v1/admin/session").cookie(admin))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.admin").value(true))
+                .andExpect(jsonPath("$.data.role").value("ADMIN"))
                 .andExpect(jsonPath("$.data.loginId").value("yogogo"));
         mvc.perform(get("/api/v1/admin/dashboard").cookie(admin))
                 .andExpect(status().isOk())

@@ -136,7 +136,8 @@ class CatalogAdminApiTest {
         Cookie[] operator = login(OPERATOR);
         mvc.perform(get("/api/v1/admin/catalog/requests").cookie(operator)).andExpect(status().isOk());
         mvc.perform(get("/api/v1/admin/gaps").cookie(operator)).andExpect(status().isOk());
-        mvc.perform(get("/api/v1/admin/session").cookie(operator)).andExpect(status().isOk());
+        mvc.perform(get("/api/v1/admin/session").cookie(operator)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.role").value("CATALOG"));
         mvc.perform(get("/api/v1/admin/members").cookie(operator)).andExpect(status().isForbidden());
         mvc.perform(get("/api/v1/admin/dashboard").cookie(operator)).andExpect(status().isForbidden());
         send(post("/api/v1/admin/retention/purge"), operator).andExpect(status().isForbidden());

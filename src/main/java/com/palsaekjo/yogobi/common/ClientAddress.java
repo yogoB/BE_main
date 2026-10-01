@@ -29,7 +29,24 @@ public final class ClientAddress {
     }
 
     public static String of(HttpServletRequest req) {
-        return forwarded(req) ? req.getHeader("X-Client-IP").strip() : req.getRemoteAddr();
+        return bucket(forwarded(req) ? req.getHeader("X-Client-IP").strip() : req.getRemoteAddr());
+    }
+
+    /**
+     * IPv6 는 /64 단위로 센다(G-90 a′). 사용자는 보통 /64 하나를 통째로 받아, 주소 하나를 버킷으로 쓰면 요청마다
+     * 주소를 바꿔 새 한도를 받을 수 있었다. 숫자 주소가 아니면(이상한 헤더 값) 그대로 둔다 — DNS 조회를 하지 않는다.
+     */
+    static String bucket(String address) {
+        // 숫자 IPv6 표기만 다룬다. 이 검사가 있어야 getByName 이 DNS 를 조회하지 않는다.
+        if (address == null || address.indexOf(':') < 0 || !address.matches("[0-9A-Fa-f:.]{2,45}")) return address;
+        try {
+            byte[] bytes = java.net.InetAddress.getByName(address).getAddress();
+            if (bytes.length != 16) return address;
+            java.util.Arrays.fill(bytes, 8, 16, (byte) 0);
+            return java.net.InetAddress.getByAddress(bytes).getHostAddress() + "/64";
+        } catch (java.net.UnknownHostException e) {
+            return address;
+        }
     }
 
     /** 믿을 수 있는 {@code X-Client-IP} 가 왔는지 — 레이트 리밋 로그용. */

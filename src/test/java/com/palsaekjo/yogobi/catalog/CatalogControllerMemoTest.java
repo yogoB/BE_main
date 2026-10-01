@@ -38,4 +38,21 @@ class CatalogControllerMemoTest {
 
         verify(reader, times(2)).listPlans();
     }
+
+    /** G-91. 만료 순간 동시에 몰린 요청도 DB 는 한 번만 읽는다. */
+    @Test
+    void concurrentMissesReadTheCatalogOnce() throws Exception {
+        var reader = mock(CatalogReader.class);
+        when(reader.listPlans()).thenAnswer(i -> { Thread.sleep(50); return List.of(); });
+        var controller = new CatalogController(reader, 60);
+        var start = new java.util.concurrent.CountDownLatch(1);
+        var pool = java.util.concurrent.Executors.newFixedThreadPool(8);
+        var calls = new java.util.ArrayList<java.util.concurrent.Future<?>>();
+        for (int i = 0; i < 8; i++) calls.add(pool.submit(() -> { start.await(); return controller.plans(); }));
+        start.countDown();
+        for (var call : calls) call.get();
+        pool.shutdown();
+
+        verify(reader, times(1)).listPlans();
+    }
 }

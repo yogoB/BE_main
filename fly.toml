@@ -25,7 +25,7 @@ primary_region = "nrt"
   #  09:00 KST 일일 수집(backoffice.md)도 잠든 머신에서는 발화하지 않는다. 같은 한 줄이 고친다.
   min_machines_running = 1
 
-  # 헬스체크: 액추에이터가 없으므로 항상 200 을 주는 카탈로그 엔드포인트로 확인한다(DB 연결까지 검증됨).
+  # 헬스체크: 항상 200 을 주는 카탈로그 엔드포인트로 확인한다. 목록은 60초 기억하므로(G-89 f) DB 연결은 60초에 한 번만 검증된다.
   # Spring Boot 콜드 스타트가 있으므로 grace_period 를 넉넉히 준다.
   [[http_service.checks]]
     grace_period = "60s"

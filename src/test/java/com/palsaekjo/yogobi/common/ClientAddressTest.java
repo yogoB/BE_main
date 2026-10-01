@@ -43,6 +43,24 @@ class ClientAddressTest {
         assertThat(ClientAddress.forwarded(fromEdge)).isTrue();
     }
 
+    /**
+     * G-90 a′. IPv6 사용자는 보통 /64 하나를 통째로 받는다. 주소 하나하나를 버킷으로 쓰면 요청마다 주소를 바꿔
+     * 새 한도를 받을 수 있었다 — 같은 /64 는 한 버킷이다. IPv4 는 그대로다.
+     */
+    @Test
+    void ipv6AddressesShareTheirSlash64Bucket() {
+        var a = new MockHttpServletRequest();
+        a.setRemoteAddr("2001:db8:1:2:aaaa:bbbb:cccc:dddd");
+        var b = new MockHttpServletRequest();
+        b.setRemoteAddr("2001:db8:1:2::9");
+        var other = new MockHttpServletRequest();
+        other.setRemoteAddr("2001:db8:1:3::9");
+
+        assertThat(ClientAddress.of(a)).isEqualTo(ClientAddress.of(b));
+        assertThat(ClientAddress.of(a)).isNotEqualTo(ClientAddress.of(other));
+        assertThat(ClientAddress.of(request(null, null))).isEqualTo("203.0.113.9");
+    }
+
     @Test
     void withoutAConfiguredSecretTheOldBehaviourStays() {
         // 배포 순서상 잠깐 비어 있을 수 있다 — 그 사이 프론트 사용자 전원이 한 버킷으로 묶이지 않게 한다(기동 시 경고).

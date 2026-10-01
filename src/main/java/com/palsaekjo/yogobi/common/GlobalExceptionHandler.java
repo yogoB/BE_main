@@ -20,6 +20,11 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ErrorResponse> handleUnreadable(HttpMessageNotReadableException e) {
+        // 길이를 밝히지 않은 본문이 상한을 넘으면 읽는 도중 끊긴다 — 밝힌 본문과 같은 413 으로 답한다(G-91).
+        for (Throwable cause = e; cause != null; cause = cause.getCause())
+            if (cause instanceof RequestBodyLimit.TooLarge)
+                return ResponseEntity.status(413).body(new ErrorResponse(
+                        new ErrorResponse.Body("YGB-REQ-001", RequestBodyLimit.TOO_LARGE_MESSAGE, null)));
         return ResponseEntity.status(400)
                 .body(new ErrorResponse(new ErrorResponse.Body("YGB-REQ-001", RETRY, null)));
     }
